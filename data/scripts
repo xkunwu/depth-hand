@@ -1,0 +1,2 @@
+# convert sequence of images into gif for previewing
+find . -type d -maxdepth 1 -exec echo {} \; -exec convert -resize 320x240 -loop 0 -delay 10 {}/images/*.png {}/{}.gif \;
