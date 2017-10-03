@@ -48,8 +48,8 @@ class args_holder:
             '--max_epoch', type=int, default=250,
             help='Epoch to run [default: 250]')
         self.parser.add_argument(
-            '--batch_size', type=int, default=16,
-            help='Batch Size during training [default: 16]')
+            '--batch_size', type=int, default=64,
+            help='Batch Size during training [default: 64]')
         self.parser.add_argument(
             '--learning_rate', type=float, default=0.001,
             help='Initial learning rate [default: 0.001]')

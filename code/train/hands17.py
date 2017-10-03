@@ -1,4 +1,5 @@
 import os
+import shutil
 import sys
 import numpy as np
 import matplotlib.pyplot as mpplot
@@ -119,9 +120,9 @@ class hands17:
 
         portion = int(hands17.num_training / hands17.tt_split)
         hands17.range_train[0] = int(0)
-        hands17.range_train[1] = int(portion * 7 + 1)
+        hands17.range_train[1] = int(portion * 7)
         hands17.range_test[0] = hands17.range_train[1]
-        hands17.range_test[1] = hands17.num_training + 1
+        hands17.range_test[1] = hands17.num_training
         print('splitted data: {} training, {} test.'.format(
             hands17.range_train, hands17.range_test))
 
@@ -130,25 +131,39 @@ class hands17:
         print('using shuffled data: {}'.format(
             hands17.training_annot_shuffled))
 
-        # if os.path.exists(hands17.training_annot_cropped):
-        #     os.remove(hands17.training_annot_cropped)
+        if rebuild and os.path.exists(hands17.training_annot_cropped):
+            os.remove(hands17.training_annot_cropped)
         if (not os.path.exists(hands17.training_annot_cropped) or
-                not os.path.exists(hands17.training_cropped) or rebuild):
+                not os.path.exists(hands17.training_cropped)):
             hands17.crop_resize_training_images()
             # hands17.crop_resize_training_images_mt()
         print('using cropped and resized images: {}'.format(
             hands17.training_cropped))
 
-        # if (not os.path.exists(hands17.evaluate_annot_cropped) or
-        #         not os.path.exists(hands17.evaluate_cropped) or rebuild):
-        #     hands17.split_evaluation_images()
-        # print('images for evaluation are: {}'.format(
-        #     hands17.evaluate_cropped))
+        if rebuild and os.path.exists(hands17.evaluate_annot_cropped):
+            os.remove(hands17.evaluate_annot_cropped)
+        if (not os.path.exists(hands17.evaluate_annot_cropped) or
+                not os.path.exists(hands17.evaluate_cropped)):
+            hands17.split_evaluation_images()
+        print('images for evaluation are: {}'.format(
+            hands17.evaluate_cropped))
 
     @staticmethod
     def split_evaluation_images():
         if not os.path.exists(hands17.evaluate_cropped):
             os.makedirs(hands17.evaluate_cropped)
+        with open(hands17.training_annot_cropped, 'r') as f:
+            lines = [x.strip() for x in f.readlines()]
+        with open(hands17.training_annot_cropped, 'w') as f:
+            for line in lines[hands17.range_train[0]:hands17.range_train[1]]:
+                f.write(line + '\n')
+        with open(hands17.evaluate_annot_cropped, 'w') as f:
+            for line in lines[hands17.range_test[0]:hands17.range_test[1]]:
+                name = re.search(r'(image_D\d+\.png)', line).group(1)
+                shutil.move(
+                    os.path.join(hands17.training_cropped, name),
+                    os.path.join(hands17.evaluate_cropped, name))
+                f.write(line + '\n')
 
     @staticmethod
     def get2d(points3):
@@ -491,14 +506,14 @@ def test(args):
     #     10
     # )
     # hands17.draw_bbox_random()
-    hands17.draw_pose2_random(
-        hands17.training_images,
-        hands17.training_annot
-    )
-    hands17.draw_pose2_random(
-        hands17.training_cropped,
-        hands17.training_annot_cropped
-    )
+    # hands17.draw_pose2_random(
+    #     hands17.training_images,
+    #     hands17.training_annot
+    # )
+    # hands17.draw_pose2_random(
+    #     hands17.training_cropped,
+    #     hands17.training_annot_cropped
+    # )
 
 
 if __name__ == '__main__':

@@ -36,6 +36,8 @@ class base_regre():
         consoleHandler.setFormatter(logFormatter)
         self.logger.addHandler(consoleHandler)
 
+        hands17.pre_provide(self.args.data_dir)
+
     def get_learning_rate(self, batch):
         learning_rate = tf.train.exponential_decay(
             self.args.learning_rate,
@@ -184,7 +186,7 @@ class base_regre():
                 self.eval_one_epoch(sess, ops, test_writer)
 
                 # Save the variables to disk.
-                if epoch.format10 == 0:
+                if epoch % 10 == 0:
                     save_path = saver.save(
                         sess, os.path.join(self.args.log_dir, "model.ckpt"))
                     self.logger.info("Model saved in file: %s".format(save_path))
@@ -193,7 +195,6 @@ class base_regre():
         """ ops: dict mapping from string to tf ops """
         is_training = True
 
-        hands17.pre_provide(self.args.data_dir)
         with open(hands17.training_annot_cropped, 'r') as fanno:
             loss_sum = 0
             batch_count = 0
@@ -230,33 +231,39 @@ class base_regre():
     def eval_one_epoch(self, sess, ops, test_writer):
         """ ops: dict mapping from string to tf ops """
         is_training = False
-        loss_sum = 0
 
-        for fn in range(len(TEST_FILES)):
-            self.logger.info('----' + str(fn) + '-----')
-            current_data, current_label = provider.loadDataFile(TEST_FILES[fn])
-            current_data = current_data[:, 0:NUM_POINT, :]
-            current_label = np.squeeze(current_label)
-
-            file_size = current_data.shape[0]
-            num_batches = file_size // self.args.batch_size
-
-            for batch_idx in range(num_batches):
-                start_idx = batch_idx * self.args.batch_size
-                end_idx = (batch_idx + 1) * self.args.batch_size
-
+        with open(hands17.evaluate_annot_cropped, 'r') as fanno:
+            loss_sum = 0
+            batch_count = 0
+            while True:
+                batch_frame = np.empty(shape=(self.args.batch_size, 96, 96))
+                batch_label = np.empty(shape=(self.args.batch_size, 42))
+                for bi in range(self.args.batch_size):
+                    annot_line = fanno.readline()
+                    if not annot_line:
+                        bi = -1
+                        break
+                    img_name, pose2d = hands17.parse_line_pose(annot_line)
+                    img = hands17.read_image(os.path.join(
+                        hands17.evaluate_cropped, img_name))
+                    batch_frame[bi, :, :] = img
+                    batch_label[bi, :] = pose2d.flatten().T
                 feed_dict = {
-                    ops['batch_frame']: current_data[start_idx:end_idx, :, :],
-                    ops['pose_out']: current_label[start_idx:end_idx],
-                    ops['is_training']: is_training}
+                    ops['batch_frame']: batch_frame,
+                    ops['pose_out']: batch_label,
+                    ops['is_training']: is_training
+                }
                 summary, step, loss_val, pred_val = sess.run(
                     [ops['merged'], ops['step'],
                         ops['loss'], ops['pred']],
                     feed_dict=feed_dict)
+                test_writer.add_summary(summary, step)
                 pred_val = np.argmax(pred_val, 1)
-                loss_sum += (loss_val * self.args.batch_size)
-
-        self.logger.info('eval mean loss: {}'.format(loss_sum / float(total_seen)))
+                loss_sum += loss_val
+                batch_count += 1
+                self.logger.info('mean loss: {}'.format(loss_sum / batch_count))
+                if 0 > bi:
+                    break
 
 
 if __name__ == "__main__":
