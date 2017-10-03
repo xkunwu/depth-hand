@@ -3,7 +3,7 @@ import shutil
 import sys
 import numpy as np
 import matplotlib.pyplot as mpplot
-import matplotlib.image as mpimg
+# import matplotlib.image as mpimg
 import matplotlib.patches as mppatches
 import scipy.ndimage as spndim
 import scipy.misc as spmisc
@@ -18,6 +18,7 @@ from colour import Color
 import multiprocessing
 from multiprocessing.dummy import Pool as ThreadPool
 from multiprocessing import Manager as ThreadManager
+from timeit import default_timer as timer
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 BASE_DIR = os.path.join(BASE_DIR, '..')
 sys.path.append(BASE_DIR)
@@ -106,8 +107,10 @@ class hands17:
         cls.data_dir = data_dir
         cls.training_images = os.path.join(data_dir, 'training/images')
         cls.training_cropped = os.path.join(data_dir, 'training/cropped')
-        cls.training_annot = os.path.join(
+        cls.training_annot_origin = os.path.join(
             data_dir, 'training/Training_Annotation.txt')
+        cls.training_annot = os.path.join(
+            data_dir, 'training/annotation.txt')
         cls.training_annot_shuffled = os.path.join(
             data_dir, 'training/annotation_shuffled.txt')
         cls.training_annot_cropped = os.path.join(
@@ -118,9 +121,11 @@ class hands17:
         cls.evaluate_annot_cropped = os.path.join(
             data_dir, 'training/annotation_cropped_eval.txt')
 
+        hands17.remove_out_frame_annot()
+
         portion = int(hands17.num_training / hands17.tt_split)
         hands17.range_train[0] = int(0)
-        hands17.range_train[1] = int(portion * 7)
+        hands17.range_train[1] = int(portion * (hands17.tt_split - 1))
         hands17.range_test[0] = hands17.range_train[1]
         hands17.range_test[1] = hands17.num_training
         print('splitted data: {} training, {} test.'.format(
@@ -135,8 +140,12 @@ class hands17:
             os.remove(hands17.training_annot_cropped)
         if (not os.path.exists(hands17.training_annot_cropped) or
                 not os.path.exists(hands17.training_cropped)):
-            hands17.crop_resize_training_images()
-            # hands17.crop_resize_training_images_mt()
+            # time_s = timer()
+            # hands17.crop_resize_training_images()
+            # print('single tread time: {:.4f}'.format(timer() - time_s))
+            # time_s = timer()
+            hands17.crop_resize_training_images_mt()
+            # print('multiprocessing time: {:.4f}'.format(timer() - time_s))
         print('using cropped and resized images: {}'.format(
             hands17.training_cropped))
 
@@ -147,6 +156,21 @@ class hands17:
             hands17.split_evaluation_images()
         print('images for evaluation are: {}'.format(
             hands17.evaluate_cropped))
+
+    @staticmethod
+    def remove_out_frame_annot():
+        hands17.num_training = int(0)
+        with open(hands17.training_annot, 'w') as writer:
+            with open(hands17.training_annot_origin, 'r') as reader:
+                for annot_line in reader.readlines():
+                    _, pose3 = hands17.parse_line_pose(annot_line)
+                    pose2d = hands17.get2d(pose3)
+                    if 0 > np.min(pose2d):
+                        continue
+                    if 0 > np.min(hands17.image_size - pose2d):
+                        continue
+                    writer.write(annot_line)
+                    hands17.num_training += 1
 
     @staticmethod
     def split_evaluation_images():
@@ -200,9 +224,12 @@ class hands17:
         img_crop = img[
             int(np.floor(rect[0, 1])):int(np.ceil(rect[0, 1] + rect[1, 1])),
             int(np.floor(rect[0, 0])):int(np.ceil(rect[0, 0] + rect[1, 0]))
-        ]  # reverse (x, y) while cropping
+        ]
+        # try:
         img_crop_resize = spmisc.imresize(
             img_crop, (hands17.crop_size, hands17.crop_size), interp='bilinear')
+        # except:
+        #     print(np.hstack((pose3, pose2d)))
 
         # fig, ax = mpplot.subplots(nrows=1, ncols=2)
         # mpplot.subplot(1, 2, 1)
@@ -277,8 +304,8 @@ class hands17:
             for result in thread_pool.map(hands17.crop_resize_save, annot_list):
                 # (item, count) tuples from worker
                 writer.write(result)
-            thread_pool.close()
-            thread_pool.join()
+        thread_pool.close()
+        thread_pool.join()
 
     @staticmethod
     def get_rect(points2d, bm):

@@ -26,12 +26,11 @@ class base_regre():
         logFormatter = logging.Formatter(
             "%(asctime)s [%(levelname)-5.5s]  %(message)s")
         self.logger = logging.getLogger()
-
+        self.logger.setLevel(logging.INFO)
         fileHandler = logging.FileHandler(
             "{0}/{1}".format(args.log_dir, args.log_file))
         fileHandler.setFormatter(logFormatter)
         self.logger.addHandler(fileHandler)
-
         consoleHandler = logging.StreamHandler()
         consoleHandler.setFormatter(logFormatter)
         self.logger.addHandler(consoleHandler)
@@ -69,7 +68,7 @@ class base_regre():
         return batch_frame, pose_out
 
     @staticmethod
-    def get_model(batch_frame, is_training, bn_decay=None):
+    def get_model(batch_frame, pose_dim, is_training, bn_decay=None):
         """ Classification PointNet, input is BxHxW, output BxF """
         batch_size = batch_frame.get_shape()[0].value
         end_points = {}
@@ -110,13 +109,13 @@ class base_regre():
             net, keep_prob=0.5, is_training=is_training,
             scope='dp1')
         net = tf_util.fully_connected(
-            net, 42, activation_fn=None, scope='fc2')
+            net, pose_dim, activation_fn=None, scope='fc2')
 
         return net, end_points
 
     @staticmethod
-    def get_loss(pred, label, end_points):
-        regre_loss = tf.reduce_sum(tf.pow(tf.subtract(pred, label), 2)) / (2 * 42)
+    def get_loss(pred, anno, end_points):
+        regre_loss = tf.reduce_sum(tf.pow(tf.subtract(pred, anno), 2)) / (2 * anno.shape[1])
         tf.summary.scalar('regression loss', regre_loss)
         return regre_loss
 
@@ -124,7 +123,7 @@ class base_regre():
         with tf.Graph().as_default():
             with tf.device('/gpu:' + str(self.args.gpu_id)):
                 batch_frame, pose_out = self.placeholder_inputs(
-                    self.args.batch_size, self.args.img_size, 42)
+                    self.args.batch_size, self.args.img_size, self.args.pose_dim)
                 is_training = tf.placeholder(tf.bool, shape=())
 
                 # Note the global_step=batch parameter to minimize.
@@ -134,7 +133,7 @@ class base_regre():
 
                 # Get model and loss
                 pred, end_points = self.get_model(
-                    batch_frame, is_training, bn_decay=bn_decay)
+                    batch_frame, self.args.pose_dim, is_training, bn_decay=bn_decay)
                 loss = self.get_loss(pred, pose_out, end_points)
                 tf.summary.scalar('loss', loss)
 
@@ -199,8 +198,8 @@ class base_regre():
             loss_sum = 0
             batch_count = 0
             while True:
-                batch_frame = np.empty(shape=(self.args.batch_size, 96, 96))
-                batch_label = np.empty(shape=(self.args.batch_size, 42))
+                batch_frame = np.empty(shape=(self.args.batch_size, self.args.img_size, self.args.img_size))
+                batch_label = np.empty(shape=(self.args.batch_size, self.args.pose_dim))
                 for bi in range(self.args.batch_size):
                     annot_line = fanno.readline()
                     if not annot_line:
@@ -236,8 +235,8 @@ class base_regre():
             loss_sum = 0
             batch_count = 0
             while True:
-                batch_frame = np.empty(shape=(self.args.batch_size, 96, 96))
-                batch_label = np.empty(shape=(self.args.batch_size, 42))
+                batch_frame = np.empty(shape=(self.args.batch_size, self.args.img_size, self.args.img_size))
+                batch_label = np.empty(shape=(self.args.batch_size, self.args.pose_dim))
                 for bi in range(self.args.batch_size):
                     annot_line = fanno.readline()
                     if not annot_line:

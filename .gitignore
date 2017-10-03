@@ -8,4 +8,4 @@ CTestTestfile.cmake
 *.pyc
 .tags*
 .ipynb_checkpoints
-*.log*
+log/*
