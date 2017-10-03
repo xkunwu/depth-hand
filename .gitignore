@@ -7,3 +7,5 @@ install_manifest.txt
 CTestTestfile.cmake
 *.pyc
 .tags*
+.ipynb_checkpoints
+*.log*

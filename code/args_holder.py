@@ -1,6 +1,7 @@
 import argparse
 import os
-import sys
+from datetime import datetime
+import multiprocessing
 
 
 class args_holder:
@@ -9,22 +10,37 @@ class args_holder:
         self.parser = argparse.ArgumentParser()
 
         # directories
-        self.home_dir = os.path.expanduser('~')
+        home_dir = os.path.expanduser('~')
         self.parser.add_argument(
-            '--data_root', default=os.path.join(self.home_dir, '/data/hands17/'),
-            help='root dir of data set [default: hands17]')
+            '--data_root', default=os.path.join(home_dir, 'data'),
+            help='root dir of all data sets [default: data]')
+        self.parser.add_argument(
+            '--data_name', default='hands17',
+            help='name of data set and its dir [default: hands17]')
         self.parser.add_argument(
             '--log_dir', default='log',
             help='Log dir [default: log]')
+        self.parser.add_argument(
+            '--log_file', default='univue.log',
+            help='Log file name [default: univue.log]')
 
         # system parameters
         self.parser.add_argument(
             '--gpu_id', type=int, default=0,
             help='GPU to use [default: GPU 0]')
         self.parser.add_argument(
-            '--model', default='pointnet_cls', help='Model name: pointnet_cls or pointnet_cls_basic [default: pointnet_cls]')
+            '--model', default='base_regre',
+            help='Model name [default: base_regre]')
+
+        # input preprocessing
+        self.parser.add_argument(
+            '--img_size', type=int, default=96,
+            help='Resized input image size [default: 96]')
 
         # learning parameters
+        self.parser.add_argument(
+            '--feature_length', type=int, default=2048,
+            help='network output feature length [default: 2048]')
         self.parser.add_argument('--max_epoch', type=int, default=250, help='Epoch to run [default: 250]')
         self.parser.add_argument('--batch_size', type=int, default=32, help='Batch Size during training [default: 32]')
         self.parser.add_argument('--learning_rate', type=float, default=0.001, help='Initial learning rate [default: 0.001]')
@@ -35,3 +51,8 @@ class args_holder:
 
     def parse_args(self):
         self.args = self.parser.parse_args()
+        self.args.data_dir = os.path.join(self.args.data_root, self.args.data_name)
+        self.args.log_file = self.args.log_file + datetime.now().strftime('-%y-%m-%d-%H:%M:%S')
+        self.cpu_count = multiprocessing.cpu_count()
+        if not os.path.exists(self.args.log_dir):
+            os.makedirs(self.args.log_dir)
