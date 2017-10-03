@@ -1,9 +1,11 @@
 import os
 import sys
 import numpy as np
-import matplotlib.pyplot as plt
+import matplotlib.pyplot as mpplot
 import matplotlib.image as mpimg
-import matplotlib.patches as patches
+import matplotlib.patches as mppatches
+import scipy.ndimage as spndim
+import scipy.misc as spmisc
 import imageio
 import csv
 # import coder
@@ -12,7 +14,6 @@ from random import random
 import linecache
 import re
 from colour import Color
-import scipy.misc
 import multiprocessing
 from multiprocessing.dummy import Pool as ThreadPool
 from multiprocessing import Manager as ThreadManager
@@ -41,6 +42,7 @@ class hands17:
 
     # num_training = int(957032)
     num_training = int(992)
+    # num_training = int(96)
     tt_split = int(8)
     range_train = np.zeros(2, dtype=np.int)
     range_test = np.zeros(2, dtype=np.int)
@@ -132,8 +134,8 @@ class hands17:
         #     os.remove(hands17.training_annot_cropped)
         if (not os.path.exists(hands17.training_annot_cropped) or
                 not os.path.exists(hands17.training_cropped) or rebuild):
-            # hands17.crop_resize_training_images()
-            hands17.crop_resize_training_images_mt()
+            hands17.crop_resize_training_images()
+            # hands17.crop_resize_training_images_mt()
         print('using cropped and resized images: {}'.format(
             hands17.training_cropped))
 
@@ -184,16 +186,17 @@ class hands17:
             int(np.floor(rect[0, 1])):int(np.ceil(rect[0, 1] + rect[1, 1])),
             int(np.floor(rect[0, 0])):int(np.ceil(rect[0, 0] + rect[1, 0]))
         ]  # reverse (x, y) while cropping
-        img_crop_resize = scipy.misc.imresize(img_crop, rs, interp='bilinear')
+        img_crop_resize = spmisc.imresize(
+            img_crop, (hands17.crop_size, hands17.crop_size), interp='bilinear')
 
-        # fig, ax = plt.subplots(nrows=1, ncols=2)
-        # plt.subplot(1, 2, 1)
-        # plt.imshow(img, cmap='bone')
+        # fig, ax = mpplot.subplots(nrows=1, ncols=2)
+        # mpplot.subplot(1, 2, 1)
+        # mpplot.imshow(img, cmap='bone')
         # hands17.draw_pose3(img, pose3)
-        # plt.subplot(1, 2, 2)
-        # plt.imshow(img_crop_resize, cmap='bone')
+        # mpplot.subplot(1, 2, 2)
+        # mpplot.imshow(img_crop_resize, cmap='bone')
         # hands17.draw_pose2d(img_crop_resize, p2d_crop)
-        # plt.show()
+        # mpplot.show()
         return img_name, img_crop_resize, p2d_crop
 
     @staticmethod
@@ -296,7 +299,7 @@ class hands17:
         # bm = hands17.getbm(pose3[3, 2])
         bm = 0.25
         rect = hands17.get_rect(pose2d, bm)
-        plt.gca().add_patch(patches.Rectangle(
+        mpplot.gca().add_patch(mppatches.Rectangle(
             rect[0, :], rect[1, 0], rect[1, 1],
             linewidth=1, facecolor='none',
             edgecolor=hands17.bbox_color.rgb)
@@ -323,13 +326,13 @@ class hands17:
             color_range = [C.rgb for C in make_color_range(
                 color_v0, hands17.join_color[fii + 1], len(p2joints) + 1)]
             for jj, joint in enumerate(p2joints):
-                plt.plot(
+                mpplot.plot(
                     p2joints[jj, 0], p2joints[jj, 1],
                     'o',
                     color=color_range[jj + 1]
                 )
             p2joints = np.vstack((p2wrist, p2joints))
-            plt.plot(
+            mpplot.plot(
                 p2joints[:, 0], p2joints[:, 1],
                 '-',
                 linewidth=2.0,
@@ -339,15 +342,15 @@ class hands17:
             # verts = path.interpolated(steps=step).vertices
             # x, y = verts[:, 0], verts[:, 1]
             # z = np.linspace(0, 1, step)
-            # colorline(x, y, z, cmap=plt.get_cmap('jet'))
-        # plt.gcf().gca().add_artist(
-        #     plt.Circle(
+            # colorline(x, y, z, cmap=mpplot.get_cmap('jet'))
+        # mpplot.gcf().gca().add_artist(
+        #     mpplot.Circle(
         #         p2wrist[0, :],
         #         20,
         #         color=[i / 255 for i in hands17.join_color[0]]
         #     )
         # )
-        plt.plot(
+        mpplot.plot(
             p2wrist[0, 0], p2wrist[0, 1],
             'o',
             color=hands17.join_color[0].rgb
@@ -356,7 +359,7 @@ class hands17:
         #     for jj in range(4):
         #         p0 = pose2d[bone[jj][0], :]
         #         p2 = pose2d[bone[jj][1], :]
-        #         plt.plot(
+        #         mpplot.plot(
         #             (int(p0[0]), int(p0[1])), (int(p2[0]), int(p2[1])),
         #             color=[i / 255 for i in hands17.join_color[fii + 1]],
         #             linewidth=2.0
@@ -366,18 +369,20 @@ class hands17:
         #         #          (int(p2[0]), int(p2[1])),
         #         #          hands17.join_color[fii + 1], 1)
 
-        # return fig2data(plt.gcf(), show_axis=True)
-        return fig2data(plt.gcf())
+        # return fig2data(mpplot.gcf(), show_axis=True)
+        return fig2data(mpplot.gcf())
 
     @staticmethod
     def read_image(image_name):
-        img = mpimg.imread(image_name)
+        # img = mpimg.imread(image_name)
+        img = spndim.imread(image_name)
         # img = (img - img.min()) / (img.max() - img.min()) * 255
         return img
 
     @staticmethod
     def save_image(image_name, img):
-        mpimg.imsave(image_name, img)
+        # mpimg.imsave(image_name, img, cmap=mpplot.cm.gray)
+        spmisc.imsave(image_name, img)
 
     @staticmethod
     def parse_line_pose(annot_line):
@@ -412,18 +417,19 @@ class hands17:
         print('drawing pose: # {}'.format(img_id))
         # Notice that linecache counts from 1
         annot_line = linecache.getline(annot_txt, img_id)
-        # annot_line = linecache.getline(annot_txt, 652)
+        # annot_line = linecache.getline(annot_txt, 652)  # palm
+        # annot_line = linecache.getline(annot_txt, 465)  # the finger
         # print(annot_line)
 
         img_name, pose3 = hands17.parse_line_pose(annot_line)
         img = hands17.read_image(os.path.join(image_dir, img_name))
 
-        plt.imshow(img, cmap='bone')
+        mpplot.imshow(img, cmap='bone')
         if 3 == pose3.shape[1]:
             hands17.draw_pose3(img, pose3)
         else:
             hands17.draw_pose2d(img, pose3)
-        plt.show()
+        mpplot.show()
 
     @staticmethod
     def draw_pose2_stream(gif_file, max_draw=100):
@@ -438,11 +444,11 @@ class hands17:
                         # raise coder.break_with.Break
                     img_name, pose3 = hands17.parse_line_pose(annot_line)
                     img = hands17.read_image(os.path.join(hands17.training_images, img_name))
-                    plt.imshow(img, cmap='bone')
+                    mpplot.imshow(img, cmap='bone')
                     img_posed = hands17.draw_pose3(img, pose3)
-                    # plt.show()
+                    # mpplot.show()
                     gif_writer.append_data(img_posed)
-                    plt.gcf().clear()
+                    mpplot.gcf().clear()
 
     @staticmethod
     def parse_line_bbox(annot_line):
@@ -463,36 +469,36 @@ class hands17:
         # Notice that linecache counts from 1
         annot_line = linecache.getline(hands17.frame_bbox, img_id)
         # annot_line = linecache.getline(hands17.frame_bbox, 652)
-        # print(annot_line)
 
-        img_name, bbox = hands17.parse_line_bbox(annot_line, hands17.frame_images)
+        img_name, bbox = hands17.parse_line_bbox(annot_line)
         img = hands17.read_image(os.path.join(hands17.frame_images, img_name))
-        plt.imshow(img, cmap='bone')
+        mpplot.imshow(img, cmap='bone')
         # rect = bbox.astype(int)
         rect = bbox
-        plt.gca().add_patch(patches.Rectangle(
+        mpplot.gca().add_patch(mppatches.Rectangle(
             rect[0, :], rect[1, 0], rect[1, 1],
             linewidth=1, facecolor='none',
             edgecolor=hands17.bbox_color.rgb)
         )
-        plt.show()
+        mpplot.show()
 
 
 def test(args):
-    hands17.pre_provide(args.data_dir)
+    # hands17.pre_provide(args.data_dir)
+    hands17.pre_provide(args.data_dir, rebuild=True)
     # hands17.draw_pose2_stream(
     #     os.path.join(args.data_dir, 'training/pose.gif'),
     #     10
     # )
     # hands17.draw_bbox_random()
-    # hands17.draw_pose2_random(
-    #     hands17.training_images,
-    #     hands17.training_annot
-    # )
-    # hands17.draw_pose2_random(
-    #     hands17.training_cropped,
-    #     hands17.training_annot_cropped
-    # )
+    hands17.draw_pose2_random(
+        hands17.training_images,
+        hands17.training_annot
+    )
+    hands17.draw_pose2_random(
+        hands17.training_cropped,
+        hands17.training_annot_cropped
+    )
 
 
 if __name__ == '__main__':

@@ -4,7 +4,7 @@ import os
 import sys
 import numpy as np
 # from train_abc import train_abc
-import hands17
+from hands17 import hands17
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 BASE_DIR = os.path.join(BASE_DIR, '..')
 sys.path.append(BASE_DIR)
@@ -25,22 +25,22 @@ class base_regre():
         # add both console and file logging
         logFormatter = logging.Formatter(
             "%(asctime)s [%(levelname)-5.5s]  %(message)s")
-        logger = logging.getLogger()
+        self.logger = logging.getLogger()
 
         fileHandler = logging.FileHandler(
             "{0}/{1}".format(args.log_dir, args.log_file))
         fileHandler.setFormatter(logFormatter)
-        logger.addHandler(fileHandler)
+        self.logger.addHandler(fileHandler)
 
         consoleHandler = logging.StreamHandler()
         consoleHandler.setFormatter(logFormatter)
-        logger.addHandler(consoleHandler)
+        self.logger.addHandler(consoleHandler)
 
     def get_learning_rate(self, batch):
         learning_rate = tf.train.exponential_decay(
             self.args.learning_rate,
             batch * self.args.batch_size,
-            self.args.decay_steps,
+            self.args.decay_step,
             self.args.decay_rate,
             staircase=True
         )
@@ -51,13 +51,14 @@ class base_regre():
         bn_momentum = tf.train.exponential_decay(
             0.5,
             batch * self.args.batch_size,
-            float(self.args.decay_steps),
+            float(self.args.decay_step),
             self.args.decay_rate,
             staircase=True
         )
         bn_decay = tf.minimum(0.99, 1 - bn_momentum)
         return bn_decay
 
+    @staticmethod
     def placeholder_inputs(batch_size, img_size, num_out):
         batch_frame = tf.placeholder(
             tf.float32, shape=(batch_size, img_size, img_size))
@@ -65,10 +66,10 @@ class base_regre():
             tf.float32, shape=(batch_size, num_out))
         return batch_frame, pose_out
 
+    @staticmethod
     def get_model(batch_frame, is_training, bn_decay=None):
         """ Classification PointNet, input is BxHxW, output BxF """
         batch_size = batch_frame.get_shape()[0].value
-        img_size = batch_frame.get_shape()[1].value
         end_points = {}
         input_image = tf.expand_dims(batch_frame, -1)
 
@@ -79,54 +80,41 @@ class base_regre():
             bn=True, is_training=is_training,
             scope='conv1', bn_decay=bn_decay)
         net = tf_util.max_pool2d(
-            net, [img_size, 1],
+            net, [1, 1],
             padding='VALID', scope='maxpool1')
         net = tf_util.conv2d(
             net, 256, [3, 3],
             padding='VALID', stride=[1, 1],
             bn=True, is_training=is_training,
-            scope='conv3', bn_decay=bn_decay)
-        net = tf_util.conv2d(
-            net, 256, [1, 1],
-            padding='VALID', stride=[1, 1],
-            bn=True, is_training=is_training,
-            scope='conv4', bn_decay=bn_decay)
+            scope='conv2', bn_decay=bn_decay)
         net = tf_util.max_pool2d(
-            net, [img_size, 1],
+            net, [1, 1],
             padding='VALID', scope='maxpool2')
         net = tf_util.conv2d(
             net, 1024, [3, 3],
             padding='VALID', stride=[1, 1],
             bn=True, is_training=is_training,
-            scope='conv5', bn_decay=bn_decay)
-        net = tf_util.conv2d(
-            net, 1024, [1, 1],
-            padding='VALID', stride=[1, 1],
-            bn=True, is_training=is_training,
-            scope='conv6', bn_decay=bn_decay)
+            scope='conv3', bn_decay=bn_decay)
         net = tf_util.max_pool2d(
-            net, [img_size, 1],
+            net, [1, 1],
             padding='VALID', scope='maxpool3')
 
         # MLP on global point cloud vector
         net = tf.reshape(net, [batch_size, -1])
         net = tf_util.fully_connected(
-            net, 1024, bn=True, is_training=is_training,
+            net, 512, bn=True, is_training=is_training,
             scope='fc1', bn_decay=bn_decay)
         net = tf_util.dropout(
             net, keep_prob=0.5, is_training=is_training,
             scope='dp1')
         net = tf_util.fully_connected(
-            net, 1024, activation_fn=None, scope='fc2')
+            net, 42, activation_fn=None, scope='fc2')
 
         return net, end_points
 
+    @staticmethod
     def get_loss(pred, label, end_points):
-        """ pred: B*NUM_CLASSES,
-            label: B, """
-        loss = tf.nn.sparse_softmax_cross_entropy_with_logits(
-            logits=pred, labels=label)
-        regre_loss = tf.reduce_mean(loss)
+        regre_loss = tf.reduce_sum(tf.pow(tf.subtract(pred, label), 2)) / (2 * 42)
         tf.summary.scalar('regression loss', regre_loss)
         return regre_loss
 
@@ -134,7 +122,7 @@ class base_regre():
         with tf.Graph().as_default():
             with tf.device('/gpu:' + str(self.args.gpu_id)):
                 batch_frame, pose_out = self.placeholder_inputs(
-                    self.args.batch_size, self.args.img_size, self.args.feature_length)
+                    self.args.batch_size, self.args.img_size, 42)
                 is_training = tf.placeholder(tf.bool, shape=())
 
                 # Note the global_step=batch parameter to minimize.
@@ -143,8 +131,9 @@ class base_regre():
                 tf.summary.scalar('bn_decay', bn_decay)
 
                 # Get model and loss
-                pred = self.get_model(batch_frame, is_training, bn_decay=bn_decay)
-                loss = self.get_loss(pred, pose_out)
+                pred, end_points = self.get_model(
+                    batch_frame, is_training, bn_decay=bn_decay)
+                loss = self.get_loss(pred, pose_out, end_points)
                 tf.summary.scalar('loss', loss)
 
                 # Get training operator
@@ -204,27 +193,23 @@ class base_regre():
         """ ops: dict mapping from string to tf ops """
         is_training = True
 
-        # Shuffle train files
-        train_file_idxs = np.arange(0, len(TRAIN_FILES))
-        np.random.shuffle(train_file_idxs)
-
-        hands17.pre_provide()
+        hands17.pre_provide(self.args.data_dir)
         with open(hands17.training_annot_cropped, 'r') as fanno:
             loss_sum = 0
             batch_count = 0
             while True:
-                batch_frame = []
-                batch_label = []
+                batch_frame = np.empty(shape=(self.args.batch_size, 96, 96))
+                batch_label = np.empty(shape=(self.args.batch_size, 42))
                 for bi in range(self.args.batch_size):
                     annot_line = fanno.readline()
                     if not annot_line:
                         bi = -1
                         break
-                    img_name, pose3 = hands17.parse_line_pose(annot_line)
+                    img_name, pose2d = hands17.parse_line_pose(annot_line)
                     img = hands17.read_image(os.path.join(
                         hands17.training_cropped, img_name))
-                    batch_frame.append(img)
-                    batch_label.append(np.flatten(hands17.get2d(pose3)))
+                    batch_frame[bi, :, :] = img
+                    batch_label[bi, :] = pose2d.flatten().T
                 feed_dict = {
                     ops['batch_frame']: batch_frame,
                     ops['pose_out']: batch_label,

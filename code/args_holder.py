@@ -36,18 +36,35 @@ class args_holder:
         self.parser.add_argument(
             '--img_size', type=int, default=96,
             help='Resized input image size [default: 96]')
+        self.parser.add_argument(
+            '--pose_dim', type=int, default=42,
+            help='Output tensor length of pose [default: 42]')
 
         # learning parameters
+        # self.parser.add_argument(
+        #     '--feature_length', type=int, default=2048,
+        #     help='network output feature length [default: 2048]')
         self.parser.add_argument(
-            '--feature_length', type=int, default=2048,
-            help='network output feature length [default: 2048]')
-        self.parser.add_argument('--max_epoch', type=int, default=250, help='Epoch to run [default: 250]')
-        self.parser.add_argument('--batch_size', type=int, default=32, help='Batch Size during training [default: 32]')
-        self.parser.add_argument('--learning_rate', type=float, default=0.001, help='Initial learning rate [default: 0.001]')
-        self.parser.add_argument('--momentum', type=float, default=0.9, help='Initial learning rate [default: 0.9]')
-        self.parser.add_argument('--optimizer', default='adam', help='adam or momentum [default: adam]')
-        self.parser.add_argument('--decay_step', type=int, default=200000, help='Decay step for lr decay [default: 200000]')
-        self.parser.add_argument('--decay_rate', type=float, default=0.7, help='Decay rate for lr decay [default: 0.8]')
+            '--max_epoch', type=int, default=250,
+            help='Epoch to run [default: 250]')
+        self.parser.add_argument(
+            '--batch_size', type=int, default=16,
+            help='Batch Size during training [default: 16]')
+        self.parser.add_argument(
+            '--learning_rate', type=float, default=0.001,
+            help='Initial learning rate [default: 0.001]')
+        self.parser.add_argument(
+            '--momentum', type=float, default=0.9,
+            help='Initial learning rate [default: 0.9]')
+        self.parser.add_argument(
+            '--optimizer', default='adam',
+            help='adam or momentum [default: adam]')
+        self.parser.add_argument(
+            '--decay_step', type=int, default=200000,
+            help='Decay step for lr decay [default: 200000]')
+        self.parser.add_argument(
+            '--decay_rate', type=float, default=0.7,
+            help='Decay rate for lr decay [default: 0.8]')
 
     def parse_args(self):
         self.args = self.parser.parse_args()
