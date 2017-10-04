@@ -4,6 +4,7 @@ import os
 import sys
 import numpy as np
 # from train_abc import train_abc
+from itertools import islice
 from hands17 import hands17
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 BASE_DIR = os.path.join(BASE_DIR, '..')
@@ -115,8 +116,10 @@ class base_regre():
 
     @staticmethod
     def get_loss(pred, anno, end_points):
-        regre_loss = tf.reduce_sum(tf.pow(tf.subtract(pred, anno), 2)) / (2 * anno.shape[1])
-        tf.summary.scalar('regression loss', regre_loss)
+        print(tf.shape(anno)[1])
+        regre_loss = tf.reduce_sum(tf.pow(tf.subtract(pred, anno), 2))  # / (2 * anno.shape[1])
+        regre_loss = tf.reduce_mean(regre_loss)
+        tf.summary.scalar('regression_loss', regre_loss)
         return regre_loss
 
     def train(self):
@@ -178,10 +181,12 @@ class base_regre():
             }
 
             for epoch in range(self.args.max_epoch):
-                self.logger.info('**** EPOCH {:03d} ****'.format(epoch))
+                self.logger.info('**** Epoque {:03d} ****'.format(epoch))
                 sys.stdout.flush()
 
+                self.logger.info('** Training **')
                 self.train_one_epoch(sess, ops, train_writer)
+                self.logger.info('** Evaluate **')
                 self.eval_one_epoch(sess, ops, test_writer)
 
                 # Save the variables to disk.
@@ -194,17 +199,20 @@ class base_regre():
         """ ops: dict mapping from string to tf ops """
         is_training = True
 
+        batch_size = self.args.batch_size
+        image_size = self.args.img_size
         with open(hands17.training_annot_cropped, 'r') as fanno:
             loss_sum = 0
             batch_count = 0
             while True:
-                batch_frame = np.empty(shape=(self.args.batch_size, self.args.img_size, self.args.img_size))
-                batch_label = np.empty(shape=(self.args.batch_size, self.args.pose_dim))
-                for bi in range(self.args.batch_size):
-                    annot_line = fanno.readline()
-                    if not annot_line:
-                        bi = -1
-                        break
+                next_n_lines = list(islice(fanno, batch_size))
+                if not next_n_lines:
+                    break
+                if len(next_n_lines) < batch_size:
+                    break
+                batch_frame = np.empty(shape=(batch_size, image_size, image_size))
+                batch_label = np.empty(shape=(batch_size, self.args.pose_dim))
+                for bi, annot_line in enumerate(next_n_lines):
                     img_name, pose2d = hands17.parse_line_pose(annot_line)
                     img = hands17.read_image(os.path.join(
                         hands17.training_cropped, img_name))
@@ -223,25 +231,26 @@ class base_regre():
                 pred_val = np.argmax(pred_val, 1)
                 loss_sum += loss_val
                 batch_count += 1
-                self.logger.info('mean loss: {}'.format(loss_sum / batch_count))
-                if 0 > bi:
-                    break
+                self.logger.info('training mean loss: {}'.format(loss_sum / batch_count))
 
     def eval_one_epoch(self, sess, ops, test_writer):
         """ ops: dict mapping from string to tf ops """
         is_training = False
 
+        batch_size = self.args.batch_size
+        image_size = self.args.img_size
         with open(hands17.evaluate_annot_cropped, 'r') as fanno:
             loss_sum = 0
             batch_count = 0
             while True:
-                batch_frame = np.empty(shape=(self.args.batch_size, self.args.img_size, self.args.img_size))
-                batch_label = np.empty(shape=(self.args.batch_size, self.args.pose_dim))
-                for bi in range(self.args.batch_size):
-                    annot_line = fanno.readline()
-                    if not annot_line:
-                        bi = -1
-                        break
+                next_n_lines = list(islice(fanno, batch_size))
+                if not next_n_lines:
+                    break
+                if len(next_n_lines) < batch_size:
+                    break
+                batch_frame = np.empty(shape=(batch_size, image_size, image_size))
+                batch_label = np.empty(shape=(batch_size, self.args.pose_dim))
+                for bi, annot_line in enumerate(next_n_lines):
                     img_name, pose2d = hands17.parse_line_pose(annot_line)
                     img = hands17.read_image(os.path.join(
                         hands17.evaluate_cropped, img_name))
@@ -260,9 +269,7 @@ class base_regre():
                 pred_val = np.argmax(pred_val, 1)
                 loss_sum += loss_val
                 batch_count += 1
-                self.logger.info('mean loss: {}'.format(loss_sum / batch_count))
-                if 0 > bi:
-                    break
+                self.logger.info('evaluate mean loss: {}'.format(loss_sum / batch_count))
 
 
 if __name__ == "__main__":
