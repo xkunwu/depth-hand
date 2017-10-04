@@ -9,4 +9,3 @@ seaborn
 jupyter
 notebook
 imageio
-colour

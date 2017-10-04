@@ -1,6 +1,5 @@
 import argparse
 import os
-from datetime import datetime
 import multiprocessing
 
 
@@ -23,6 +22,9 @@ class args_holder:
         self.parser.add_argument(
             '--log_file', default='univue.log',
             help='Log file name [default: univue.log]')
+        self.parser.add_argument(
+            '--model_ckpt', default='model.ckpt',
+            help='Model checkpoint name [default: model.ckpt]')
 
         # system parameters
         self.parser.add_argument(
@@ -37,8 +39,8 @@ class args_holder:
             '--img_size', type=int, default=96,
             help='Resized input image size [default: 96]')
         self.parser.add_argument(
-            '--pose_dim', type=int, default=42,
-            help='Output tensor length of pose [default: 42]')
+            '--pose_dim', type=int, default=63,
+            help='Output tensor length of pose [default: 63]')
 
         # learning parameters
         # self.parser.add_argument(
@@ -69,7 +71,4 @@ class args_holder:
     def parse_args(self):
         self.args = self.parser.parse_args()
         self.args.data_dir = os.path.join(self.args.data_root, self.args.data_name)
-        self.args.log_file = self.args.log_file + datetime.now().strftime('-%y-%m-%d-%H:%M:%S')
         self.cpu_count = multiprocessing.cpu_count()
-        if not os.path.exists(self.args.log_dir):
-            os.makedirs(self.args.log_dir)
