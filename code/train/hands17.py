@@ -127,7 +127,11 @@ class hands17:
             data_dir, 'training/annotation_evaluation.txt')
         cls.frame_bbox = os.path.join(data_dir, 'frame/BoundingBox.txt')
 
-        hands17.remove_out_frame_annot()
+        if rebuild or (not os.path.exists(hands17.training_annot_cleaned)):
+            hands17.remove_out_frame_annot()
+        else:
+            hands17.num_training = int(sum(
+                1 for line in open(hands17.training_annot_cleaned, 'r')))
 
         portion = int(hands17.num_training / hands17.tt_split)
         hands17.range_train[0] = int(0)
@@ -137,15 +141,19 @@ class hands17:
         print('splitted data: {} training, {} test.'.format(
             hands17.range_train, hands17.range_test))
 
-        if (not os.path.exists(hands17.training_annot_shuffled) or rebuild):
+        if rebuild or (not os.path.exists(hands17.training_annot_shuffled)):
             hands17.shuffle_annot()
         print('using shuffled data: {}'.format(
             hands17.training_annot_shuffled))
 
-        if rebuild and os.path.exists(hands17.annotation_training):
-            os.remove(hands17.annotation_training)
-        if (not os.path.exists(hands17.annotation_training) or
+        if rebuild:
+            if os.path.exists(hands17.training_annot_cropped):
+                os.remove(hands17.training_annot_cropped)
+            if os.path.exists(hands17.training_cropped):
+                shutil.rmtree(hands17.training_cropped)
+        if (not os.path.exists(hands17.training_annot_cropped) or
                 not os.path.exists(hands17.training_cropped)):
+            print('running cropping code (be patient) ...')
             # time_s = timer()
             # hands17.crop_resize_training_images()
             # print('single tread time: {:.4f}'.format(timer() - time_s))
@@ -155,9 +163,8 @@ class hands17:
         print('using cropped and resized images: {}'.format(
             hands17.training_cropped))
 
-        if rebuild and os.path.exists(hands17.annotation_evaluation):
-            os.remove(hands17.annotation_evaluation)
-        if not os.path.exists(hands17.annotation_evaluation):
+        if (rebuild or (not os.path.exists(hands17.annotation_training)) or
+                (not os.path.exists(hands17.annotation_evaluation))):
             hands17.split_evaluation_images()
         print('images are splitted out for evaluation: {:d} portions'.format(
             hands17.tt_split))
@@ -240,8 +247,8 @@ class hands17:
             img_crop, (hands17.crop_size, hands17.crop_size))
         # except:
         #     print(np.hstack((pose_mat, pose2d)))
+        # print(np.max(img_crop), np.max(img_crop_resize), img_crop_resize.shape)
 
-        print(np.max(img_crop), np.max(img_crop_resize), img_crop_resize.shape)
         return img_name, img_crop_resize, p3z_crop, rescen
 
     @staticmethod
@@ -471,7 +478,6 @@ class hands17:
         """
         # img_id = randint(1, hands17.num_training)
         img_id = randint(1, hands17.num_training)
-        print('drawing pose: # {}'.format(img_id))
         # Notice that linecache counts from 1
         annot_line = linecache.getline(annot_txt, img_id)
         # annot_line = linecache.getline(annot_txt, 652)  # palm
@@ -479,7 +485,9 @@ class hands17:
         # print(annot_line)
 
         img_name, pose_mat, rescen = hands17.parse_line_pose(annot_line)
-        img = hands17.read_image(os.path.join(image_dir, img_name))
+        img_path = os.path.join(image_dir, img_name)
+        print('drawing pose #{:d}: {}'.format(img_id, img_path))
+        img = hands17.read_image(img_path)
 
         mpplot.imshow(img, cmap='bone')
         if rescen is None:
@@ -522,13 +530,14 @@ class hands17:
         """
         # img_id = randint(1, hands17.num_training)
         img_id = randint(1, hands17.num_training)
-        print('drawing BoundingBox: # {}'.format(img_id))
         # Notice that linecache counts from 1
         annot_line = linecache.getline(hands17.frame_bbox, img_id)
         # annot_line = linecache.getline(hands17.frame_bbox, 652)
 
         img_name, bbox = hands17.parse_line_bbox(annot_line)
-        img = hands17.read_image(os.path.join(hands17.frame_images, img_name))
+        img_path = os.path.join(hands17.frame_images, img_name)
+        print('drawing BoundingBox #{:d}: {}'.format(img_id, img_path))
+        img = hands17.read_image(img_path)
         mpplot.imshow(img, cmap='bone')
         # rect = bbox.astype(int)
         rect = bbox
@@ -575,7 +584,7 @@ class hands17:
 def test(args):
     hands17.pre_provide(
         args.data_dir,
-        # rebuild=True
+        rebuild=True
     )
     # hands17.draw_pose_stream(
     #     os.path.join(args.data_dir, 'training/pose.gif'),
@@ -590,10 +599,10 @@ def test(args):
     #     hands17.training_cropped,
     #     hands17.training_annot_cropped
     # )
-    hands17.draw_hist_random(
-        # hands17.training_images
-        hands17.training_cropped
-    )
+    # hands17.draw_hist_random(
+    #     # hands17.training_images
+    #     hands17.training_cropped
+    # )
 
 
 if __name__ == '__main__':

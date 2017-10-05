@@ -9,3 +9,4 @@ seaborn
 jupyter
 notebook
 imageio
+opencv
