@@ -7,8 +7,10 @@ import matplotlib.pyplot as mpplot
 import matplotlib.patches as mppatches
 import scipy.ndimage as spndim
 import scipy.misc as spmisc
+from skimage import io as skimio
 import imageio
 import csv
+import cv2
 # import coder
 from random import randint
 from random import random
@@ -147,9 +149,9 @@ class hands17:
             # time_s = timer()
             # hands17.crop_resize_training_images()
             # print('single tread time: {:.4f}'.format(timer() - time_s))
-            # time_s = timer()
+            time_s = timer()
             hands17.crop_resize_training_images_mt()
-            # print('multiprocessing time: {:.4f}'.format(timer() - time_s))
+            print('multiprocessing time: {:.4f}'.format(timer() - time_s))
         print('using cropped and resized images: {}'.format(
             hands17.training_cropped))
 
@@ -196,11 +198,6 @@ class hands17:
             Args:
                 points3: nx3 array
         """
-        # pose2d = np.array(points3[:, 0:2])
-        # pose2d = np.divide(points3[:, 0:2], np.array(points3[:, 2]).reshape(-1, 1))
-        # pose2d = np.multiply(pose2d, hands17.focal)
-        # pose2d = np.add(pose2d, hands17.centre)
-        # return pose2d
         return points3[:, 0:2] / np.array(points3[:, 2]).reshape(-1, 1) * \
             hands17.focal + hands17.centre
 
@@ -235,19 +232,16 @@ class hands17:
             int(np.floor(rect[0, 0])):int(np.ceil(rect[0, 0] + rect[1, 0]))
         ]
         # try:
-        img_crop_resize = spmisc.imresize(
-            img_crop, (hands17.crop_size, hands17.crop_size), interp='bilinear')
+        # img_crop_resize = spmisc.imresize(
+        #     img_crop, (hands17.crop_size, hands17.crop_size), interp='bilinear')
+        # img_crop_resize = spndim.interpolation.zoom(img_crop, rs)
+        # img_crop_resize = img_crop_resize[0:hands17.crop_size, 0:hands17.crop_size]
+        img_crop_resize = cv2.resize(
+            img_crop, (hands17.crop_size, hands17.crop_size))
         # except:
         #     print(np.hstack((pose_mat, pose2d)))
 
-        # fig, ax = mpplot.subplots(nrows=1, ncols=2)
-        # mpplot.subplot(1, 2, 1)
-        # mpplot.imshow(img, cmap='bone')
-        # hands17.draw_pose3(img, pose_mat)
-        # mpplot.subplot(1, 2, 2)
-        # mpplot.imshow(img_crop_resize, cmap='bone')
-        # hands17.draw_pose2d(img_crop_resize, p2d_crop)
-        # mpplot.show()
+        print(np.max(img_crop), np.max(img_crop_resize), img_crop_resize.shape)
         return img_name, img_crop_resize, p3z_crop, rescen
 
     @staticmethod
@@ -259,7 +253,7 @@ class hands17:
             os.path.join(hands17.training_cropped, img_name),
             img_crop
         )
-        # out_list = [p3z_crop.flatten(), rescen.flatten()]
+        # hands17.draw_hist_random(hands17.training_cropped, img_name)
         out_list = np.append(p3z_crop.flatten(), rescen.flatten()).flatten()
         crimg_line = ''.join("%12.4f" % x for x in out_list)
         pose_l = img_name + crimg_line + '\n'
@@ -434,14 +428,16 @@ class hands17:
     @staticmethod
     def read_image(image_name):
         # img = mpimg.imread(image_name)
-        img = spndim.imread(image_name)
+        # img = spndim.imread(image_name)
         # img = (img - img.min()) / (img.max() - img.min()) * 255
+        img = skimio.imread(image_name)
         return img
 
     @staticmethod
     def save_image(image_name, img):
         # mpimg.imsave(image_name, img, cmap=mpplot.cm.gray)
-        spmisc.imsave(image_name, img)
+        # spmisc.imsave(image_name, img)
+        skimio.imsave(image_name, img)
 
     @staticmethod
     def parse_line_pose(annot_line):
@@ -474,7 +470,7 @@ class hands17:
         """ Draw 3D pose of a randomly picked image.
         """
         # img_id = randint(1, hands17.num_training)
-        img_id = randint(1, 999)
+        img_id = randint(1, hands17.num_training)
         print('drawing pose: # {}'.format(img_id))
         # Notice that linecache counts from 1
         annot_line = linecache.getline(annot_txt, img_id)
@@ -525,7 +521,7 @@ class hands17:
         """ Draw 3D pose of a randomly picked image.
         """
         # img_id = randint(1, hands17.num_training)
-        img_id = randint(1, 999)
+        img_id = randint(1, hands17.num_training)
         print('drawing BoundingBox: # {}'.format(img_id))
         # Notice that linecache counts from 1
         annot_line = linecache.getline(hands17.frame_bbox, img_id)
@@ -543,22 +539,60 @@ class hands17:
         )
         mpplot.show()
 
+    @staticmethod
+    def draw_hist_random(image_dir, image_name=None):
+        if image_name is None:
+            img_id = randint(1, hands17.num_training)
+            img_name = 'image_D{:08d}.png'.format(img_id)
+        img_path = os.path.join(image_dir, img_name)
+        print('drawing hist: {}'.format(img_path))
+        img = hands17.read_image(img_path)
+
+        fig, ax = mpplot.subplots(nrows=2, ncols=2)
+        mpplot.subplot(2, 2, 1)
+        mpplot.imshow(img, cmap='bone')
+        mpplot.subplot(2, 2, 2)
+        img_val = img.flatten()
+        # img_val = [v for v in img.flatten() if (10 > v)]
+        mpplot.hist(img_val)
+        mpplot.subplot(2, 2, 3)
+        img_matt = img
+        img_matt[2 > img_matt] = 9999
+        mpplot.imshow(img_matt, cmap='bone')
+        mpplot.subplot(2, 2, 4)
+        img_val = [v for v in img_matt.flatten() if (10 > v)]
+        mpplot.hist(img_val)
+        mpplot.show()
+
+        # rect0 = img_matt[0:10, 0:10]
+        # hands17.save_image('/tmp/test-rect-10.png', rect0)
+        # rect1 = hands17.read_image('/tmp/test-rect-10.png')
+        # print(np.max(img))
+        # print(rect0)
+        # print(rect1 - rect0)
+
 
 def test(args):
-    hands17.pre_provide(args.data_dir)
-    # hands17.pre_provide(args.data_dir, rebuild=True)
+    hands17.pre_provide(
+        args.data_dir,
+        # rebuild=True
+    )
     # hands17.draw_pose_stream(
     #     os.path.join(args.data_dir, 'training/pose.gif'),
     #     10
     # )
     # hands17.draw_bbox_random()
-    hands17.draw_pose_random(
-        hands17.training_images,
-        hands17.training_annot_cleaned
-    )
-    hands17.draw_pose_random(
-        hands17.training_cropped,
-        hands17.training_annot_cropped
+    # hands17.draw_pose_random(
+    #     hands17.training_images,
+    #     hands17.training_annot_cleaned
+    # )
+    # hands17.draw_pose_random(
+    #     hands17.training_cropped,
+    #     hands17.training_annot_cropped
+    # )
+    hands17.draw_hist_random(
+        # hands17.training_images
+        hands17.training_cropped
     )
 
 
