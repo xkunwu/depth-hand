@@ -77,7 +77,10 @@ class base_regre():
 
     @staticmethod
     def get_model(batch_frame, pose_dim, is_training, bn_decay=None):
-        """ Classification PointNet, input is BxHxW, output BxF """
+        """ directly predict all joints' location using regression
+            batch_frame: BxHxW
+            pose_dim: BxJ, where J is flattened 3D locations
+        """
         batch_size = batch_frame.get_shape()[0].value
         end_points = {}
         input_image = tf.expand_dims(batch_frame, -1)
@@ -123,10 +126,14 @@ class base_regre():
 
     @staticmethod
     def get_loss(pred, anno, end_points):
-        print(tf.shape(anno)[1])
-        regre_loss = tf.reduce_sum(tf.pow(tf.subtract(pred, anno), 2))  # / (2 * anno.shape[1])
-        regre_loss = tf.reduce_mean(regre_loss)
-        return regre_loss
+        """ simple sum-of-squares loss
+            pred: BxJ
+            anno: BxJ
+        """
+        # loss = tf.reduce_sum(tf.pow(tf.subtract(pred, anno), 2)) / 2
+        # loss = tf.nn.l2_loss(pred - anno)  # already divided by 2
+        loss = tf.reduce_mean(tf.squared_difference(pred, anno)) / 2
+        return loss
 
     def train(self):
         with tf.Graph().as_default():
@@ -144,7 +151,8 @@ class base_regre():
                 pred, end_points = self.get_model(
                     batch_frame, self.args.pose_dim, is_training, bn_decay=bn_decay)
                 loss = self.get_loss(pred, pose_out, end_points)
-                tf.summary.scalar('regression_loss', loss)
+                regre_error = tf.sqrt(loss * 2)
+                tf.summary.scalar('regression_error', regre_error)
 
                 # Get training operator
                 learning_rate = self.get_learning_rate(batch)
@@ -179,11 +187,11 @@ class base_regre():
                 'batch_frame': batch_frame,
                 'pose_out': pose_out,
                 'is_training': is_training,
-                'pred': pred,
-                'loss': loss,
-                'train_op': train_op,
                 'merged': merged,
-                'step': batch
+                'step': batch,
+                'train_op': train_op,
+                'loss': loss,
+                'pred': pred
             }
 
             for epoch in range(self.args.max_epoch):
@@ -207,7 +215,6 @@ class base_regre():
         batch_size = self.args.batch_size
         image_size = self.args.img_size
         with open(hands17.annotation_training, 'r') as fanno:
-            loss_sum = 0
             batch_count = 0
             while True:
                 next_n_lines = list(islice(fanno, batch_size))
@@ -228,15 +235,13 @@ class base_regre():
                     ops['pose_out']: batch_label,
                     ops['is_training']: is_training
                 }
-                summary, step, _, loss_val, pred_val = sess.run(
-                    [ops['merged'], ops['step'],
-                        ops['train_op'], ops['loss'], ops['pred']],
+                summary, step, _, loss_val, _ = sess.run(
+                    [ops['merged'], ops['step'], ops['train_op'],
+                        ops['loss'], ops['pred']],
                     feed_dict=feed_dict)
                 train_writer.add_summary(summary, step)
-                pred_val = np.argmax(pred_val, 1)
-                loss_sum += loss_val
                 batch_count += 1
-                self.logger.info('training mean loss: {}'.format(loss_sum / batch_count))
+                self.logger.info('batch training loss (half-squared): {}'.format(loss_val))
 
     def eval_one_epoch(self, sess, ops, test_writer):
         """ ops: dict mapping from string to tf ops """
@@ -244,7 +249,6 @@ class base_regre():
         batch_size = self.args.batch_size
         image_size = self.args.img_size
         with open(hands17.annotation_evaluation, 'r') as fanno:
-            loss_sum = 0
             batch_count = 0
             while True:
                 next_n_lines = list(islice(fanno, batch_size))
@@ -265,15 +269,13 @@ class base_regre():
                     ops['pose_out']: batch_label,
                     ops['is_training']: is_training
                 }
-                summary, step, loss_val, pred_val = sess.run(
+                summary, step, loss_val, _ = sess.run(
                     [ops['merged'], ops['step'],
                         ops['loss'], ops['pred']],
                     feed_dict=feed_dict)
                 test_writer.add_summary(summary, step)
-                pred_val = np.argmax(pred_val, 1)
-                loss_sum += loss_val
                 batch_count += 1
-                self.logger.info('evaluate mean loss: {}'.format(loss_sum / batch_count))
+                self.logger.info('batch evaluate mean loss (half-squared): {}'.format(loss_val))
 
     def evaluate(self, num_eval):
         with tf.device('/gpu:' + str(self.args.gpu_id)):
@@ -306,8 +308,8 @@ class base_regre():
             'batch_frame': batch_frame,
             'pose_out': pose_out,
             'is_training': is_training,
-            'pred': pred,
             'loss': loss,
+            'pred': pred
         }
 
         self.eval_one_epoch(sess, ops, num_eval)
@@ -317,7 +319,6 @@ class base_regre():
     #     is_training = False
     #     total_correct = 0
     #     total_seen = 0
-    #     loss_sum = 0
     #     total_seen_class = [0 for _ in range(NUM_CLASSES)]
     #     total_correct_class = [0 for _ in range(NUM_CLASSES)]
     #     fout = open(os.path.join(DUMP_DIR, 'pred_label.txt'), 'w')
@@ -363,7 +364,6 @@ class base_regre():
     #             # correct = np.sum(pred_val_topk[:,0:topk] == label_val)
     #             total_correct += correct
     #             total_seen += cur_batch_size
-    #             loss_sum += batch_loss_sum
     #
     #             for i in range(start_idx, end_idx):
     #                 l = current_label[i]

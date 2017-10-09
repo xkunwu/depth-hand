@@ -146,13 +146,11 @@ class hands17:
         print('using shuffled data: {}'.format(
             hands17.training_annot_shuffled))
 
-        if rebuild:
-            if os.path.exists(hands17.training_annot_cropped):
-                os.remove(hands17.training_annot_cropped)
-            if os.path.exists(hands17.training_cropped):
-                shutil.rmtree(hands17.training_cropped)
-        if (not os.path.exists(hands17.training_annot_cropped) or
-                not os.path.exists(hands17.training_cropped)):
+        # if rebuild:  # just over-write, this detete operation is slow
+        #     if os.path.exists(hands17.training_cropped):
+        #         shutil.rmtree(hands17.training_cropped)
+        if (rebuild or (not os.path.exists(hands17.training_annot_cropped)) or
+                (not os.path.exists(hands17.training_cropped))):
             print('running cropping code (be patient) ...')
             # time_s = timer()
             # hands17.crop_resize_training_images()
@@ -186,7 +184,7 @@ class hands17:
 
     @staticmethod
     def split_evaluation_images():
-        with open(hands17.training_annot_shuffled, 'r') as f:
+        with open(hands17.training_annot_cropped, 'r') as f:
             lines = [x.strip() for x in f.readlines()]
         with open(hands17.annotation_training, 'w') as f:
             for line in lines[hands17.range_train[0]:hands17.range_train[1]]:
@@ -233,7 +231,9 @@ class hands17:
         rs = hands17.crop_size / rect[1, 1]
         rescen = np.append(rs, rect[0, :])
         p2d_crop = (pose2d - rect[0, :]) * rs
-        p3z_crop = np.hstack((p2d_crop, np.array(pose_mat[:, 2].reshape(-1, 1))))
+        p3z_crop = np.hstack((
+            p2d_crop, np.array(pose_mat[:, 2].reshape(-1, 1)) * rs
+        ))
         img_crop = img[
             int(np.floor(rect[0, 1])):int(np.ceil(rect[0, 1] + rect[1, 1])),
             int(np.floor(rect[0, 0])):int(np.ceil(rect[0, 0] + rect[1, 0]))
