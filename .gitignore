@@ -9,3 +9,4 @@ CTestTestfile.cmake
 .tags*
 .ipynb_checkpoints
 log/*
+output/*

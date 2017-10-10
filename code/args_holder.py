@@ -17,8 +17,8 @@ class args_holder:
             '--data_name', default='hands17',
             help='name of data set and its dir [default: hands17]')
         self.parser.add_argument(
-            '--log_dir', default='log',
-            help='Log dir [default: log]')
+            '--out_dir', default='output',
+            help='Output dir [default: output]')
         self.parser.add_argument(
             '--log_file', default='univue.log',
             help='Log file name [default: univue.log]')
@@ -71,4 +71,13 @@ class args_holder:
     def parse_args(self):
         self.args = self.parser.parse_args()
         self.args.data_dir = os.path.join(self.args.data_root, self.args.data_name)
-        self.cpu_count = multiprocessing.cpu_count()
+        this_dir = os.path.dirname(os.path.abspath(__file__))
+        self.args.proj_root = os.path.abspath(os.path.join(this_dir, os.pardir))
+        self.args.out_dir = os.path.join(self.args.proj_root, self.args.out_dir)
+        if not os.path.exists(self.args.out_dir):
+            os.makedirs(self.args.out_dir)
+        self.args.out_dir = os.path.join(self.args.out_dir, self.args.data_name)
+        if not os.path.exists(self.args.out_dir):
+            os.makedirs(self.args.out_dir)
+        self.args.log_dir = os.path.join(self.args.out_dir, 'log')
+        self.args.cpu_count = multiprocessing.cpu_count()

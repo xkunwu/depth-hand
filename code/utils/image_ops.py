@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 import matplotlib.collections as mcoll
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-BASE_DIR = os.path.join(BASE_DIR, '..')
+BASE_DIR = os.path.abspath(os.path.join(BASE_DIR, os.pardir))
 sys.path.append(BASE_DIR)
 from args_holder import args_holder
 

@@ -17,16 +17,17 @@ from random import random
 import linecache
 import re
 from colour import Color
-import multiprocessing
 from multiprocessing.dummy import Pool as ThreadPool
-from multiprocessing import Manager as ThreadManager
+# import multiprocessing
+# from multiprocessing import Manager as ThreadManager
 from timeit import default_timer as timer
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-BASE_DIR = os.path.join(BASE_DIR, '..')
+BASE_DIR = os.path.abspath(os.path.join(BASE_DIR, os.pardir))
 sys.path.append(BASE_DIR)
 from args_holder import args_holder
 sys.path.append(os.path.join(BASE_DIR, 'utils'))
 from image_ops import make_color_range, fig2data
+BASE_DIR = os.path.abspath(os.path.join(BASE_DIR, os.pardir))
 
 
 class hands17:
@@ -41,8 +42,9 @@ class hands17:
     training_annot_cleaned = ''
     training_annot_shuffled = ''
     training_annot_cropped = ''
-    annotation_training = ''
-    annotation_evaluation = ''
+    training_annot_training = ''
+    training_annot_evaluation = ''
+    training_annot_prediction = ''
     frame_bbox = ''
 
     # num_training = int(957032)
@@ -72,6 +74,7 @@ class hands17:
     # RPIP, RDIP, RTIP,
     # PPIP, PDIP, PTIP]
 
+    join_num = 21
     join_type = ('W', 'T', 'I', 'M', 'R', 'P')
     join_color = (
         # Color('cyan'),
@@ -108,23 +111,25 @@ class hands17:
                 target.write(line)
 
     @classmethod
-    def pre_provide(cls, data_dir, rebuild=False):
+    def pre_provide(cls, data_dir, out_dir, rebuild=False):
         cls.data_dir = data_dir
         cls.training_images = os.path.join(data_dir, 'training/images')
         cls.frame_images = os.path.join(data_dir, 'frame/images')
-        cls.training_cropped = os.path.join(data_dir, 'training/cropped')
+        cls.training_cropped = os.path.join(out_dir, 'cropped')
         cls.training_annot_origin = os.path.join(
             data_dir, 'training/Training_Annotation.txt')
         cls.training_annot_cleaned = os.path.join(
-            data_dir, 'training/annotation.txt')
+            out_dir, 'annotation.txt')
         cls.training_annot_shuffled = os.path.join(
-            data_dir, 'training/annotation_shuffled.txt')
+            out_dir, 'annotation_shuffled.txt')
         cls.training_annot_cropped = os.path.join(
-            data_dir, 'training/annotation_cropped.txt')
-        cls.annotation_training = os.path.join(
-            data_dir, 'training/annotation_training.txt')
-        cls.annotation_evaluation = os.path.join(
-            data_dir, 'training/annotation_evaluation.txt')
+            out_dir, 'annotation_cropped.txt')
+        cls.training_annot_training = os.path.join(
+            out_dir, 'training_training.txt')
+        cls.training_annot_evaluation = os.path.join(
+            out_dir, 'training_evaluate.txt')
+        cls.training_annot_prediction = os.path.join(
+            out_dir, 'training_predict.txt')
         cls.frame_bbox = os.path.join(data_dir, 'frame/BoundingBox.txt')
 
         if rebuild or (not os.path.exists(hands17.training_annot_cleaned)):
@@ -161,8 +166,8 @@ class hands17:
         print('using cropped and resized images: {}'.format(
             hands17.training_cropped))
 
-        if (rebuild or (not os.path.exists(hands17.annotation_training)) or
-                (not os.path.exists(hands17.annotation_evaluation))):
+        if (rebuild or (not os.path.exists(hands17.training_annot_training)) or
+                (not os.path.exists(hands17.training_annot_evaluation))):
             hands17.split_evaluation_images()
         print('images are splitted out for evaluation: {:d} portions'.format(
             hands17.tt_split))
@@ -170,26 +175,26 @@ class hands17:
     @staticmethod
     def remove_out_frame_annot():
         hands17.num_training = int(0)
-        with open(hands17.training_annot_cleaned, 'w') as writer:
-            with open(hands17.training_annot_origin, 'r') as reader:
-                for annot_line in reader.readlines():
-                    _, pose_mat, rescen = hands17.parse_line_pose(annot_line)
-                    pose2d = hands17.get2d(pose_mat)
-                    if 0 > np.min(pose2d):
-                        continue
-                    if 0 > np.min(hands17.image_size - pose2d):
-                        continue
-                    writer.write(annot_line)
-                    hands17.num_training += 1
+        with open(hands17.training_annot_cleaned, 'w') as writer, \
+                open(hands17.training_annot_origin, 'r') as reader:
+            for annot_line in reader.readlines():
+                _, pose_mat, rescen = hands17.parse_line_pose(annot_line)
+                pose2d = hands17.get2d(pose_mat)
+                if 0 > np.min(pose2d):
+                    continue
+                if 0 > np.min(hands17.image_size - pose2d):
+                    continue
+                writer.write(annot_line)
+                hands17.num_training += 1
 
     @staticmethod
     def split_evaluation_images():
         with open(hands17.training_annot_cropped, 'r') as f:
             lines = [x.strip() for x in f.readlines()]
-        with open(hands17.annotation_training, 'w') as f:
+        with open(hands17.training_annot_training, 'w') as f:
             for line in lines[hands17.range_train[0]:hands17.range_train[1]]:
                 f.write(line + '\n')
-        with open(hands17.annotation_evaluation, 'w') as f:
+        with open(hands17.training_annot_evaluation, 'w') as f:
             for line in lines[hands17.range_test[0]:hands17.range_test[1]]:
                 # name = re.search(r'(image_D\d+\.png)', line).group(1)
                 # shutil.move(
@@ -198,13 +203,64 @@ class hands17:
                 f.write(line + '\n')
 
     @staticmethod
+    def draw_error_percentage_curve(error_l):
+        num_v = len(error_l)
+        percent = np.arange(num_v + 1) * 100 / num_v
+        error_l = np.concatenate(([0], np.sort(error_l)))
+        fig, ax = mpplot.subplots()
+        mpplot.plot(
+            error_l, percent,
+            '-',
+            linewidth=2.0
+        )
+        ax.set_ylabel('Percentage (%)')
+        ax.set_ylim([0, 100])
+        ax.set_xlabel('Maximal error of single joint (mm)')
+        ax.set_xlim(left=0)
+        ax.set_xlim(right=50)
+        mpplot.show()
+
+    @staticmethod
+    def get3d(pose_mat, rescen=None):
+        """ reproject 2d poses to 3d.
+            pose_mat: nx3 array
+        """
+        if rescen is None:
+            rescen = np.array([1, 0, 0])
+        pose2d = pose_mat[:, 0:2] * rescen[0] + rescen[1:3]
+        pose_z = np.array(pose_mat[:, 2]).reshape(-1, 1)
+        pose3d = (pose2d - hands17.centre) / hands17.focal * pose_z
+        return np.hstack((pose3d, pose_z))
+
+    @staticmethod
+    def compare_max_joint_error(fname_echt, fname_pred):
+        error_l = []
+        with open(fname_echt, 'r') as file_s, \
+                open(fname_pred, 'r') as file_t:
+            sour_lines = [x.strip() for x in file_s.readlines()]
+            # targ_lines = [x.strip() for x in file_t.readlines()]
+            for li, line_t in enumerate(file_t):
+                name_s, pose_s, scen_s = hands17.parse_line_pose(sour_lines[li])
+                name_t, pose_t, scen_t = hands17.parse_line_pose(line_t)
+                if name_s != name_t:
+                    print('different names: {} - {}'.format(name_s, name_t))
+                    return
+                p3d_s = hands17.get3d(pose_s, scen_s)
+                p3d_t = hands17.get3d(pose_t, scen_t)
+                max_error = np.sqrt(np.max(
+                    np.sum((p3d_s - p3d_t) ** 2, axis=1)
+                )) / hands17.join_num
+                error_l.append(max_error)
+        return error_l
+
+    @staticmethod
     def get2d(points3):
         """ project 3D point onto image plane using camera info
             Args:
                 points3: nx3 array
         """
-        return points3[:, 0:2] / np.array(points3[:, 2]).reshape(-1, 1) * \
-            hands17.focal + hands17.centre
+        pose_z = np.array(points3[:, 2]).reshape(-1, 1)
+        return points3[:, 0:2] / pose_z * hands17.focal + hands17.centre
 
     @staticmethod
     def getbm(base_z, base_margin=20):
@@ -453,14 +509,14 @@ class hands17:
         if 64 == len(line_l):
             pose_mat = np.reshape(
                 [float(i) for i in line_l[1:64]],
-                (21, 3)
+                (hands17.join_num, 3)
             )
         elif 67 == len(line_l):
             pose_mat = np.reshape(
                 [float(i) for i in line_l[1:64]],
-                (21, 3)
+                (hands17.join_num, 3)
             )
-            rescen = line_l[64:67]
+            rescen = np.array([float(i) for i in line_l[64:67]])
         else:
             print('error - wrong pose annotation: {}'.format(line_l))
         return line_l[0], pose_mat, rescen
@@ -584,6 +640,7 @@ class hands17:
 def test(args):
     hands17.pre_provide(
         args.data_dir,
+        args.out_dir,
         rebuild=True
     )
     # hands17.draw_pose_stream(
