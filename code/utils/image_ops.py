@@ -1,7 +1,7 @@
 import os
 import sys
 import numpy as np
-import matplotlib.pyplot as plt
+import matplotlib.pyplot as mpplot
 import matplotlib.image as mpimg
 import matplotlib.collections as mcoll
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -10,16 +10,18 @@ sys.path.append(BASE_DIR)
 from args_holder import args_holder
 
 
-def fig2data(fig, show_axis=False):
+def fig2data(fig, show_margin=False):
     """
     @brief Convert a Matplotlib figure to a 3D numpy array with RGBA channels
     @param fig a matplotlib figure
     @return a numpy 3D array of RGBA values
     """
     # draw the renderer
-    if not show_axis:
-        plt.gcf().gca().axis('off')
-        plt.subplots_adjust(left=0, bottom=0, right=1, top=1, wspace=0, hspace=0)
+    mpplot.gcf().gca().axis('off')
+    if not show_margin:
+        mpplot.subplots_adjust(left=0, bottom=0, right=1, top=1, wspace=0, hspace=0)
+    else:
+        mpplot.tight_layout()
     fig.canvas.draw()
 
     # Get the RGBA buffer from the figure
@@ -35,8 +37,8 @@ def fig2data(fig, show_axis=False):
 def show_depth(file_name):
     """ show a depth image """
     img = mpimg.imread(file_name)
-    plt.imshow(img, cmap='bone')
-    plt.show()
+    mpplot.imshow(img, cmap='bone')
+    mpplot.show()
 
 
 def make_color_range(Color_beg, Color_end, step=10):
@@ -65,7 +67,7 @@ def make_segments(x, y):
     return segments
 
 
-def colorline(x, y, z=None, cmap=plt.get_cmap('copper'), linewidth=2):
+def colorline(x, y, z=None, cmap=mpplot.get_cmap('copper'), linewidth=2):
     """
     Plot a colored line.
     """
@@ -82,7 +84,7 @@ def colorline(x, y, z=None, cmap=plt.get_cmap('copper'), linewidth=2):
     segments = make_segments(x, y)
     lc = mcoll.LineCollection(segments, array=z, cmap=cmap, linewidth=linewidth)
 
-    ax = plt.gca()
+    ax = mpplot.gca()
     ax.add_collection(lc)
 
     return lc

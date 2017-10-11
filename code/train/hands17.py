@@ -66,13 +66,15 @@ class hands17:
     # cx = 315.944855
     # cy = 245.287079
 
-    # [Wrist,
-    # TMCP, IMCP, MMCP, RMCP, PMCP,
-    # TPIP, TDIP, TTIP,
-    # IPIP, IDIP, ITIP,
-    # MPIP, MDIP, MTIP,
-    # RPIP, RDIP, RTIP,
-    # PPIP, PDIP, PTIP]
+    join_name = [
+        'Wrist',
+        'TMCP', 'IMCP', 'MMCP', 'RMCP', 'PMCP',
+        'TPIP', 'TDIP', 'TTIP',
+        'IPIP', 'IDIP', 'ITIP',
+        'MPIP', 'MDIP', 'MTIP',
+        'RPIP', 'RDIP', 'RTIP',
+        'PPIP', 'PDIP', 'PTIP'
+    ]
 
     join_num = 21
     join_type = ('W', 'T', 'I', 'M', 'R', 'P')
@@ -203,43 +205,28 @@ class hands17:
                 f.write(line + '\n')
 
     @staticmethod
-    def draw_error_percentage_curve(error_l):
-        num_v = len(error_l)
-        percent = np.arange(num_v + 1) * 100 / num_v
-        error_l = np.concatenate(([0], np.sort(error_l)))
-        fig, ax = mpplot.subplots()
-        mpplot.plot(
-            error_l, percent,
-            '-',
-            linewidth=2.0
-        )
-        ax.set_ylabel('Percentage (%)')
-        ax.set_ylim([0, 100])
-        ax.set_xlabel('Maximal error of single joint (mm)')
-        ax.set_xlim(left=0)
-        ax.set_xlim(right=50)
-        mpplot.show()
-
-    @staticmethod
     def get3d(pose_mat, rescen=None):
         """ reproject 2d poses to 3d.
             pose_mat: nx3 array
         """
         if rescen is None:
             rescen = np.array([1, 0, 0])
-        pose2d = pose_mat[:, 0:2] * rescen[0] + rescen[1:3]
+        pose2d = pose_mat[:, 0:2] / rescen[0] + rescen[1:3]
         pose_z = np.array(pose_mat[:, 2]).reshape(-1, 1)
         pose3d = (pose2d - hands17.centre) / hands17.focal * pose_z
         return np.hstack((pose3d, pose_z))
 
     @staticmethod
-    def compare_max_joint_error(fname_echt, fname_pred):
+    def compare_error(fname_echt, fname_pred):
+        """ NOTE: the number of predictions might be smaller
+            return: FxJ, l2 error matrix
+        """
         error_l = []
         with open(fname_echt, 'r') as file_s, \
                 open(fname_pred, 'r') as file_t:
             sour_lines = [x.strip() for x in file_s.readlines()]
-            # targ_lines = [x.strip() for x in file_t.readlines()]
-            for li, line_t in enumerate(file_t):
+            targ_lines = [x.strip() for x in file_t.readlines()]
+            for li, line_t in enumerate(targ_lines):
                 name_s, pose_s, scen_s = hands17.parse_line_pose(sour_lines[li])
                 name_t, pose_t, scen_t = hands17.parse_line_pose(line_t)
                 if name_s != name_t:
@@ -247,11 +234,57 @@ class hands17:
                     return
                 p3d_s = hands17.get3d(pose_s, scen_s)
                 p3d_t = hands17.get3d(pose_t, scen_t)
-                max_error = np.sqrt(np.max(
+                error_l.append(np.sqrt(
                     np.sum((p3d_s - p3d_t) ** 2, axis=1)
-                )) / hands17.join_num
-                error_l.append(max_error)
-        return error_l
+                ))
+        return np.array(error_l)
+
+    @staticmethod
+    def draw_error_percentage_curve(errors):
+        err_max = np.max(errors, axis=1).tolist()
+        num_v = len(err_max)
+        percent = np.arange(num_v + 1) * 100 / num_v
+        err_max = np.concatenate(([0], np.sort(err_max)))
+        fig, ax = mpplot.subplots()
+        mpplot.plot(
+            err_max, percent,
+            '-',
+            linewidth=2.0
+        )
+        ax.set_ylabel('Percentage (%)')
+        ax.set_ylim([0, 100])
+        ax.set_xlabel('Maximal error of single joint (mm)')
+        ax.set_xlim(left=0)
+        # ax.set_xlim(right=50)
+        mpplot.show()
+
+    @staticmethod
+    def draw_error_per_joint(errors):
+        err_mean = np.mean(errors, axis=0)
+        err_max = np.max(errors, axis=0)
+        err_min = np.min(errors, axis=0)
+        err_mean = np.append(err_mean, np.mean(err_mean))
+        err_max = np.append(err_max, np.mean(err_max))
+        err_min = np.append(err_min, np.mean(err_min))
+        err_m2m = [
+            (err_mean - err_min).tolist(),
+            (err_max - err_mean).tolist()
+        ]
+        err_mean = err_mean.tolist()
+        jid = range(len(err_mean))
+        jtick = hands17.join_name
+        jtick.append('Mean')
+        fig, ax = mpplot.subplots()
+        mpplot.bar(
+            jid, err_mean, yerr=err_m2m, align='center',
+            error_kw=dict(ecolor='gray', lw=1, capsize=3, capthick=2)
+        )
+        ax.set_ylabel('Mean error (mm)')
+        ax.set_ylim(bottom=0)
+        ax.set_xlim([-1, 22])
+        mpplot.xticks(jid, jtick, rotation='vertical')
+        mpplot.margins(0.1)
+        mpplot.show()
 
     @staticmethod
     def get2d(points3):
@@ -404,7 +437,7 @@ class hands17:
             Args:
         """
     @staticmethod
-    def draw_pose3(img, pose_mat):
+    def draw_pose3(img, pose_mat, show_margin=False):
         """ Draw 3D pose onto 2D image domain: using only (x, y).
             Args:
                 pose_mat: nx3 array
@@ -421,11 +454,11 @@ class hands17:
             edgecolor=hands17.bbox_color.rgb)
         )
 
-        img_posed = hands17.draw_pose2d(img, pose2d)
+        img_posed = hands17.draw_pose2d(img, pose2d, show_margin)
         return img_posed
 
     @staticmethod
-    def draw_pose2d(img, pose2d):
+    def draw_pose2d(img, pose2d, show_margin=False):
         """ Draw 2D pose on the image domain.
             Args:
                 pose2d: nx2 array
@@ -485,8 +518,7 @@ class hands17:
         #         #          (int(p2[0]), int(p2[1])),
         #         #          hands17.join_color[fii + 1], 1)
 
-        # return fig2data(mpplot.gcf(), show_axis=True)
-        return fig2data(mpplot.gcf())
+        return fig2data(mpplot.gcf(), show_margin)
 
     @staticmethod
     def read_image(image_name):
@@ -529,11 +561,48 @@ class hands17:
                     return line
 
     @staticmethod
-    def draw_pose_random(image_dir, annot_txt):
+    def draw_pred_random(image_dir, annot_echt, annot_pred):
+        img_id = randint(1, sum(1 for _ in open(annot_pred, 'r')))
+        line_echt = linecache.getline(annot_echt, img_id)
+        line_pred = linecache.getline(annot_pred, img_id)
+        img_name, pose_echt, rescen_echt = hands17.parse_line_pose(line_echt)
+        _, pose_pred, rescen_pred = hands17.parse_line_pose(line_pred)
+        img_path = os.path.join(image_dir, img_name)
+        print('drawing pose #{:d}: {}'.format(img_id, img_path))
+        img = hands17.read_image(img_path)
+
+        fig, ax = mpplot.subplots(nrows=1, ncols=2)
+        mpplot.subplot(1, 2, 1)
+        mpplot.imshow(img, cmap='bone')
+        if rescen_echt is None:
+            hands17.draw_pose3(img, pose_echt, show_margin=True)
+        else:
+            hands17.draw_pose3(
+                img,
+                hands17.get3d(pose_echt, rescen_echt),
+                show_margin=True
+            )
+        mpplot.gcf().gca().set_title('Ground truth')
+        mpplot.subplot(1, 2, 2)
+        mpplot.imshow(img, cmap='bone')
+        if rescen_pred is None:
+            hands17.draw_pose3(img, pose_pred, show_margin=True)
+        else:
+            hands17.draw_pose3(
+                img,
+                hands17.get3d(pose_pred, rescen_pred),
+                show_margin=True
+            )
+        mpplot.gcf().gca().set_title('Prediction')
+        mpplot.show()
+
+    @staticmethod
+    def draw_pose_random(image_dir, annot_txt, img_id=-1):
         """ Draw 3D pose of a randomly picked image.
         """
-        # img_id = randint(1, hands17.num_training)
-        img_id = randint(1, hands17.num_training)
+        if 0 > img_id:
+            # img_id = randint(1, hands17.num_training)
+            img_id = randint(1, hands17.num_training)
         # Notice that linecache counts from 1
         annot_line = linecache.getline(annot_txt, img_id)
         # annot_line = linecache.getline(annot_txt, 652)  # palm
@@ -551,6 +620,7 @@ class hands17:
         else:
             hands17.draw_pose2d(img, pose_mat[:, 0:2])
         mpplot.show()
+        return img_id
 
     @staticmethod
     def draw_pose_stream(gif_file, max_draw=100):
@@ -602,13 +672,15 @@ class hands17:
             linewidth=1, facecolor='none',
             edgecolor=hands17.bbox_color.rgb)
         )
+        mpplot.subplots_adjust(left=0, bottom=0, right=1, top=1, wspace=0, hspace=0)
+        mpplot.gcf().gca().axis('off')
         mpplot.show()
 
     @staticmethod
-    def draw_hist_random(image_dir, image_name=None):
-        if image_name is None:
+    def draw_hist_random(image_dir, img_id=-1):
+        if 0 > img_id:
             img_id = randint(1, hands17.num_training)
-            img_name = 'image_D{:08d}.png'.format(img_id)
+        img_name = 'image_D{:08d}.png'.format(img_id)
         img_path = os.path.join(image_dir, img_name)
         print('drawing hist: {}'.format(img_path))
         img = hands17.read_image(img_path)
@@ -628,13 +700,7 @@ class hands17:
         img_val = [v for v in img_matt.flatten() if (10 > v)]
         mpplot.hist(img_val)
         mpplot.show()
-
-        # rect0 = img_matt[0:10, 0:10]
-        # hands17.save_image('/tmp/test-rect-10.png', rect0)
-        # rect1 = hands17.read_image('/tmp/test-rect-10.png')
-        # print(np.max(img))
-        # print(rect0)
-        # print(rect1 - rect0)
+        return img_id
 
 
 def test(args):

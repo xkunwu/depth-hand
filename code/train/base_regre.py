@@ -36,7 +36,7 @@ class base_regre():
 
         self.log_dir_ln = "{0}/log-base_regre".format(self.args.log_dir)
         if (not os.path.exists(self.log_dir_ln) or new_log):
-            base_regre.make_new_log()
+            self.make_new_log()
         else:
             self.log_dir_t = os.readlink(self.log_dir_ln)
 
@@ -291,6 +291,9 @@ class base_regre():
                 test_writer.add_summary(summary, step)
                 batch_count += 1
                 loss_sum += loss_val
+                sys.stdout.write('.')
+                sys.stdout.flush()
+            print('\n')
             self.logger.info('epoque evaluate mean loss (half-squared): {}'.format(
                 loss_sum / batch_count))
 
@@ -372,6 +375,9 @@ class base_regre():
                     writer.write(image_names[bi] + crimg_line + '\n')
                 batch_count += 1
                 loss_sum += loss_val
+                sys.stdout.write('.')
+                sys.stdout.flush()
+            print('\n')
             self.logger.info('epoque evaluate mean loss (half-squared): {}'.format(
                 loss_sum / batch_count))
 
@@ -379,6 +385,7 @@ class base_regre():
 if __name__ == "__main__":
     argsholder = args_holder()
     argsholder.parse_args()
+
     trainer = base_regre(argsholder.args, False)
     # trainer = base_regre(argsholder.args)
     # trainer.train()
