@@ -240,12 +240,12 @@ class hands17:
         return np.array(error_l)
 
     @staticmethod
-    def draw_error_percentage_curve(errors):
+    def draw_error_percentage_curve(errors, ax):
         err_max = np.max(errors, axis=1).tolist()
         num_v = len(err_max)
         percent = np.arange(num_v + 1) * 100 / num_v
         err_max = np.concatenate(([0], np.sort(err_max)))
-        fig, ax = mpplot.subplots()
+        # fig, ax = mpplot.subplots()
         mpplot.plot(
             err_max, percent,
             '-',
@@ -256,10 +256,10 @@ class hands17:
         ax.set_xlabel('Maximal error of single joint (mm)')
         ax.set_xlim(left=0)
         # ax.set_xlim(right=50)
-        mpplot.show()
+        # mpplot.show()
 
     @staticmethod
-    def draw_error_per_joint(errors):
+    def draw_error_per_joint(errors, ax):
         err_mean = np.mean(errors, axis=0)
         err_max = np.max(errors, axis=0)
         err_min = np.min(errors, axis=0)
@@ -274,7 +274,7 @@ class hands17:
         jid = range(len(err_mean))
         jtick = hands17.join_name
         jtick.append('Mean')
-        fig, ax = mpplot.subplots()
+        # fig, ax = mpplot.subplots()
         mpplot.bar(
             jid, err_mean, yerr=err_m2m, align='center',
             error_kw=dict(ecolor='gray', lw=1, capsize=3, capthick=2)
@@ -284,7 +284,7 @@ class hands17:
         ax.set_xlim([-1, 22])
         mpplot.xticks(jid, jtick, rotation='vertical')
         mpplot.margins(0.1)
-        mpplot.show()
+        # mpplot.show()
 
     @staticmethod
     def get2d(points3):

@@ -53,20 +53,22 @@ class args_holder:
             '--batch_size', type=int, default=64,
             help='Batch Size during training [default: 64]')
         self.parser.add_argument(
+            '--optimizer', default='adam',
+            help='Only using adam currently [default: adam]')
+        self.parser.add_argument(
+            '--bn_momentum', type=float, default=0.8,
+            help='Initial batch normalization momentum [default: 0.8]')
+        self.parser.add_argument(
             '--learning_rate', type=float, default=0.001,
             help='Initial learning rate [default: 0.001]')
         self.parser.add_argument(
-            '--momentum', type=float, default=0.9,
-            help='Initial learning rate [default: 0.9]')
-        self.parser.add_argument(
-            '--optimizer', default='adam',
-            help='adam or momentum [default: adam]')
-        self.parser.add_argument(
             '--decay_step', type=int, default=200000,
+            # twice of 1M dataset
             help='Decay step for lr decay [default: 200000]')
         self.parser.add_argument(
-            '--decay_rate', type=float, default=0.7,
-            help='Decay rate for lr decay [default: 0.8]')
+            '--decay_rate', type=float, default=0.9,
+            # fast decay, as using adaptive optimizer
+            help='Decay rate for lr decay [default: 0.9]')
 
     def parse_args(self):
         self.args = self.parser.parse_args()

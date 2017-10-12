@@ -1,7 +1,6 @@
 import tensorflow as tf
 import logging
 import os
-import errno
 import sys
 import numpy as np
 # from train_abc import train_abc
@@ -63,18 +62,21 @@ class base_regre():
             self.args.decay_rate,
             staircase=True
         )
-        learning_rate = tf.maximum(learning_rate, 0.00001)
+        # learning_rate = tf.maximum(learning_rate, 1e-6)
         return learning_rate
 
     def get_bn_decay(self, batch):
+        """ Generally a value between .95 and .99.
+            Lower decay factors tend to weight recent data more heavily.
+        """
         bn_momentum = tf.train.exponential_decay(
-            0.5,
+            self.args.bn_momentum,
             batch * self.args.batch_size,
             float(self.args.decay_step),
             self.args.decay_rate,
             staircase=True
         )
-        bn_decay = tf.minimum(0.99, 1 - bn_momentum)
+        bn_decay = 1 - tf.maximum(1e-2, bn_momentum)
         return bn_decay
 
     @staticmethod
@@ -205,7 +207,7 @@ class base_regre():
             }
 
             for epoch in range(self.args.max_epoch):
-                self.logger.info('**** Epoque {:03d} ****'.format(epoch))
+                self.logger.info('**** Epoch #{:03d} ****'.format(epoch))
                 sys.stdout.flush()
 
                 time_s = datetime.now()
@@ -213,7 +215,8 @@ class base_regre():
                 self.train_one_epoch(sess, ops, train_writer)
                 self.logger.info('** Evaluate **')
                 self.eval_one_epoch(sess, ops, test_writer)
-                self.logger.info('one epoque processing time: {}'.format(
+                self.logger.info('Epoch #{:03d} processing time: {}'.format(
+                    epoch,
                     datetime.now() - time_s))
 
                 # Save the variables to disk.
@@ -294,7 +297,7 @@ class base_regre():
                 sys.stdout.write('.')
                 sys.stdout.flush()
             print('\n')
-            self.logger.info('epoque evaluate mean loss (half-squared): {}'.format(
+            self.logger.info('epoch evaluate mean loss (half-squared): {}'.format(
                 loss_sum / batch_count))
 
     def evaluate(self):
@@ -377,8 +380,8 @@ class base_regre():
                 loss_sum += loss_val
                 sys.stdout.write('.')
                 sys.stdout.flush()
-            print('\n')
-            self.logger.info('epoque evaluate mean loss (half-squared): {}'.format(
+            # print('\n')
+            self.logger.info('epoch evaluate mean loss (half-squared): {}'.format(
                 loss_sum / batch_count))
 
 
@@ -386,7 +389,5 @@ if __name__ == "__main__":
     argsholder = args_holder()
     argsholder.parse_args()
 
-    trainer = base_regre(argsholder.args, False)
-    # trainer = base_regre(argsholder.args)
-    # trainer.train()
-    trainer.evaluate()
+    trainer = base_regre(argsholder.args)
+    trainer.train()
