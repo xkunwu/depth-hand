@@ -47,8 +47,8 @@ class args_holder:
         #     '--feature_length', type=int, default=2048,
         #     help='network output feature length [default: 2048]')
         self.parser.add_argument(
-            '--max_epoch', type=int, default=100,
-            help='Epoch to run [default: 100]')
+            '--max_epoch', type=int, default=10,
+            help='Epoch to run [default: 10]')
         self.parser.add_argument(
             '--batch_size', type=int, default=64,
             help='Batch Size during training [default: 64]')

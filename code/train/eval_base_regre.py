@@ -27,9 +27,17 @@ errors = hands17.compare_error(
     hands17.training_annot_evaluation,
     hands17.training_annot_prediction
 )
-mpplot.subplots(nrows=1, ncols=2)
-mpplot.subplot(1, 2, 1)
+draw_sum = 3
+draw_i = 1
+fig_size = (draw_sum * 5, 5)
+mpplot.subplots(nrows=1, ncols=draw_sum, figsize=fig_size)
+mpplot.subplot(1, draw_sum, draw_i)
+draw_i += 1
 hands17.draw_error_percentage_curve(errors, mpplot.gca())
-mpplot.subplot(1, 2, 2)
+mpplot.subplot(1, draw_sum, draw_i)
 hands17.draw_error_per_joint(errors, mpplot.gca())
+draw_i += 1
+mpplot.subplot(1, draw_sum, draw_i)
+hands17.draw_mean_error_distribution(errors, mpplot.gca())
+draw_i += 1
 mpplot.show()

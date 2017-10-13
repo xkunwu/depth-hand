@@ -240,6 +240,18 @@ class hands17:
         return np.array(error_l)
 
     @staticmethod
+    def draw_mean_error_distribution(errors, ax):
+        err_mean = np.mean(errors, axis=1)
+        mpplot.hist(
+            err_mean, 100,
+            weights=np.ones_like(err_mean) * 100. / err_mean.size)
+        ax.set_ylabel('Percentage (%)')
+        ax.set_ylim(bottom=0)
+        # ax.set_ylim([0, 100])
+        ax.set_xlabel('Mean error of single frame (mm)')
+        # ax.set_xlim(left=0)
+
+    @staticmethod
     def draw_error_percentage_curve(errors, ax):
         err_max = np.max(errors, axis=1).tolist()
         num_v = len(err_max)
