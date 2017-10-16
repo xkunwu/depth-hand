@@ -113,7 +113,7 @@ class hands17:
                 target.write(line)
 
     @classmethod
-    def pre_provide(cls, data_dir, out_dir, rebuild=False):
+    def init_data(cls, data_dir, out_dir, rebuild=False):
         cls.data_dir = data_dir
         cls.training_images = os.path.join(data_dir, 'training/images')
         cls.frame_images = os.path.join(data_dir, 'frame/images')
@@ -716,7 +716,7 @@ class hands17:
 
 
 def test(args):
-    hands17.pre_provide(
+    hands17.init_data(
         args.data_dir,
         args.out_dir,
         rebuild=True

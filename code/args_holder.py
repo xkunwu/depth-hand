@@ -1,5 +1,6 @@
-import argparse
 import os
+import importlib
+import argparse
 import multiprocessing
 
 
@@ -31,7 +32,7 @@ class args_holder:
             '--gpu_id', type=int, default=0,
             help='GPU to use [default: GPU 0]')
         self.parser.add_argument(
-            '--model', default='base_regre',
+            '--model_name', default='base_regre',
             help='Model name [default: base_regre]')
 
         # input preprocessing
@@ -50,8 +51,8 @@ class args_holder:
             '--max_epoch', type=int, default=10,
             help='Epoch to run [default: 10]')
         self.parser.add_argument(
-            '--batch_size', type=int, default=64,
-            help='Batch Size during training [default: 64]')
+            '--batch_size', type=int, default=128,
+            help='Batch Size during training [default: 128]')
         self.parser.add_argument(
             '--optimizer', default='adam',
             help='Only using adam currently [default: adam]')
@@ -83,3 +84,11 @@ class args_holder:
             os.makedirs(self.args.out_dir)
         self.args.log_dir = os.path.join(self.args.out_dir, 'log')
         self.args.cpu_count = multiprocessing.cpu_count()
+        self.args.data_class = getattr(
+            importlib.import_module(self.args.data_name),
+            self.args.data_name
+        )
+        self.args.model_class = getattr(
+            importlib.import_module(self.args.model_name),
+            self.args.model_name
+        )
