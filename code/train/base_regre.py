@@ -1,13 +1,13 @@
 import tensorflow as tf
 import os
 import sys
-import importlib
+from importlib import import_module
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 BASE_DIR = os.path.abspath(os.path.join(BASE_DIR, os.pardir))
 sys.path.append(BASE_DIR)
 sys.path.append(os.path.join(BASE_DIR, 'utils'))
-tf_util = importlib.import_module('tf_util')
+tf_util = import_module('tf_util')
 
 
 class base_regre():

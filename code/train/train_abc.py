@@ -1,6 +1,6 @@
 import os
 import sys
-import importlib
+from importlib import import_module
 import logging
 from datetime import datetime
 import tensorflow as tf
@@ -10,13 +10,10 @@ from itertools import islice
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 BASE_DIR = os.path.abspath(os.path.join(BASE_DIR, os.pardir))
 sys.path.append(BASE_DIR)
-args_holder_class = getattr(
-    importlib.import_module('args_holder'),
+args_holder = getattr(
+    import_module('args_holder'),
     'args_holder'
 )
-argsholder = args_holder_class()
-argsholder.parse_args()
-ARGS = argsholder.args
 
 
 class train_abc():
@@ -26,11 +23,11 @@ class train_abc():
 
     def train(self):
         with tf.Graph().as_default():
-            with tf.device('/gpu:' + str(ARGS.gpu_id)):
-                batch_frame, pose_out = ARGS.model_class.placeholder_inputs(
-                    ARGS.batch_size,
-                    ARGS.img_size,
-                    ARGS.data_class.join_num)
+            with tf.device('/gpu:' + str(self.args.gpu_id)):
+                batch_frame, pose_out = self.args.model_class.placeholder_inputs(
+                    self.args.batch_size,
+                    self.args.img_size,
+                    self.args.data_inst.join_num)
                 is_training = tf.placeholder(tf.bool, shape=())
 
                 # Note the global_step=batch parameter to minimize.
@@ -39,9 +36,9 @@ class train_abc():
                 tf.summary.scalar('bn_decay', bn_decay)
 
                 # Get model and loss
-                pred, end_points = ARGS.model_class.get_model(
-                    batch_frame, ARGS.pose_dim, is_training, bn_decay=bn_decay)
-                loss = ARGS.model_class.get_loss(pred, pose_out, end_points)
+                pred, end_points = self.args.model_class.get_model(
+                    batch_frame, self.args.pose_dim, is_training, bn_decay=bn_decay)
+                loss = self.args.model_class.get_loss(pred, pose_out, end_points)
                 regre_error = tf.sqrt(loss * 2)
                 tf.summary.scalar('regression_error', regre_error)
 
@@ -85,7 +82,7 @@ class train_abc():
                 'pred': pred
             }
 
-            for epoch in range(ARGS.max_epoch):
+            for epoch in range(self.args.max_epoch):
                 self.logger.info('**** Epoch #{:03d} ****'.format(epoch))
                 sys.stdout.flush()
 
@@ -101,17 +98,19 @@ class train_abc():
                 # Save the variables to disk.
                 if epoch % 10 == 0:
                     save_path = saver.save(
-                        sess, os.path.join(self.log_dir_t, ARGS.model_ckpt))
+                        sess, os.path.join(self.log_dir_t, self.args.model_ckpt))
                     self.logger.info("Model saved in file: {}".format(save_path))
 
     def train_one_epoch(self, sess, ops, train_writer):
         """ ops: dict mapping from string to tf ops """
         is_training = True
-        batch_size = ARGS.batch_size
-        image_size = ARGS.img_size
+        batch_size = self.args.batch_size
+        image_size = self.args.img_size
         batch_frame = np.empty(shape=(batch_size, image_size, image_size))
-        batch_poses = np.empty(shape=(batch_size, ARGS.pose_dim))
-        with open(ARGS.data_class.training_annot_training, 'r') as fanno:
+        batch_poses = np.empty(shape=(batch_size, self.args.pose_dim))
+        with open(self.args.data_inst.training_annot_train, 'r') as fanno:
+        # fanno = self.args.data_provider.open_train(self.args.data_inst)
+        # try:
             # batch_count = 0
             while True:
                 next_n_lines = list(islice(fanno, batch_size))
@@ -119,13 +118,17 @@ class train_abc():
                     break
                 if len(next_n_lines) < batch_size:
                     break
-                for bi, annot_line in enumerate(next_n_lines):
-                    img_name, pose_mat, _ = ARGS.data_class.parse_line_pose(
-                        annot_line)
-                    img = ARGS.data_class.read_image(os.path.join(
-                        ARGS.data_class.training_cropped, img_name))
-                    batch_frame[bi, :, :] = img
-                    batch_poses[bi, :] = pose_mat.flatten().T
+                # for bi, annot_line in enumerate(next_n_lines):
+                #     img_name, pose_mat, _ = self.args.data_inst.parse_line_pose(
+                #         annot_line)
+                #     img = self.args.data_inst.read_image(os.path.join(
+                #         self.args.data_inst.training_cropped, img_name))
+                #     batch_frame[bi, :, :] = img
+                #     batch_poses[bi, :] = pose_mat.flatten().T
+                self.args.data_provider.put2d(
+                    self.args.data_inst, next_n_lines,
+                    batch_frame, batch_poses
+                )
                 feed_dict = {
                     ops['batch_frame']: batch_frame,
                     ops['pose_out']: batch_poses,
@@ -139,15 +142,19 @@ class train_abc():
                 # batch_count += 1
                 self.logger.info('batch training loss (half-squared): {}'.format(
                     loss_val))
+        # finally:
+        #     self.args.data_provider.close(self.args.data_inst, fanno)
 
     def test_one_epoch(self, sess, ops, test_writer):
         """ ops: dict mapping from string to tf ops """
         is_training = False
-        batch_size = ARGS.batch_size
-        image_size = ARGS.img_size
+        batch_size = self.args.batch_size
+        image_size = self.args.img_size
         batch_frame = np.empty(shape=(batch_size, image_size, image_size))
-        batch_poses = np.empty(shape=(batch_size, ARGS.pose_dim))
-        with open(ARGS.data_class.training_annot_evaluation, 'r') as fanno:
+        batch_poses = np.empty(shape=(batch_size, self.args.pose_dim))
+        with open(self.args.data_inst.training_annot_test, 'r') as fanno:
+        # fanno = self.args.data_provider.open(self.args.data_inst)
+        # try:
             batch_count = 0
             loss_sum = 0
             while True:
@@ -156,13 +163,17 @@ class train_abc():
                     break
                 if len(next_n_lines) < batch_size:
                     break
-                for bi, annot_line in enumerate(next_n_lines):
-                    img_name, pose_mat, _ = ARGS.data_class.parse_line_pose(
-                        annot_line)
-                    img = ARGS.data_class.read_image(os.path.join(
-                        ARGS.data_class.training_cropped, img_name))
-                    batch_frame[bi, :, :] = img
-                    batch_poses[bi, :] = pose_mat.flatten().T
+                # for bi, annot_line in enumerate(next_n_lines):
+                #     img_name, pose_mat, _ = self.args.data_inst.parse_line_pose(
+                #         annot_line)
+                #     img = self.args.data_inst.read_image(os.path.join(
+                #         self.args.data_inst.training_cropped, img_name))
+                #     batch_frame[bi, :, :] = img
+                #     batch_poses[bi, :] = pose_mat.flatten().T
+                self.args.data_provider.put2d(
+                    self.args.data_inst, next_n_lines,
+                    batch_frame, batch_poses
+                )
                 feed_dict = {
                     ops['batch_frame']: batch_frame,
                     ops['pose_out']: batch_poses,
@@ -180,17 +191,21 @@ class train_abc():
             print('\n')
             self.logger.info('epoch evaluate mean loss (half-squared): {}'.format(
                 loss_sum / batch_count))
+        # finally:
+        #     self.args.data_provider.close(self.args.data_inst, fanno)
 
     def evaluate(self):
-        with tf.device('/gpu:' + str(ARGS.gpu_id)):
-            batch_frame, pose_out = self.placeholder_inputs(
-                ARGS.batch_size, ARGS.img_size, ARGS.pose_dim)
+        with tf.device('/gpu:' + str(self.args.gpu_id)):
+            batch_frame, pose_out = self.args.model_class.placeholder_inputs(
+                self.args.batch_size,
+                self.args.img_size,
+                self.args.data_inst.join_num)
             is_training = tf.placeholder(tf.bool, shape=())
 
             # Get model and loss
-            pred, end_points = self.get_model(
-                batch_frame, ARGS.pose_dim, is_training)
-            loss = self.get_loss(pred, pose_out, end_points)
+            pred, end_points = self.args.model_class.get_model(
+                batch_frame, self.args.pose_dim, is_training)
+            loss = self.args.model_class.get_loss(pred, pose_out, end_points)
 
             # Add ops to save and restore all the variables.
             saver = tf.train.Saver()
@@ -203,7 +218,7 @@ class train_abc():
         sess = tf.Session(config=config)
 
         # Restore variables from disk.
-        model_path = os.path.join(self.log_dir_t, ARGS.model_ckpt)
+        model_path = os.path.join(self.log_dir_t, self.args.model_ckpt)
         saver.restore(sess, model_path)
         self.logger.info("Model restored from: {}.".format(model_path))
 
@@ -215,17 +230,19 @@ class train_abc():
             'pred': pred
         }
 
-        with open(ARGS.data_class.training_annot_prediction, 'w') as writer:
+        with open(self.args.data_inst.training_annot_predict, 'w') as writer:
             self.eval_one_epoch_write(sess, ops, writer)
 
     def eval_one_epoch_write(self, sess, ops, writer):
         is_training = False
-        batch_size = ARGS.batch_size
-        image_size = ARGS.img_size
+        batch_size = self.args.batch_size
+        image_size = self.args.img_size
         batch_frame = np.empty(shape=(batch_size, image_size, image_size))
-        batch_poses = np.empty(shape=(batch_size, ARGS.pose_dim))
+        batch_poses = np.empty(shape=(batch_size, self.args.pose_dim))
         batch_resce = np.empty(shape=(batch_size, 3))
-        with open(ARGS.data_class.training_annot_evaluation, 'r') as fanno:
+        with open(self.args.data_inst.training_annot_test, 'r') as fanno:
+        # fanno = self.args.data_provider.open(self.args.data_inst)
+        # try:
             batch_count = 0
             loss_sum = 0
             while True:
@@ -235,15 +252,19 @@ class train_abc():
                 if len(next_n_lines) < batch_size:
                     break
                 image_names = []
-                for bi, annot_line in enumerate(next_n_lines):
-                    img_name, pose_mat, rescen = ARGS.data_class.parse_line_pose(
-                        annot_line)
-                    img = ARGS.data_class.read_image(os.path.join(
-                        ARGS.data_class.training_cropped, img_name))
-                    batch_frame[bi, :, :] = img
-                    batch_poses[bi, :] = pose_mat.flatten().T
-                    image_names.append(img_name)
-                    batch_resce[bi, :] = rescen
+                # for bi, annot_line in enumerate(next_n_lines):
+                #     img_name, pose_mat, rescen = self.args.data_inst.parse_line_pose(
+                #         annot_line)
+                #     img = self.args.data_inst.read_image(os.path.join(
+                #         self.args.data_inst.training_cropped, img_name))
+                #     batch_frame[bi, :, :] = img
+                #     batch_poses[bi, :] = pose_mat.flatten().T
+                #     image_names.append(img_name)
+                #     batch_resce[bi, :] = rescen
+                self.args.data_provider.put2d(
+                    self.args.data_inst, next_n_lines,
+                    batch_frame, batch_poses, image_names, batch_resce
+                )
                 feed_dict = {
                     ops['batch_frame']: batch_frame,
                     ops['pose_out']: batch_poses,
@@ -265,13 +286,15 @@ class train_abc():
             # print('\n')
             self.logger.info('epoch evaluate mean loss (half-squared): {}'.format(
                 loss_sum / batch_count))
+        # finally:
+        #     self.args.data_provider.close(self.args.data_inst, fanno)
 
     def get_learning_rate(self, batch):
         learning_rate = tf.train.exponential_decay(
-            ARGS.learning_rate,
-            batch * ARGS.batch_size,
-            ARGS.decay_step,
-            ARGS.decay_rate,
+            self.args.learning_rate,
+            batch * self.args.batch_size,
+            self.args.decay_step,
+            self.args.decay_rate,
             staircase=True
         )
         # learning_rate = tf.maximum(learning_rate, 1e-6)
@@ -282,10 +305,10 @@ class train_abc():
             Lower decay factors tend to weight recent data more heavily.
         """
         bn_momentum = tf.train.exponential_decay(
-            ARGS.bn_momentum,
-            batch * ARGS.batch_size,
-            float(ARGS.decay_step),
-            ARGS.decay_rate,
+            self.args.bn_momentum,
+            batch * self.args.batch_size,
+            float(self.args.decay_step),
+            self.args.decay_rate,
             staircase=True
         )
         bn_decay = 1 - tf.maximum(1e-2, bn_momentum)
@@ -296,15 +319,16 @@ class train_abc():
         # git_hash = subprocess.check_output(
         #     ['git', 'rev-parse', '--short', 'HEAD'])
         self.log_dir_t = os.path.join(
-            ARGS.log_dir, 'log-{}'.format(log_time)
+            self.args.log_dir, 'log-{}'.format(log_time)
         )
         os.makedirs(self.log_dir_t)
         os.symlink(self.log_dir_t, self.log_dir_ln + '-tmp')
         os.rename(self.log_dir_ln + '-tmp', self.log_dir_ln)
 
-    def __init__(self, new_log=True):
+    def __init__(self, args, new_log=True):
+        self.args = args
         self.log_dir_ln = "{}/log-{}".format(
-            ARGS.log_dir, ARGS.model_name)
+            self.args.log_dir, self.args.model_name)
         if (not os.path.exists(self.log_dir_ln) or new_log):
             self.make_new_log()
         else:
@@ -316,16 +340,16 @@ class train_abc():
         self.logger = logging.getLogger()
         self.logger.setLevel(logging.INFO)
         fileHandler = logging.FileHandler(
-            "{0}/{1}".format(self.log_dir_t, ARGS.log_file))
+            "{0}/{1}".format(self.log_dir_t, self.args.log_file))
         fileHandler.setFormatter(logFormatter)
         self.logger.addHandler(fileHandler)
         consoleHandler = logging.StreamHandler()
         consoleHandler.setFormatter(logFormatter)
         self.logger.addHandler(consoleHandler)
 
-        ARGS.data_class.init_data(
-            ARGS.data_dir, ARGS.out_dir)
 
 if __name__ == "__main__":
-    trainer = train_abc()
+    argsholder = args_holder()
+    argsholder.parse_args()
+    trainer = train_abc(argsholder.args)
     trainer.train()

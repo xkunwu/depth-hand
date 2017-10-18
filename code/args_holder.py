@@ -1,5 +1,5 @@
 import os
-import importlib
+from importlib import import_module
 import argparse
 import multiprocessing
 
@@ -44,9 +44,6 @@ class args_holder:
             help='Output tensor length of pose [default: 63]')
 
         # learning parameters
-        # self.parser.add_argument(
-        #     '--feature_length', type=int, default=2048,
-        #     help='network output feature length [default: 2048]')
         self.parser.add_argument(
             '--max_epoch', type=int, default=10,
             help='Epoch to run [default: 10]')
@@ -84,11 +81,25 @@ class args_holder:
             os.makedirs(self.args.out_dir)
         self.args.log_dir = os.path.join(self.args.out_dir, 'log')
         self.args.cpu_count = multiprocessing.cpu_count()
+
+        self.args.data_module = import_module(
+            'data.' + self.args.data_name)
+        self.args.data_provider = import_module(
+            'data.' + self.args.data_name + '.provider')
         self.args.data_class = getattr(
-            importlib.import_module(self.args.data_name),
-            self.args.data_name
+            import_module('data.' + self.args.data_name + '.holder'),
+            self.args.data_name + 'holder'
+        )
+        self.args.data_inst = self.args.data_class()
+        self.args.data_inst.init_data(
+            self.args.data_dir, self.args.out_dir
         )
         self.args.model_class = getattr(
-            importlib.import_module(self.args.model_name),
+            import_module('train.' + self.args.model_name),
             self.args.model_name
         )
+
+
+if __name__ == "__main__":
+    argsholder = args_holder()
+    argsholder.parse_args()

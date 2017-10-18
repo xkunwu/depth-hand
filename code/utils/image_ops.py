@@ -1,13 +1,7 @@
-import os
-import sys
 import numpy as np
 import matplotlib.pyplot as mpplot
 import matplotlib.image as mpimg
 import matplotlib.collections as mcoll
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-BASE_DIR = os.path.abspath(os.path.join(BASE_DIR, os.pardir))
-sys.path.append(BASE_DIR)
-from args_holder import args_holder
 
 
 def fig2data(fig, show_margin=False):
@@ -88,9 +82,3 @@ def colorline(x, y, z=None, cmap=mpplot.get_cmap('copper'), linewidth=2):
     ax.add_collection(lc)
 
     return lc
-
-
-if __name__ == '__main__':
-    argsholder = args_holder()
-    argsholder.parse_args()
-    # test(argsholder.args)
