@@ -21,6 +21,9 @@ class args_holder:
             '--out_dir', default='output',
             help='Output dir [default: output]')
         self.parser.add_argument(
+            '--rebuild_data', default=False,
+            help='rebuild data structure and preprocess [default: False]')
+        self.parser.add_argument(
             '--log_file', default='univue.log',
             help='Log file name [default: univue.log]')
         self.parser.add_argument(
@@ -37,8 +40,8 @@ class args_holder:
 
         # input preprocessing
         self.parser.add_argument(
-            '--img_size', type=int, default=96,
-            help='Resized input image size [default: 96]')
+            '--crop_resize', type=int, default=96,
+            help='Resized image size of cropped area [default: 96]')
         self.parser.add_argument(
             '--pose_dim', type=int, default=63,
             help='Output tensor length of pose [default: 63]')
@@ -82,6 +85,7 @@ class args_holder:
         self.args.log_dir = os.path.join(self.args.out_dir, 'log')
         self.args.cpu_count = multiprocessing.cpu_count()
 
+    def create_instance(self):
         self.args.data_module = import_module(
             'data.' + self.args.data_name)
         self.args.data_provider = import_module(
@@ -92,7 +96,7 @@ class args_holder:
         )
         self.args.data_inst = self.args.data_class()
         self.args.data_inst.init_data(
-            self.args.data_dir, self.args.out_dir
+            self.args, self.args.rebuild_data
         )
         self.args.model_class = getattr(
             import_module('train.' + self.args.model_name),
@@ -103,3 +107,6 @@ class args_holder:
 if __name__ == "__main__":
     argsholder = args_holder()
     argsholder.parse_args()
+    ARGS = argsholder.args
+    ARGS.rebuild_data = True
+    argsholder.create_instance()

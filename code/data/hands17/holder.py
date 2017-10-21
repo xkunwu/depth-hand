@@ -16,6 +16,7 @@ class hands17holder:
 
     # dataset info
     data_dir = ''
+    out_dir = ''
     training_images = ''
     frame_images = ''
     training_cropped = ''
@@ -37,8 +38,10 @@ class hands17holder:
 
     # cropped & resized training images
     image_size = [640, 480]
-    crop_size = 96
-
+    crop_resize = 96
+    min_z = 1
+    max_z = 6666
+    max_distance = 9999  # max distance set to 10m
     # camera info
     focal = (475.065948, 475.065857)
     centre = (315.944855, 245.287079)
@@ -90,7 +93,7 @@ class hands17holder:
                 open(self.training_annot_origin, 'r') as reader:
             for annot_line in reader.readlines():
                 _, pose_mat, rescen = dataio.parse_line_pose(annot_line)
-                pose2d = dataops.get2d(pose_mat)
+                pose2d = dataops.get2d(pose_mat, self.centre, self.focal)
                 if 0 > np.min(pose2d):
                     continue
                 if 0 > np.min(self.image_size - pose2d):
@@ -128,9 +131,11 @@ class hands17holder:
         img_name, pose_mat, rescen = dataio.parse_line_pose(annot_line)
         img = dataio.read_image(
             os.path.join(self.training_images, img_name))
-        pose2d = self.get2d(pose_mat)
-        rect = dataops.get_rect(pose2d, 0.25)
-        rs = self.crop_size / rect[1, 1]
+        pose2d = dataops.get2d(
+            pose_mat, self.centre, self.focal)
+        rect = dataops.get_rect(pose2d, self.image_size, 0.25)
+        crop_resize = self.crop_resize
+        rs = crop_resize / rect[1, 1]
         rescen = np.append(rs, rect[0, :])
         p2d_crop = (pose2d - rect[0, :]) * rs
         p3z_crop = np.hstack((
@@ -142,11 +147,11 @@ class hands17holder:
         ]
         # try:
         # img_crop_resize = spmisc.imresize(
-        #     img_crop, (self.crop_size, self.crop_size), interp='bilinear')
+        #     img_crop, (crop_resize, crop_resize), interp='bilinear')
         # img_crop_resize = spndim.interpolation.zoom(img_crop, rs)
-        # img_crop_resize = img_crop_resize[0:self.crop_size, 0:self.crop_size]
+        # img_crop_resize = img_crop_resize[0:crop_resize, 0:crop_resize]
         img_crop_resize = cv2.resize(
-            img_crop, (self.crop_size, self.crop_size))
+            img_crop, (crop_resize, crop_resize))
         # except:
         #     print(np.hstack((pose_mat, pose2d)))
         # print(np.max(img_crop), np.max(img_crop_resize), img_crop_resize.shape)
@@ -156,12 +161,13 @@ class hands17holder:
     def crop_resize_save(self, annot_line, messages=None):
         img_name, img_crop, p3z_crop, rescen = self.get_rect_crop_resize(
             annot_line)
-        img_crop[1 > img_crop] = 9999  # max distance set to 10m
+        img_crop[self.min_z > img_crop] = self.max_distance
+        img_crop[self.max_z < img_crop] = self.max_distance
         dataio.save_image(
             os.path.join(self.training_cropped, img_name),
             img_crop
         )
-        # hands17.draw_hist_random(self.training_cropped, img_name)
+        # self.draw_hist_random(self.training_cropped, img_name)
         out_list = np.append(p3z_crop.flatten(), rescen.flatten()).flatten()
         crimg_line = ''.join("%12.4f" % x for x in out_list)
         pose_l = img_name + crimg_line + '\n'
@@ -175,6 +181,10 @@ class hands17holder:
         with open(self.training_annot_cropped, 'w') as crop_writer:
             with open(self.training_annot_shuffled, 'r') as fanno:
                 for line_number, annot_line in enumerate(fanno):
+                    # opts = {
+                    #     'class_inst': self,
+                    #     'annot_line': annot_line
+                    # }
                     pose_l = self.crop_resize_save(annot_line)
                     crop_writer.write(pose_l)
                     # break
@@ -203,7 +213,7 @@ class hands17holder:
         # with open(self.training_annot_shuffled, 'r') as fanno:
         #     annot_line = fanno.readline()
         #     job = thread_pool.apply_async(
-        #         hands17.crop_resize_save, (annot_line, messages))
+        #         hands17holder.crop_resize_save, (annot_line, opts.crop_resize, messages))
         #     jobs.append(job)
         # for job in jobs:
         #     job.get()
@@ -214,34 +224,34 @@ class hands17holder:
             annot_list = [line for line in fanno if line]
         with open(self.training_annot_cropped, 'w') as writer:
             for result in thread_pool.map(self.crop_resize_save, annot_list):
-                # (item, count) tuples from worker
                 writer.write(result)
         thread_pool.close()
         thread_pool.join()
 
-    def init_data(self, data_dir, out_dir, rebuild=False):
-        self.data_dir = data_dir
-        self.training_images = os.path.join(data_dir, 'training/images')
-        self.frame_images = os.path.join(data_dir, 'frame/images')
-        self.training_cropped = os.path.join(out_dir, 'cropped')
+    def init_data(self, args, rebuild=False):
+        self.data_dir = args.data_dir
+        self.out_dir = args.out_dir
+        self.training_images = os.path.join(self.data_dir, 'training/images')
+        self.frame_images = os.path.join(self.data_dir, 'frame/images')
+        self.training_cropped = os.path.join(self.out_dir, 'cropped')
         self.training_annot_origin = os.path.join(
-            data_dir, 'training/Training_Annotation.txt')
+            self.data_dir, 'training/Training_Annotation.txt')
         self.training_annot_cleaned = os.path.join(
-            out_dir, 'annotation.txt')
+            self.out_dir, 'annotation.txt')
         self.training_annot_shuffled = os.path.join(
-            out_dir, 'annotation_shuffled.txt')
+            self.out_dir, 'annotation_shuffled.txt')
         self.training_annot_cropped = os.path.join(
-            out_dir, 'annotation_cropped.txt')
+            self.out_dir, 'annotation_cropped.txt')
         self.training_annot_train = os.path.join(
-            out_dir, 'training_training.txt')
+            self.out_dir, 'training_training.txt')
         self.training_annot_test = os.path.join(
-            out_dir, 'training_evaluate.txt')
+            self.out_dir, 'training_evaluate.txt')
         self.training_annot_predict = os.path.join(
-            out_dir, 'training_predict.txt')
-        self.frame_bbox = os.path.join(data_dir, 'frame/BoundingBox.txt')
+            self.out_dir, 'training_predict.txt')
+        self.frame_bbox = os.path.join(self.data_dir, 'frame/BoundingBox.txt')
 
         if rebuild or (not os.path.exists(self.training_annot_cleaned)):
-            self.remove_out_frame_annot(self)
+            self.remove_out_frame_annot()
         else:
             self.num_training = int(sum(
                 1 for line in open(self.training_annot_cleaned, 'r')))
@@ -255,7 +265,7 @@ class hands17holder:
             self.range_train, self.range_test))
 
         if rebuild or (not os.path.exists(self.training_annot_shuffled)):
-            self.shuffle_annot(self)
+            self.shuffle_annot()
         print('using shuffled data: {}'.format(
             self.training_annot_shuffled))
 
@@ -266,16 +276,16 @@ class hands17holder:
                 (not os.path.exists(self.training_cropped))):
             print('running cropping code (be patient) ...')
             # time_s = timer()
-            # hands17.crop_resize_training_images()
+            # self.crop_resize_training_images()
             # print('single tread time: {:.4f}'.format(timer() - time_s))
             time_s = timer()
-            self.crop_resize_training_images_mt(self)
+            self.crop_resize_training_images_mt()
             print('multiprocessing time: {:.4f}'.format(timer() - time_s))
         print('using cropped and resized images: {}'.format(
             self.training_cropped))
 
         if (rebuild or (not os.path.exists(self.training_annot_train)) or
                 (not os.path.exists(self.training_annot_test))):
-            self.split_evaluation_images(self)
+            self.split_evaluation_images()
         print('images are splitted out for evaluation: {:d} portions'.format(
             self.tt_split))

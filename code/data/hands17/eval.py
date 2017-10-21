@@ -19,8 +19,8 @@ def compare_error(thedata, fname_echt, fname_pred):
             if name_s != name_t:
                 print('different names: {} - {}'.format(name_s, name_t))
                 return
-            p3d_s = dataops.get3d(thedata, pose_s, scen_s)
-            p3d_t = dataops.get3d(thedata, pose_t, scen_t)
+            p3d_s = dataops.get3d(pose_s, thedata.centre, thedata.focal, scen_s)
+            p3d_t = dataops.get3d(pose_t, thedata.centre, thedata.focal, scen_t)
             error_l.append(np.sqrt(
                 np.sum((p3d_s - p3d_t) ** 2, axis=1)
             ))
@@ -58,7 +58,7 @@ def draw_error_percentage_curve(errors, ax):
     # mpplot.show()
 
 
-def draw_error_per_joint(thedata, errors, ax):
+def draw_error_per_joint(errors, ax, join_name=None):
     err_mean = np.mean(errors, axis=0)
     err_max = np.max(errors, axis=0)
     err_min = np.min(errors, axis=0)
@@ -71,8 +71,12 @@ def draw_error_per_joint(thedata, errors, ax):
     ]
     err_mean = err_mean.tolist()
     jid = range(len(err_mean))
-    jtick = thedata.join_name
-    jtick.append('Mean')
+    jtick = join_name
+    if join_name is None:
+        jtick = [str(x) for x in jid]
+        jtick[-1] = 'Mean'
+    else:
+        jtick.append('Mean')
     # fig, ax = mpplot.subplots()
     mpplot.bar(
         jid, err_mean, yerr=err_m2m, align='center',

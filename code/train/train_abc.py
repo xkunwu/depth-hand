@@ -26,7 +26,7 @@ class train_abc():
             with tf.device('/gpu:' + str(self.args.gpu_id)):
                 batch_frame, pose_out = self.args.model_class.placeholder_inputs(
                     self.args.batch_size,
-                    self.args.img_size,
+                    self.args.crop_resize,
                     self.args.data_inst.join_num)
                 is_training = tf.placeholder(tf.bool, shape=())
 
@@ -105,7 +105,7 @@ class train_abc():
         """ ops: dict mapping from string to tf ops """
         is_training = True
         batch_size = self.args.batch_size
-        image_size = self.args.img_size
+        image_size = self.args.crop_resize
         batch_frame = np.empty(shape=(batch_size, image_size, image_size))
         batch_poses = np.empty(shape=(batch_size, self.args.pose_dim))
         with open(self.args.data_inst.training_annot_train, 'r') as fanno:
@@ -149,7 +149,7 @@ class train_abc():
         """ ops: dict mapping from string to tf ops """
         is_training = False
         batch_size = self.args.batch_size
-        image_size = self.args.img_size
+        image_size = self.args.crop_resize
         batch_frame = np.empty(shape=(batch_size, image_size, image_size))
         batch_poses = np.empty(shape=(batch_size, self.args.pose_dim))
         with open(self.args.data_inst.training_annot_test, 'r') as fanno:
@@ -198,7 +198,7 @@ class train_abc():
         with tf.device('/gpu:' + str(self.args.gpu_id)):
             batch_frame, pose_out = self.args.model_class.placeholder_inputs(
                 self.args.batch_size,
-                self.args.img_size,
+                self.args.crop_resize,
                 self.args.data_inst.join_num)
             is_training = tf.placeholder(tf.bool, shape=())
 
@@ -236,7 +236,7 @@ class train_abc():
     def eval_one_epoch_write(self, sess, ops, writer):
         is_training = False
         batch_size = self.args.batch_size
-        image_size = self.args.img_size
+        image_size = self.args.crop_resize
         batch_frame = np.empty(shape=(batch_size, image_size, image_size))
         batch_poses = np.empty(shape=(batch_size, self.args.pose_dim))
         batch_resce = np.empty(shape=(batch_size, 3))
@@ -351,5 +351,9 @@ class train_abc():
 if __name__ == "__main__":
     argsholder = args_holder()
     argsholder.parse_args()
+    ARGS = argsholder.args
+    ARGS.batch_size = 16
+    ARGS.max_epoch = 1
+    argsholder.create_instance()
     trainer = train_abc(argsholder.args)
     trainer.train()

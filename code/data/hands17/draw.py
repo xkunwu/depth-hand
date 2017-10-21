@@ -94,12 +94,12 @@ def draw_pose3(thedata, img, pose_mat, show_margin=False):
         Args:
             pose_mat: nx3 array
     """
-    pose2d = dataops.get2d(thedata, pose_mat)
+    pose2d = dataops.get2d(pose_mat, thedata.centre, thedata.focal)
 
     # draw bounding box
     # bm = dataops.getbm(pose_mat[3, 2])
     bm = 0.25
-    rect = dataops.get_rect(thedata, pose2d, bm)
+    rect = dataops.get_rect(pose2d, thedata.image_size, bm)
     mpplot.gca().add_patch(mppatches.Rectangle(
         rect[0, :], rect[1, 0], rect[1, 1],
         linewidth=1, facecolor='none',
@@ -129,7 +129,7 @@ def draw_pred_random(thedata, image_dir, annot_echt, annot_pred):
         draw_pose3(
             thedata,
             img,
-            dataops.get3d(thedata, pose_echt, rescen_echt),
+            dataops.get3d(pose_echt, thedata.centre, thedata.focal, rescen_echt),
             show_margin=True
         )
     mpplot.gcf().gca().set_title('Ground truth')
@@ -141,7 +141,7 @@ def draw_pred_random(thedata, image_dir, annot_echt, annot_pred):
         draw_pose3(
             thedata,
             img,
-            dataops.get3d(thedata, pose_pred, rescen_pred),
+            dataops.get3d(pose_pred, thedata.centre, thedata.focal, rescen_pred),
             show_margin=True
         )
     mpplot.gcf().gca().set_title('Prediction')
@@ -236,7 +236,7 @@ def draw_hist_random(thedata, image_dir, img_id=-1):
     mpplot.hist(img_val)
     mpplot.subplot(2, 2, 3)
     img_matt = img
-    img_matt[2 > img_matt] = 9999
+    img_matt[2 > img_matt] = thedata.max_distance
     mpplot.imshow(img_matt, cmap='bone')
     mpplot.subplot(2, 2, 4)
     img_val = [v for v in img_matt.flatten() if (10 > v)]

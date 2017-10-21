@@ -3,6 +3,7 @@ pandas
 scipy
 scikit-learn
 scikit-image
+scikit-fmm
 pillow
 matplotlib
 seaborn

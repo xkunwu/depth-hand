@@ -13,21 +13,21 @@ args_holder = getattr(
 )
 argsholder = args_holder()
 argsholder.parse_args()
-# dataops = import_module(
-#     'data.' + argsholder.args.data_name + '.ops')
-# dataio = import_module(
-#     'data.' + argsholder.args.data_name + '.io')
-datadraw = import_module(
-    'data.' + argsholder.args.data_name + '.draw')
-dataeval = import_module(
-    'data.' + argsholder.args.data_name + '.eval')
-argsholder.args.batch_size = 16
-argsholder.args.max_epoch = 1
-data_inst = argsholder.args.data_inst
+ARGS = argsholder.args
+ARGS.batch_size = 16
+ARGS.max_epoch = 1
+argsholder.create_instance()
+data_inst = ARGS.data_inst
 
-trainer = train_abc(argsholder.args, False)
-if (not os.path.exists(data_inst.training_annot_predict)):
-    trainer.evaluate()
+trainer = train_abc(ARGS, False)
+# if (not os.path.exists(data_inst.training_annot_predict)):
+#     trainer.evaluate()
+trainer.evaluate()
+
+datadraw = import_module(
+    'data.' + ARGS.data_name + '.draw')
+dataeval = import_module(
+    'data.' + ARGS.data_name + '.eval')
 
 datadraw.draw_pred_random(
     data_inst,
@@ -49,7 +49,7 @@ mpplot.subplot(1, draw_sum, draw_i)
 draw_i += 1
 dataeval.draw_error_percentage_curve(errors, mpplot.gca())
 mpplot.subplot(1, draw_sum, draw_i)
-dataeval.draw_error_per_joint(data_inst, errors, mpplot.gca())
+dataeval.draw_error_per_joint(errors, mpplot.gca(), data_inst.join_name)
 draw_i += 1
 mpplot.subplot(1, draw_sum, draw_i)
 dataeval.draw_mean_error_distribution(errors, mpplot.gca())

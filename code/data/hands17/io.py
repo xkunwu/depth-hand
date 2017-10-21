@@ -1,5 +1,5 @@
-from skimage import io as skimio
 import numpy as np
+from skimage import io as skimio
 import re
 
 
