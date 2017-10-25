@@ -9,7 +9,6 @@ class iso_box:
     def __init__(self):
         self.cen = [0, 0, 0]
         self.len = 0  # half side length
-        self.evals = np.ones(3)
         self.evecs = np.eye(3)
 
     def pick(self, points3):
@@ -24,7 +23,7 @@ class iso_box:
         )
         return points3[conds, :]
 
-    def build(self, points3, m=0.1):
+    def build(self, points3, m=0.5):
         # from sklearn.decomposition import PCA
         # pca = PCA(n_components=3)
         # points3_trans_skl = pca.fit_transform(points3)  # bias might be wrong
@@ -46,7 +45,6 @@ class iso_box:
         print(ptp)
         self.len = np.max(ptp) / 2
         print(self.len)
-        self.evals = evals
         self.evecs = evecs
         if 1 > m:
             m = self.len * m
@@ -54,26 +52,29 @@ class iso_box:
         return points3_trans
 
     def transform(self, points3):
-        # points3_trans = np.dot(points3 - self.cen, self.evecs) / np.sqrt(self.evals)
         points3_trans = np.dot(points3 - self.cen, self.evecs)
         return points3_trans
 
     def add_margin(self, m):
         self.len += m
 
-    def project_pca(self, ps3_pca, roll=0):
+    def project_pca(self, ps3_pca, roll=0, sort=True):
         ar3 = np.roll(np.arange(3), roll)
         cid = ar3[:2]
         did = 2
-        idx = np.argsort(ps3_pca[:, did])
-        ps3_pca = ps3_pca[idx, :]
+        if sort is True:
+            idx = np.argsort(ps3_pca[:, did])
+            ps3_pca = ps3_pca[idx, :]
         coord = ps3_pca[:, cid]
-        depth = ps3_pca[:, did]
         cll = np.array([-self.len, -self.len])
+        coord = np.floor(coord - cll + 0.5).astype(int)
+        depth = ps3_pca[:, did] + self.len
+        return coord, depth
+
+    def print_image(self, coord, depth):
         sidelen = np.ceil(2 * self.len).astype(int) + 1
         img = np.zeros((sidelen, sidelen))
-        coord = np.floor(coord - cll + 0.5).astype(int)
-        img[coord[:, 0], coord[:, 1]] = depth + self.len
+        img[coord[:, 1], coord[:, 0]] = depth  # reverse coordinates!
         return img
 
     @staticmethod
