@@ -13,11 +13,14 @@ class iso_box:
         self.evecs = np.eye(3)
 
     def pick(self, points3):
-        cmin = self.cen - self.len
-        cmax = self.cen + self.len
+        points3_trans = self.transform(points3)
+        # cmin = self.cen - self.len
+        # cmax = self.cen + self.len
+        cmin = - np.ones(3) * self.len
+        cmax = np.ones(3) * self.len
         conds = np.logical_and(
-            np.all(cmin < points3, axis=1),
-            np.all(cmax > points3, axis=1)
+            np.all(cmin < points3_trans, axis=1),
+            np.all(cmax > points3_trans, axis=1)
         )
         return points3[conds, :]
 
@@ -57,6 +60,21 @@ class iso_box:
 
     def add_margin(self, m):
         self.len += m
+
+    def project_pca(self, ps3_pca, roll=0):
+        ar3 = np.roll(np.arange(3), roll)
+        cid = ar3[:2]
+        did = 2
+        idx = np.argsort(ps3_pca[:, did])
+        ps3_pca = ps3_pca[idx, :]
+        coord = ps3_pca[:, cid]
+        depth = ps3_pca[:, did]
+        cll = np.array([-self.len, -self.len])
+        sidelen = np.ceil(2 * self.len).astype(int) + 1
+        img = np.zeros((sidelen, sidelen))
+        coord = np.floor(coord - cll + 0.5).astype(int)
+        img[coord[:, 0], coord[:, 1]] = depth + self.len
+        return img
 
     @staticmethod
     def get_corners(cen, len):

@@ -34,6 +34,7 @@ iso_box = getattr(
 
 
 def draw_raw3d(thedata, img, pose_raw):
+    # draw full image
     points3 = dataops.img_to_raw(
         img, thedata.centre, thedata.focal,
         thedata.min_z, thedata.max_z)
@@ -52,23 +53,43 @@ def draw_raw3d(thedata, img, pose_raw):
     ax.set_zlabel('depth (mm)', labelpad=15)
     draw_raw3d_pose(thedata, ax, pose_raw)
     mpplot.show()
+    # draw cropped region
     box = iso_box()
     box.build(pose_raw)
     points3 = box.pick(points3)
     numpts = points3.shape[0]
     if 1000 < numpts:
         samid = randsample(range(numpts), 1000)
-        points3 = points3[samid, :]
-    points3 = box.transform(points3)
+        points3_sam = points3[samid, :]
+    points3_sam = box.transform(points3_sam)
     pose_raw = box.transform(pose_raw)
     fig = mpplot.figure()
     ax = Axes3D(fig)
     ax.scatter(
-        points3[:, 0], points3[:, 1], points3[:, 2],
+        points3_sam[:, 0], points3_sam[:, 1], points3_sam[:, 2],
         color=Color('lightsteelblue').rgb)
     draw_raw3d_pose(thedata, ax, pose_raw)
     box.draw_wire(ax)
     ax.view_init(azim=-120, elev=-150)
+    mpplot.show()
+    # draw projected image
+    points3_trans = box.transform(points3)
+    mpplot.subplots(nrows=1, ncols=3)
+    mpplot.subplot(1, 3, 1)
+    img = box.project_pca(points3_trans, 0)
+    mpplot.imshow(img, cmap='bone')
+    mpplot.gcf().gca().axis('off')
+    mpplot.tight_layout()
+    mpplot.subplot(1, 3, 2)
+    img = box.project_pca(points3_trans, 1)
+    mpplot.imshow(img, cmap='bone')
+    mpplot.gcf().gca().axis('off')
+    mpplot.tight_layout()
+    mpplot.subplot(1, 3, 3)
+    img = box.project_pca(points3_trans, 2)
+    mpplot.imshow(img, cmap='bone')
+    mpplot.gcf().gca().axis('off')
+    mpplot.tight_layout()
     mpplot.show()
 
 
