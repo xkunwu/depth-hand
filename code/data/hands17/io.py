@@ -18,6 +18,7 @@ def save_image(image_name, img):
 
 
 def parse_line_pose(annot_line):
+    """ parse raw annotation """
     line_l = re.split(r'\s+', annot_line.strip())
     rescen = None
     if 64 == len(line_l):
@@ -36,10 +37,12 @@ def parse_line_pose(annot_line):
     return line_l[0], pose_mat, rescen
 
 
-def get_line(filename, n):
+def get_line(filename, img_id):
+    img_name_id = 'image_D{:08d}.png'.format(img_id)
     with open(filename, 'r') as f:
         for line_number, line in enumerate(f):
-            if line_number == n:
+            img_name, _, _ = parse_line_pose(line)
+            if img_name_id == img_name:
                 return line
 
 

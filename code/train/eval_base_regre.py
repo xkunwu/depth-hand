@@ -20,14 +20,32 @@ argsholder.create_instance()
 data_inst = ARGS.data_inst
 
 trainer = train_abc(ARGS, False)
-# if (not os.path.exists(data_inst.training_annot_predict)):
-#     trainer.evaluate()
-trainer.evaluate()
+if (not os.path.exists(data_inst.training_annot_predict)):
+    trainer.evaluate()
+# trainer.evaluate()
 
 datadraw = import_module(
     'data.' + ARGS.data_name + '.draw')
 dataeval = import_module(
     'data.' + ARGS.data_name + '.eval')
+
+fig_size = (2 * 5, 5)
+mpplot.subplots(nrows=1, ncols=2, figsize=fig_size)
+mpplot.subplot(1, 2, 1)
+datadraw.draw_pose_xy_random(
+    data_inst,
+    data_inst.training_images,
+    data_inst.training_annot_cleaned,
+    219  # palm
+)
+mpplot.subplot(1, 2, 2)
+datadraw.draw_pose_xy_random(
+    data_inst,
+    data_inst.training_cropped,
+    data_inst.training_annot_cropped,
+    219  # palm
+)
+mpplot.show()
 
 datadraw.draw_pred_random(
     data_inst,

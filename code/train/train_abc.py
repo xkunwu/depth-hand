@@ -108,9 +108,9 @@ class train_abc():
         image_size = self.args.crop_resize
         batch_frame = np.empty(shape=(batch_size, image_size, image_size))
         batch_poses = np.empty(shape=(batch_size, self.args.pose_dim))
-        with open(self.args.data_inst.training_annot_train, 'r') as fanno:
-        # fanno = self.args.data_provider.open_train(self.args.data_inst)
-        # try:
+        # with open(self.args.data_inst.training_annot_train, 'r') as fanno:
+        fanno = self.args.data_provider.read_train(self.args.data_inst)
+        try:
             # batch_count = 0
             while True:
                 next_n_lines = list(islice(fanno, batch_size))
@@ -142,8 +142,8 @@ class train_abc():
                 # batch_count += 1
                 self.logger.info('batch training loss (half-squared): {}'.format(
                     loss_val))
-        # finally:
-        #     self.args.data_provider.close(self.args.data_inst, fanno)
+        finally:
+            self.args.data_provider.close(self.args.data_inst, fanno)
 
     def test_one_epoch(self, sess, ops, test_writer):
         """ ops: dict mapping from string to tf ops """
@@ -152,9 +152,9 @@ class train_abc():
         image_size = self.args.crop_resize
         batch_frame = np.empty(shape=(batch_size, image_size, image_size))
         batch_poses = np.empty(shape=(batch_size, self.args.pose_dim))
-        with open(self.args.data_inst.training_annot_test, 'r') as fanno:
-        # fanno = self.args.data_provider.open(self.args.data_inst)
-        # try:
+        # with open(self.args.data_inst.training_annot_test, 'r') as fanno:
+        fanno = self.args.data_provider.read_test(self.args.data_inst)
+        try:
             batch_count = 0
             loss_sum = 0
             while True:
@@ -191,8 +191,8 @@ class train_abc():
             print('\n')
             self.logger.info('epoch evaluate mean loss (half-squared): {}'.format(
                 loss_sum / batch_count))
-        # finally:
-        #     self.args.data_provider.close(self.args.data_inst, fanno)
+        finally:
+            self.args.data_provider.close(self.args.data_inst, fanno)
 
     def evaluate(self):
         with tf.device('/gpu:' + str(self.args.gpu_id)):
@@ -230,19 +230,20 @@ class train_abc():
             'pred': pred
         }
 
-        with open(self.args.data_inst.training_annot_predict, 'w') as writer:
-            self.eval_one_epoch_write(sess, ops, writer)
+        # with open(self.args.data_inst.training_annot_predict, 'w') as writer:
+        self.eval_one_epoch_write(sess, ops)
 
-    def eval_one_epoch_write(self, sess, ops, writer):
+    def eval_one_epoch_write(self, sess, ops):
         is_training = False
         batch_size = self.args.batch_size
         image_size = self.args.crop_resize
         batch_frame = np.empty(shape=(batch_size, image_size, image_size))
         batch_poses = np.empty(shape=(batch_size, self.args.pose_dim))
         batch_resce = np.empty(shape=(batch_size, 3))
-        with open(self.args.data_inst.training_annot_test, 'r') as fanno:
-        # fanno = self.args.data_provider.open(self.args.data_inst)
-        # try:
+        # with open(self.args.data_inst.training_annot_test, 'r') as fanno:
+        fanno = self.args.data_provider.read_test(self.args.data_inst)
+        writer = self.args.data_provider.write_predict(self.args.data_inst)
+        try:
             batch_count = 0
             loss_sum = 0
             while True:
@@ -286,8 +287,8 @@ class train_abc():
             # print('\n')
             self.logger.info('epoch evaluate mean loss (half-squared): {}'.format(
                 loss_sum / batch_count))
-        # finally:
-        #     self.args.data_provider.close(self.args.data_inst, fanno)
+        finally:
+            self.args.data_provider.close(self.args.data_inst, fanno)
 
     def get_learning_rate(self, batch):
         learning_rate = tf.train.exponential_decay(

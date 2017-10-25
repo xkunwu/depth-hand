@@ -14,6 +14,17 @@ class base_regre():
     """ This class holds baseline training approach using plain regression.
     """
     @staticmethod
+    def tweak_args(args):
+        """ Tweak algorithm specific parameters """
+        args.crop_resize = 96
+        args.batch_size = 96
+
+    @staticmethod
+    def receive_args(args):
+        """ Receive parameters specific to the data """
+        args.pose_dim = args.join_num * 3
+
+    @staticmethod
     def placeholder_inputs(batch_size, img_size, joint_num):
         num_out = joint_num * 3
         batch_frame = tf.placeholder(

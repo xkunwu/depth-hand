@@ -2,15 +2,15 @@ import os
 import io as dataio
 
 
-def open_train(thedata):
+def read_train(thedata):
     return open(thedata.training_annot_train, 'r')
 
 
-def open_test(thedata):
+def read_test(thedata):
     return open(thedata.training_annot_test, 'r')
 
 
-def open_predict(thedata):
+def write_predict(thedata):
     return open(thedata.training_annot_predict, 'w')
 
 

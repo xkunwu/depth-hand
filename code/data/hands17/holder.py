@@ -40,7 +40,7 @@ class hands17holder:
     image_size = [640, 480]
     crop_resize = 96
     min_z = 1
-    max_z = 6666
+    max_z = 3333
     max_distance = 9999  # max distance set to 10m
     # camera info
     focal = (475.065948, 475.065857)
@@ -93,7 +93,7 @@ class hands17holder:
                 open(self.training_annot_origin, 'r') as reader:
             for annot_line in reader.readlines():
                 _, pose_mat, rescen = dataio.parse_line_pose(annot_line)
-                pose2d = dataops.get2d(pose_mat, self.centre, self.focal)
+                pose2d = dataops.raw_to_2d(pose_mat, self.centre, self.focal)
                 if 0 > np.min(pose2d):
                     continue
                 if 0 > np.min(self.image_size - pose2d):
@@ -131,7 +131,7 @@ class hands17holder:
         img_name, pose_mat, rescen = dataio.parse_line_pose(annot_line)
         img = dataio.read_image(
             os.path.join(self.training_images, img_name))
-        pose2d = dataops.get2d(
+        pose2d = dataops.raw_to_2d(
             pose_mat, self.centre, self.focal)
         rect = dataops.get_rect(pose2d, self.image_size, 0.25)
         crop_resize = self.crop_resize
@@ -228,28 +228,7 @@ class hands17holder:
         thread_pool.close()
         thread_pool.join()
 
-    def init_data(self, args, rebuild=False):
-        self.data_dir = args.data_dir
-        self.out_dir = args.out_dir
-        self.training_images = os.path.join(self.data_dir, 'training/images')
-        self.frame_images = os.path.join(self.data_dir, 'frame/images')
-        self.training_cropped = os.path.join(self.out_dir, 'cropped')
-        self.training_annot_origin = os.path.join(
-            self.data_dir, 'training/Training_Annotation.txt')
-        self.training_annot_cleaned = os.path.join(
-            self.out_dir, 'annotation.txt')
-        self.training_annot_shuffled = os.path.join(
-            self.out_dir, 'annotation_shuffled.txt')
-        self.training_annot_cropped = os.path.join(
-            self.out_dir, 'annotation_cropped.txt')
-        self.training_annot_train = os.path.join(
-            self.out_dir, 'training_training.txt')
-        self.training_annot_test = os.path.join(
-            self.out_dir, 'training_evaluate.txt')
-        self.training_annot_predict = os.path.join(
-            self.out_dir, 'training_predict.txt')
-        self.frame_bbox = os.path.join(self.data_dir, 'frame/BoundingBox.txt')
-
+    def init_data(self, rebuild=False):
         if rebuild or (not os.path.exists(self.training_annot_cleaned)):
             self.remove_out_frame_annot()
         else:
@@ -289,3 +268,31 @@ class hands17holder:
             self.split_evaluation_images()
         print('images are splitted out for evaluation: {:d} portions'.format(
             self.tt_split))
+
+    def provide_args(self, args):
+        """ Provide data specific parameters """
+        args.join_num = self.join_num
+
+    def __init__(self, args):
+        self.data_dir = args.data_dir
+        self.out_dir = args.out_dir
+        self.crop_resize = args.crop_resize
+
+        self.training_images = os.path.join(self.data_dir, 'training/images')
+        self.frame_images = os.path.join(self.data_dir, 'frame/images')
+        self.training_cropped = os.path.join(self.out_dir, 'cropped')
+        self.training_annot_origin = os.path.join(
+            self.data_dir, 'training/Training_Annotation.txt')
+        self.training_annot_cleaned = os.path.join(
+            self.out_dir, 'annotation.txt')
+        self.training_annot_shuffled = os.path.join(
+            self.out_dir, 'annotation_shuffled.txt')
+        self.training_annot_cropped = os.path.join(
+            self.out_dir, 'annotation_cropped.txt')
+        self.training_annot_train = os.path.join(
+            self.out_dir, 'training_training.txt')
+        self.training_annot_test = os.path.join(
+            self.out_dir, 'training_evaluate.txt')
+        self.training_annot_predict = os.path.join(
+            self.out_dir, 'training_predict.txt')
+        self.frame_bbox = os.path.join(self.data_dir, 'frame/BoundingBox.txt')

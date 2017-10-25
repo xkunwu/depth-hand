@@ -4,9 +4,12 @@ from importlib import import_module
 import numpy as np
 import matplotlib.pyplot as mpplot
 import matplotlib.patches as mppatches
+# from mpl_toolkits import mplot3d
+from mpl_toolkits.mplot3d import Axes3D
 import imageio
 from colour import Color
 from random import randint
+from random import sample as randsample
 import linecache
 import csv
 import ops as dataops
@@ -24,6 +27,106 @@ fig2data = getattr(
     import_module('image_ops'),
     'fig2data'
 )
+iso_box = getattr(
+    import_module('regu_grid'),
+    'iso_box'
+)
+
+
+def draw_raw3d(thedata, img, pose_raw):
+    points3 = dataops.img_to_raw(
+        img, thedata.centre, thedata.focal,
+        thedata.min_z, thedata.max_z)
+    numpts = points3.shape[0]
+    if 1000 < numpts:
+        samid = randsample(range(numpts), 1000)
+        points3_sam = points3[samid, :]
+    else:
+        points3_sam = points3
+    fig = mpplot.figure()
+    ax = Axes3D(fig)
+    ax.scatter(
+        points3_sam[:, 0], points3_sam[:, 1], points3_sam[:, 2],
+        color=Color('lightsteelblue').rgb)
+    ax.view_init(azim=-90, elev=-60)
+    ax.set_zlabel('depth (mm)', labelpad=15)
+    draw_raw3d_pose(thedata, ax, pose_raw)
+    mpplot.show()
+    box = iso_box()
+    box.build(pose_raw)
+    points3 = box.pick(points3)
+    numpts = points3.shape[0]
+    if 1000 < numpts:
+        samid = randsample(range(numpts), 1000)
+        points3 = points3[samid, :]
+    points3 = box.transform(points3)
+    pose_raw = box.transform(pose_raw)
+    fig = mpplot.figure()
+    ax = Axes3D(fig)
+    ax.scatter(
+        points3[:, 0], points3[:, 1], points3[:, 2],
+        color=Color('lightsteelblue').rgb)
+    draw_raw3d_pose(thedata, ax, pose_raw)
+    box.draw_wire(ax)
+    ax.view_init(azim=-120, elev=-150)
+    mpplot.show()
+
+
+def draw_raw3d_pose(thedata, ax, pose_raw, zdir='z'):
+    p3wrist = np.array([pose_raw[0, :]])
+    for fii, joints in enumerate(thedata.join_id):
+        p3joints = pose_raw[joints, :]
+        color_v0 = Color(thedata.join_color[fii + 1])
+        color_v0.luminance = 0.3
+        color_range = [C.rgb for C in make_color_range(
+            color_v0, thedata.join_color[fii + 1], len(p3joints) + 1)]
+        for jj, joint in enumerate(p3joints):
+            ax.scatter(
+                p3joints[jj, 0], p3joints[jj, 1], p3joints[jj, 2],
+                color=color_range[jj + 1],
+                zdir=zdir
+            )
+        p3joints_w = np.vstack((p3wrist, p3joints))
+        mpplot.plot(
+            p3joints_w[:, 0], p3joints_w[:, 1], p3joints_w[:, 2],
+            '-',
+            linewidth=2.0,
+            color=thedata.join_color[fii + 1].rgb,
+            zdir=zdir
+        )
+    ax.scatter(
+        p3wrist[0, 0], p3wrist[0, 1], p3wrist[0, 2],
+        color=thedata.join_color[0].rgb,
+        zdir=zdir
+    )
+
+
+def draw_raw3d_random(thedata, image_dir, annot_txt, img_id=-1):
+    """ Draw 3D pose of a randomly picked image.
+    """
+    if 0 > img_id:
+        # img_id = randint(1, thedata.num_training)
+        img_id = randint(1, thedata.num_training)
+    # Notice that linecache counts from 1
+    annot_line = linecache.getline(annot_txt, img_id)
+    # annot_line = linecache.getline(annot_txt, 219)  # palm
+    # annot_line = linecache.getline(annot_txt, 465)  # the finger
+    # print(annot_line)
+
+    img_name, pose_raw, rescen = dataio.parse_line_pose(annot_line)
+    img_path = os.path.join(image_dir, img_name)
+    print('drawing pose #{:d}: {}'.format(img_id, img_path))
+    img = dataio.read_image(img_path)
+
+    mpplot.figure()
+    mpplot.imshow(img, cmap='bone')
+    if rescen is None:
+        draw_pose_xy(thedata, img, pose_raw)
+    else:
+        draw_pose2d(thedata, img, pose_raw[:, 0:2])
+    mpplot.show()
+    draw_raw3d(thedata, img, pose_raw)
+    return img_id
 
 
 def draw_pose2d(thedata, img, pose2d, show_margin=False):
@@ -89,24 +192,35 @@ def draw_pose2d(thedata, img, pose2d, show_margin=False):
     return fig2data(mpplot.gcf(), show_margin)
 
 
-def draw_pose3(thedata, img, pose_mat, show_margin=False):
+def draw_pose_xy(thedata, img, pose_raw, show_margin=False):
     """ Draw 3D pose onto 2D image domain: using only (x, y).
         Args:
-            pose_mat: nx3 array
+            pose_raw: nx3 array
     """
-    pose2d = dataops.get2d(pose_mat, thedata.centre, thedata.focal)
+    pose2d = dataops.raw_to_2d(pose_raw, thedata.centre, thedata.focal)
+    # indz = np.hstack((
+    #     pose2d,
+    #     pose_raw[:, 2].reshape(-1, 1))
+    # )
+    # points3 = dataops.d2z_to_raw(indz, thedata.centre, thedata.focal)
+    # print(pose_raw - points3)
 
     # draw bounding box
-    # bm = dataops.getbm(pose_mat[3, 2])
     bm = 0.25
-    rect = dataops.get_rect(pose2d, thedata.image_size, bm)
+    rect = dataops.get_rect(
+        pose2d,
+        # thedata.centre, thedata.focal,
+        thedata.image_size, bm)
     mpplot.gca().add_patch(mppatches.Rectangle(
         rect[0, :], rect[1, 0], rect[1, 1],
         linewidth=1, facecolor='none',
         edgecolor=thedata.bbox_color.rgb)
     )
 
-    img_posed = draw_pose2d(thedata, img, pose2d, show_margin)
+    img_posed = draw_pose2d(
+        thedata, img,
+        pose2d,
+        show_margin)
     return img_posed
 
 
@@ -124,53 +238,59 @@ def draw_pred_random(thedata, image_dir, annot_echt, annot_pred):
     mpplot.subplot(1, 2, 1)
     mpplot.imshow(img, cmap='bone')
     if rescen_echt is None:
-        draw_pose3(thedata, img, pose_echt, show_margin=True)
+        draw_pose_xy(
+            thedata, img,
+            pose_echt,
+            show_margin=True)
     else:
-        draw_pose3(
-            thedata,
-            img,
-            dataops.get3d(pose_echt, thedata.centre, thedata.focal, rescen_echt),
-            show_margin=True
-        )
+        draw_pose_xy(
+            thedata, img,
+            dataops.d2z_to_raw(pose_echt, thedata.centre, thedata.focal, rescen_echt),
+            show_margin=True)
     mpplot.gcf().gca().set_title('Ground truth')
     mpplot.subplot(1, 2, 2)
     mpplot.imshow(img, cmap='bone')
     if rescen_pred is None:
-        draw_pose3(thedata, img, pose_pred, show_margin=True)
+        draw_pose_xy(
+            thedata, img,
+            pose_pred,
+            show_margin=True)
     else:
-        draw_pose3(
-            thedata,
-            img,
-            dataops.get3d(pose_pred, thedata.centre, thedata.focal, rescen_pred),
-            show_margin=True
-        )
+        draw_pose_xy(
+            thedata, img,
+            dataops.d2z_to_raw(pose_pred, thedata.centre, thedata.focal, rescen_pred),
+            show_margin=True)
     mpplot.gcf().gca().set_title('Prediction')
     mpplot.show()
 
 
-def draw_pose_random(thedata, image_dir, annot_txt, img_id=-1):
-    """ Draw 3D pose of a randomly picked image.
+def draw_pose_xy_random(thedata, image_dir, annot_txt, img_id=-1):
+    """ Draw pose in the frontal view of a randomly picked image.
     """
-    if 0 > img_id:
+    if 1 > img_id:
         # img_id = randint(1, thedata.num_training)
         img_id = randint(1, thedata.num_training)
     # Notice that linecache counts from 1
     annot_line = linecache.getline(annot_txt, img_id)
-    # annot_line = linecache.getline(annot_txt, 652)  # palm
+    # annot_line = linecache.getline(annot_txt, 219)  # palm
     # annot_line = linecache.getline(annot_txt, 465)  # the finger
     # print(annot_line)
 
-    img_name, pose_mat, rescen = dataio.parse_line_pose(annot_line)
+    img_name_id = 'image_D{:08d}.png'.format(img_id)
+    img_name, pose_raw, rescen = dataio.parse_line_pose(annot_line)
+    if img_name_id != img_name:
+        annot_line = dataio.get_line(annot_txt, img_id)
+        img_name, pose_raw, rescen = dataio.parse_line_pose(annot_line)
     img_path = os.path.join(image_dir, img_name)
     print('drawing pose #{:d}: {}'.format(img_id, img_path))
     img = dataio.read_image(img_path)
 
     mpplot.imshow(img, cmap='bone')
     if rescen is None:
-        draw_pose3(thedata, img, pose_mat)
+        draw_pose_xy(thedata, img, pose_raw)
     else:
-        draw_pose2d(thedata, img, pose_mat[:, 0:2])
-    mpplot.show()
+        draw_pose2d(thedata, img, pose_raw[:, 0:2])
+    # mpplot.show()
     return img_id
 
 
@@ -184,10 +304,10 @@ def draw_pose_stream(thedata, gif_file, max_draw=100):
                 if lii >= max_draw:
                     return
                     # raise coder.break_with.Break
-                img_name, pose_mat, rescen = dataio.parse_line_pose(annot_line)
+                img_name, pose_raw, rescen = dataio.parse_line_pose(annot_line)
                 img = dataio.read_image(os.path.join(thedata.training_images, img_name))
                 mpplot.imshow(img, cmap='bone')
-                img_posed = draw_pose3(img, pose_mat)
+                img_posed = draw_pose_xy(img, pose_raw)
                 # mpplot.show()
                 gif_writer.append_data(img_posed)
                 mpplot.gcf().clear()

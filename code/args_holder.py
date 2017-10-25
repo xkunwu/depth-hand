@@ -39,23 +39,23 @@ class args_holder:
             help='Model name [default: base_regre]')
 
         # input preprocessing
-        self.parser.add_argument(
-            '--crop_resize', type=int, default=96,
-            help='Resized image size of cropped area [default: 96]')
-        self.parser.add_argument(
-            '--pose_dim', type=int, default=63,
-            help='Output tensor length of pose [default: 63]')
+        # self.parser.add_argument(
+        #     '--crop_resize', type=int, default=96,
+        #     help='Resized image size of cropped area [default: 96]')
+        # self.parser.add_argument(
+        #     '--pose_dim', type=int, default=63,
+        #     help='Output tensor length of pose [default: 63]')
 
         # learning parameters
         self.parser.add_argument(
             '--max_epoch', type=int, default=10,
             help='Epoch to run [default: 10]')
         self.parser.add_argument(
-            '--batch_size', type=int, default=128,
-            help='Batch Size during training [default: 128]')
-        self.parser.add_argument(
-            '--optimizer', default='adam',
-            help='Only using adam currently [default: adam]')
+            '--batch_size', type=int, default=64,
+            help='Batch Size during training [default: 64]')
+        # self.parser.add_argument(
+        #     '--optimizer', default='adam',
+        #     help='Only using adam currently [default: adam]')
         self.parser.add_argument(
             '--bn_momentum', type=float, default=0.8,
             help='Initial batch normalization momentum [default: 0.8]')
@@ -84,6 +84,11 @@ class args_holder:
             os.makedirs(self.args.out_dir)
         self.args.log_dir = os.path.join(self.args.out_dir, 'log')
         self.args.cpu_count = multiprocessing.cpu_count()
+        self.args.model_class = getattr(
+            import_module('train.' + self.args.model_name),
+            self.args.model_name
+        )
+        self.args.model_class.tweak_args(self.args)
 
     def create_instance(self):
         self.args.data_module = import_module(
@@ -94,14 +99,12 @@ class args_holder:
             import_module('data.' + self.args.data_name + '.holder'),
             self.args.data_name + 'holder'
         )
-        self.args.data_inst = self.args.data_class()
+        self.args.data_inst = self.args.data_class(self.args)
         self.args.data_inst.init_data(
-            self.args, self.args.rebuild_data
+            self.args.rebuild_data
         )
-        self.args.model_class = getattr(
-            import_module('train.' + self.args.model_name),
-            self.args.model_name
-        )
+        self.args.data_inst.provide_args(self.args)
+        self.args.model_class.receive_args(self.args)
 
 
 if __name__ == "__main__":
