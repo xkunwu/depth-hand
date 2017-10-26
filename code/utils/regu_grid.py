@@ -5,16 +5,42 @@ from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 from colour import Color
 
 
+class iso_rect:
+    def __init__(self, cen=np.zeros(2), len=0):
+        self.cen = cen
+        self.len = len  # half side length
+
+    def build(self, points2, m=0.1):
+        self.cen = np.mean(points2, axis=0)
+        self.len = np.max(np.ptp(points2, axis=0))
+        if 1 > m:
+            m = self.len * m
+        self.len += m
+
+    def get_sidelen(self):
+        return np.ceil(2 * self.len).astype(int) + 1
+
+    def print_image(self, coord, value):
+        cll = self.cen - self.len
+        coord = np.floor(coord - cll + 0.5).astype(int)
+        sidelen = self.get_sidelen()
+        img = np.zeros((sidelen, sidelen))
+        img[coord[:, 1], coord[:, 0]] = value  # reverse coordinates!
+        return img
+
+
 class iso_box:
-    def __init__(self):
-        self.cen = [0, 0, 0]
-        self.len = 0  # half side length
+    def __init__(self, cen=np.zeros(3), len=0):
+        self.cen = cen
+        self.len = len  # half side length
         self.evecs = np.eye(3)
 
+    def get_sidelen(self):
+        return np.ceil(2 * self.len).astype(int) + 1
+
     def pick(self, points3):
+        """ only meaningful when picked in the local coordinates """
         points3_trans = self.transform(points3)
-        # cmin = self.cen - self.len
-        # cmax = self.cen + self.len
         cmin = - np.ones(3) * self.len
         cmax = np.ones(3) * self.len
         conds = np.logical_and(
@@ -23,7 +49,7 @@ class iso_box:
         )
         return points3[conds, :]
 
-    def build(self, points3, m=0.5):
+    def build(self, points3, m=0.6):
         # from sklearn.decomposition import PCA
         # pca = PCA(n_components=3)
         # points3_trans_skl = pca.fit_transform(points3)  # bias might be wrong
@@ -31,20 +57,20 @@ class iso_box:
         # print(np.ptp(points3_trans_skl, axis=0))
         self.cen = np.mean(points3, axis=0)
         C = np.cov((points3 - self.cen), rowvar=False)
-        evals, evecs = np.linalg.eigh(C)
-        idx = np.argsort(evals)[::-1]
-        evecs = evecs[idx, :]
-        evals = evals[idx]
-        print(evals)
-        # print(np.linalg.norm(evecs, axis=0))
+        # evals, evecs = np.linalg.eigh(C)
+        _, evecs = np.linalg.eigh(C)
+        # idx = np.argsort(evals)[::-1]
+        # evecs = evecs[idx, :]
+        # evals = evals[idx]
+        # print(evals)
         points3_trans = self.transform(points3)
         ptp = np.ptp(points3_trans, axis=0)
         idx = np.argsort(ptp)[::-1]
         evecs = evecs[idx, :]
         ptp = ptp[idx]
-        print(ptp)
+        # print(ptp)
         self.len = np.max(ptp) / 2
-        print(self.len)
+        # print(self.len)
         self.evecs = evecs
         if 1 > m:
             m = self.len * m
@@ -52,7 +78,13 @@ class iso_box:
         return points3_trans
 
     def transform(self, points3):
+        """ to local coordinates """
         points3_trans = np.dot(points3 - self.cen, self.evecs)
+        return points3_trans
+
+    def transform_inv(self, points3):
+        """ to world coordinates """
+        points3_trans = np.dot(points3, self.evecs.T) + self.cen
         return points3_trans
 
     def add_margin(self, m):
@@ -72,15 +104,16 @@ class iso_box:
         return coord, depth
 
     def print_image(self, coord, depth):
-        sidelen = np.ceil(2 * self.len).astype(int) + 1
+        sidelen = self.get_sidelen()
         img = np.zeros((sidelen, sidelen))
         img[coord[:, 1], coord[:, 0]] = depth  # reverse coordinates!
         return img
 
-    @staticmethod
-    def get_corners(cen, len):
-        cmin = cen - len
-        cmax = cen + len
+    def get_corners(self):
+        # cmin = self.cen - self.len
+        # cmax = self.cen + self.len
+        cmin = - np.ones(3) * self.len
+        cmax = np.ones(3) * self.len
         corners = np.array([
             cmin,
             [cmax[0], cmin[1], cmin[2]],
@@ -93,8 +126,7 @@ class iso_box:
         ])
         return corners
 
-    def draw(self, ax, alpha='0.25'):
-        corners = iso_box.get_corners(self.cen, self.len)
+    def draw(self, corners, ax, alpha='0.25'):
         faces = [
             [corners[0], corners[3], corners[2], corners[1]],
             [corners[0], corners[1], corners[5], corners[4]],
@@ -112,11 +144,7 @@ class iso_box:
             corners[:, 0], corners[:, 1], corners[:, 2],
             color=Color('cyan').rgb, alpha=0.5, marker='o')
 
-    def draw_wire(self, ax):
-        corners = iso_box.get_corners(
-            self.transform(self.cen),
-            self.len
-        )
+    def draw_wire(self, corners, ax):
         ring_b = np.array([
             corners[0], corners[1], corners[2], corners[3], corners[0]
         ])

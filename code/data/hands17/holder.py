@@ -3,7 +3,7 @@ import numpy as np
 from colour import Color
 import cv2
 from timeit import default_timer as timer
-from random import random
+import random
 from multiprocessing.dummy import Pool as ThreadPool
 # import multiprocessing
 # from multiprocessing import Manager as ThreadManager
@@ -22,8 +22,6 @@ class hands17holder:
     training_cropped = ''
     training_annot_origin = ''
     training_annot_cleaned = ''
-    training_annot_shuffled = ''
-    training_annot_cropped = ''
     training_annot_train = ''
     training_annot_test = ''
     training_annot_predict = ''
@@ -92,8 +90,8 @@ class hands17holder:
         with open(self.training_annot_cleaned, 'w') as writer, \
                 open(self.training_annot_origin, 'r') as reader:
             for annot_line in reader.readlines():
-                _, pose_mat, rescen = dataio.parse_line_pose(annot_line)
-                pose2d = dataops.raw_to_2d(pose_mat, self.centre, self.focal)
+                _, pose_raw, rescen = dataio.parse_line_pose(annot_line)
+                pose2d = dataops.raw_to_2d(pose_raw, self.centre, self.focal)
                 if 0 > np.min(pose2d):
                     continue
                 if 0 > np.min(self.image_size - pose2d):
@@ -101,17 +99,10 @@ class hands17holder:
                 writer.write(annot_line)
                 self.num_training += 1
 
-    def shuffle_annot(self):
+    def shuffle_split(self):
         with open(self.training_annot_cleaned, 'r') as source:
-            data = [(random(), line) for line in source]
-        data.sort()
-        with open(self.training_annot_shuffled, 'w') as target:
-            for _, line in data:
-                target.write(line)
-
-    def split_evaluation_images(self):
-        with open(self.training_annot_cropped, 'r') as f:
-            lines = [x.strip() for x in f.readlines()]
+            lines = source.readlines()
+        random.shuffle(lines)
         with open(self.training_annot_train, 'w') as f:
             for line in lines[self.range_train[0]:self.range_train[1]]:
                 f.write(line + '\n')
@@ -128,18 +119,21 @@ class hands17holder:
             Returns:
                 p3z_crop: projected 2d coordinates, and original z on the 3rd column
         """
-        img_name, pose_mat, rescen = dataio.parse_line_pose(annot_line)
+        img_name, pose_raw, rescen = dataio.parse_line_pose(annot_line)
         img = dataio.read_image(
             os.path.join(self.training_images, img_name))
         pose2d = dataops.raw_to_2d(
-            pose_mat, self.centre, self.focal)
-        rect = dataops.get_rect(pose2d, self.image_size, 0.25)
+            pose_raw, self.centre, self.focal)
+        rect = dataops.get_rect3(
+            pose_raw,
+            self.centre, self.focal,
+            self.image_size, 0.25)
         crop_resize = self.crop_resize
         rs = crop_resize / rect[1, 1]
         rescen = np.append(rs, rect[0, :])
         p2d_crop = (pose2d - rect[0, :]) * rs
         p3z_crop = np.hstack((
-            p2d_crop, np.array(pose_mat[:, 2].reshape(-1, 1)) * rs
+            p2d_crop, np.array(pose_raw[:, 2].reshape(-1, 1)) * rs
         ))
         img_crop = img[
             int(np.floor(rect[0, 1])):int(np.ceil(rect[0, 1] + rect[1, 1])),
@@ -153,7 +147,7 @@ class hands17holder:
         img_crop_resize = cv2.resize(
             img_crop, (crop_resize, crop_resize))
         # except:
-        #     print(np.hstack((pose_mat, pose2d)))
+        #     print(np.hstack((pose_raw, pose2d)))
         # print(np.max(img_crop), np.max(img_crop_resize), img_crop_resize.shape)
 
         return img_name, img_crop_resize, p3z_crop, rescen
@@ -231,9 +225,13 @@ class hands17holder:
     def init_data(self, rebuild=False):
         if rebuild or (not os.path.exists(self.training_annot_cleaned)):
             self.remove_out_frame_annot()
+            print('data cleaned, using: {}'.format(
+                self.training_annot_cleaned))
         else:
             self.num_training = int(sum(
                 1 for line in open(self.training_annot_cleaned, 'r')))
+        print('total number of images: {:d}'.format(
+            self.num_training))
 
         portion = int(self.num_training / self.tt_split)
         self.range_train[0] = int(0)
@@ -243,31 +241,26 @@ class hands17holder:
         print('splitted data: {} training, {} test.'.format(
             self.range_train, self.range_test))
 
-        if rebuild or (not os.path.exists(self.training_annot_shuffled)):
-            self.shuffle_annot()
-        print('using shuffled data: {}'.format(
-            self.training_annot_shuffled))
-
-        # if rebuild:  # just over-write, this detete operation is slow
-        #     if os.path.exists(self.training_cropped):
-        #         shutil.rmtree(self.training_cropped)
-        if (rebuild or (not os.path.exists(self.training_annot_cropped)) or
-                (not os.path.exists(self.training_cropped))):
-            print('running cropping code (be patient) ...')
-            # time_s = timer()
-            # self.crop_resize_training_images()
-            # print('single tread time: {:.4f}'.format(timer() - time_s))
-            time_s = timer()
-            self.crop_resize_training_images_mt()
-            print('multiprocessing time: {:.4f}'.format(timer() - time_s))
-        print('using cropped and resized images: {}'.format(
-            self.training_cropped))
-
         if (rebuild or (not os.path.exists(self.training_annot_train)) or
                 (not os.path.exists(self.training_annot_test))):
-            self.split_evaluation_images()
+            self.shuffle_split()
         print('images are splitted out for evaluation: {:d} portions'.format(
             self.tt_split))
+
+        # # if rebuild:  # just over-write, this detete operation is slow
+        # #     if os.path.exists(self.training_cropped):
+        # #         shutil.rmtree(self.training_cropped)
+        # if (rebuild or (not os.path.exists(self.training_annot_cropped)) or
+        #         (not os.path.exists(self.training_cropped))):
+        #     print('running cropping code (be patient) ...')
+        #     # time_s = timer()
+        #     # self.crop_resize_training_images()
+        #     # print('single tread time: {:.4f}'.format(timer() - time_s))
+        #     time_s = timer()
+        #     self.crop_resize_training_images_mt()
+        #     print('multiprocessing time: {:.4f}'.format(timer() - time_s))
+        # print('using cropped and resized images: {}'.format(
+        #     self.training_cropped))
 
     def provide_args(self, args):
         """ Provide data specific parameters """
@@ -285,14 +278,10 @@ class hands17holder:
             self.data_dir, 'training/Training_Annotation.txt')
         self.training_annot_cleaned = os.path.join(
             self.out_dir, 'annotation.txt')
-        self.training_annot_shuffled = os.path.join(
-            self.out_dir, 'annotation_shuffled.txt')
-        self.training_annot_cropped = os.path.join(
-            self.out_dir, 'annotation_cropped.txt')
         self.training_annot_train = os.path.join(
-            self.out_dir, 'training_training.txt')
+            self.out_dir, 'training_train.txt')
         self.training_annot_test = os.path.join(
-            self.out_dir, 'training_evaluate.txt')
+            self.out_dir, 'training_test.txt')
         self.training_annot_predict = os.path.join(
             self.out_dir, 'training_predict.txt')
         self.frame_bbox = os.path.join(self.data_dir, 'frame/BoundingBox.txt')

@@ -17,24 +17,22 @@ def save_image(image_name, img):
     skimio.imsave(image_name, img)
 
 
-def parse_line_pose(annot_line):
-    """ parse raw annotation """
-    line_l = re.split(r'\s+', annot_line.strip())
-    rescen = None
-    if 64 == len(line_l):
+def parse_line_pose(annot_line, append_line=None):
+    """ parse raw annotation, and appendix for crop-resize """
+    annot_list = re.split(r'\s+', annot_line.strip())
+    if 64 == len(annot_list):
         pose_mat = np.reshape(
-            [float(i) for i in line_l[1:64]],
+            [float(i) for i in annot_list[1:64]],
             (21, 3)
         )
-    elif 67 == len(line_l):
-        pose_mat = np.reshape(
-            [float(i) for i in line_l[1:64]],
-            (21, 3)
-        )
-        rescen = np.array([float(i) for i in line_l[64:67]])
     else:
-        print('error - wrong pose annotation: {}'.format(line_l))
-    return line_l[0], pose_mat, rescen
+        print('error - wrong pose annotation: {}'.format(annot_list))
+    if append_line is None:
+        rescen = np.array([1, 0, 0])
+    else:
+        append_list = re.split(r'\s+', annot_line.strip())
+        rescen = np.array([float(i) for i in append_list])
+    return annot_list[0], pose_mat, rescen
 
 
 def get_line(filename, img_id):

@@ -33,124 +33,10 @@ iso_box = getattr(
 )
 
 
-def draw_raw3d(thedata, img, pose_raw):
-    # draw full image
-    points3 = dataops.img_to_raw(
-        img, thedata.centre, thedata.focal,
-        thedata.min_z, thedata.max_z)
-    numpts = points3.shape[0]
-    if 1000 < numpts:
-        samid = randsample(range(numpts), 1000)
-        points3_sam = points3[samid, :]
-    else:
-        points3_sam = points3
-    fig = mpplot.figure()
-    ax = Axes3D(fig)
-    ax.scatter(
-        points3_sam[:, 0], points3_sam[:, 1], points3_sam[:, 2],
-        color=Color('lightsteelblue').rgb)
-    ax.view_init(azim=-90, elev=-60)
-    ax.set_zlabel('depth (mm)', labelpad=15)
-    draw_raw3d_pose(thedata, ax, pose_raw)
-    mpplot.show()
-    # draw cropped region
-    box = iso_box()
-    box.build(pose_raw)
-    points3 = box.pick(points3)
-    numpts = points3.shape[0]
-    if 1000 < numpts:
-        samid = randsample(range(numpts), 1000)
-        points3_sam = points3[samid, :]
-    else:
-        points3_sam = points3
-    points3_sam = box.transform(points3_sam)
-    pose_trans = box.transform(pose_raw)
-    fig = mpplot.figure()
-    ax = Axes3D(fig)
-    ax.scatter(
-        points3_sam[:, 0], points3_sam[:, 1], points3_sam[:, 2],
-        color=Color('lightsteelblue').rgb)
-    draw_raw3d_pose(thedata, ax, pose_trans)
-    box.draw_wire(ax)
-    ax.view_init(azim=-120, elev=-150)
-    mpplot.show()
-    # draw projected image
-    points3_trans = box.transform(points3)
-    fig_size = (3 * 5, 5)
-    mpplot.subplots(nrows=1, ncols=3, figsize=fig_size)
-    for spi in range(3):
-        mpplot.subplot(1, 3, spi + 1)
-        coord, depth = box.project_pca(points3_trans, roll=spi)
-        img = box.print_image(coord, depth)
-        pose2d, _ = box.project_pca(pose_trans, roll=spi, sort=False)
-        draw_pose2d(thedata, img, pose2d)
-        mpplot.imshow(img, cmap='bone')
-        mpplot.gcf().gca().axis('off')
-        mpplot.tight_layout()
-    mpplot.show()
-
-
-def draw_raw3d_pose(thedata, ax, pose_raw, zdir='z'):
-    p3wrist = np.array([pose_raw[0, :]])
-    for fii, joints in enumerate(thedata.join_id):
-        p3joints = pose_raw[joints, :]
-        color_v0 = Color(thedata.join_color[fii + 1])
-        color_v0.luminance = 0.3
-        color_range = [C.rgb for C in make_color_range(
-            color_v0, thedata.join_color[fii + 1], len(p3joints) + 1)]
-        for jj, joint in enumerate(p3joints):
-            ax.scatter(
-                p3joints[jj, 0], p3joints[jj, 1], p3joints[jj, 2],
-                color=color_range[jj + 1],
-                zdir=zdir
-            )
-        p3joints_w = np.vstack((p3wrist, p3joints))
-        mpplot.plot(
-            p3joints_w[:, 0], p3joints_w[:, 1], p3joints_w[:, 2],
-            '-',
-            linewidth=2.0,
-            color=thedata.join_color[fii + 1].rgb,
-            zdir=zdir
-        )
-    ax.scatter(
-        p3wrist[0, 0], p3wrist[0, 1], p3wrist[0, 2],
-        color=thedata.join_color[0].rgb,
-        zdir=zdir
-    )
-
-
-def draw_raw3d_random(thedata, image_dir, annot_txt, img_id=-1):
-    """ Draw 3D pose of a randomly picked image.
-    """
-    if 0 > img_id:
-        # img_id = randint(1, thedata.num_training)
-        img_id = randint(1, thedata.num_training)
-    # Notice that linecache counts from 1
-    annot_line = linecache.getline(annot_txt, img_id)
-    # annot_line = linecache.getline(annot_txt, 219)  # palm
-    # annot_line = linecache.getline(annot_txt, 465)  # the finger
-    # print(annot_line)
-
-    img_name, pose_raw, rescen = dataio.parse_line_pose(annot_line)
-    img_path = os.path.join(image_dir, img_name)
-    print('drawing pose #{:d}: {}'.format(img_id, img_path))
-    img = dataio.read_image(img_path)
-
-    mpplot.figure()
-    mpplot.imshow(img, cmap='bone')
-    if rescen is None:
-        draw_pose_xy(thedata, img, pose_raw)
-    else:
-        draw_pose2d(thedata, img, pose_raw[:, 0:2])
-    mpplot.show()
-    draw_raw3d(thedata, img, pose_raw)
-    return img_id
-
-
 def draw_pose2d(thedata, img, pose2d, show_margin=False):
     """ Draw 2D pose on the image domain.
         Args:
-            pose2d: nx2 array
+            pose2d: nx2 array, image domain coordinates
     """
     p2wrist = np.array([pose2d[0, :]])
     for fii, joints in enumerate(thedata.join_id):
@@ -224,11 +110,10 @@ def draw_pose_xy(thedata, img, pose_raw, show_margin=False):
     # print(pose_raw - points3)
 
     # draw bounding box
-    bm = 0.25
-    rect = dataops.get_rect(
-        pose2d,
-        # thedata.centre, thedata.focal,
-        thedata.image_size, bm)
+    rect = dataops.get_rect3(
+        pose_raw,
+        thedata.centre, thedata.focal,
+        thedata.image_size)
     mpplot.gca().add_patch(mppatches.Rectangle(
         rect[0, :], rect[1, 0], rect[1, 1],
         linewidth=1, facecolor='none',
@@ -329,6 +214,133 @@ def draw_pose_stream(thedata, gif_file, max_draw=100):
                 # mpplot.show()
                 gif_writer.append_data(img_posed)
                 mpplot.gcf().clear()
+
+
+def draw_raw3d(thedata, img, pose_raw):
+    box = iso_box()
+    box.build(pose_raw)
+    # draw full image
+    fig_size = (2 * 6, 6)
+    fig = mpplot.figure(figsize=fig_size)
+    points3 = dataops.img_to_raw(
+        img, thedata.centre, thedata.focal,
+        thedata.min_z, thedata.max_z)
+    numpts = points3.shape[0]
+    if 1000 < numpts:
+        samid = randsample(range(numpts), 1000)
+        points3_sam = points3[samid, :]
+    else:
+        points3_sam = points3
+    ax = fig.add_subplot(1, 2, 1, projection='3d')
+    ax.scatter(
+        points3_sam[:, 0], points3_sam[:, 1], points3_sam[:, 2],
+        color=Color('lightsteelblue').rgb)
+    ax.view_init(azim=-90, elev=-60)
+    ax.set_zlabel('depth (mm)', labelpad=15)
+    draw_raw3d_pose(thedata, ax, pose_raw)
+    corners = box.get_corners()
+    corners = box.transform_inv(corners)
+    box.draw_wire(corners, ax)
+    # draw cropped region
+    ax = fig.add_subplot(1, 2, 2, projection='3d')
+    points3 = box.pick(points3)
+    numpts = points3.shape[0]
+    if 1000 < numpts:
+        samid = randsample(range(numpts), 1000)
+        points3_sam = points3[samid, :]
+    else:
+        points3_sam = points3
+    points3_sam = box.transform(points3_sam)
+    pose_trans = box.transform(pose_raw)
+    ax.scatter(
+        points3_sam[:, 0], points3_sam[:, 1], points3_sam[:, 2],
+        color=Color('lightsteelblue').rgb)
+    draw_raw3d_pose(thedata, ax, pose_trans)
+    corners = box.get_corners()
+    box.draw_wire(corners, ax)
+    ax.view_init(azim=-120, elev=-150)
+    mpplot.tight_layout()
+    mpplot.show()
+    # draw projected image
+    points3_trans = box.transform(points3)
+    fig_size = (3 * 5, 5)
+    mpplot.subplots(nrows=1, ncols=3, figsize=fig_size)
+    for spi in range(3):
+        mpplot.subplot(1, 3, spi + 1)
+        coord, depth = box.project_pca(points3_trans, roll=spi)
+        img = box.print_image(coord, depth)
+        pose2d, _ = box.project_pca(pose_trans, roll=spi, sort=False)
+        draw_pose2d(thedata, img, pose2d)
+        mpplot.imshow(img, cmap='bone')
+    mpplot.gcf().gca().axis('off')
+    mpplot.tight_layout()
+    mpplot.show()
+
+
+def draw_raw3d_pose(thedata, ax, pose_raw, zdir='z'):
+    p3wrist = np.array([pose_raw[0, :]])
+    for fii, joints in enumerate(thedata.join_id):
+        p3joints = pose_raw[joints, :]
+        color_v0 = Color(thedata.join_color[fii + 1])
+        color_v0.luminance = 0.3
+        color_range = [C.rgb for C in make_color_range(
+            color_v0, thedata.join_color[fii + 1], len(p3joints) + 1)]
+        for jj, joint in enumerate(p3joints):
+            ax.scatter(
+                p3joints[jj, 0], p3joints[jj, 1], p3joints[jj, 2],
+                color=color_range[jj + 1],
+                zdir=zdir
+            )
+        p3joints_w = np.vstack((p3wrist, p3joints))
+        mpplot.plot(
+            p3joints_w[:, 0], p3joints_w[:, 1], p3joints_w[:, 2],
+            '-',
+            linewidth=2.0,
+            color=thedata.join_color[fii + 1].rgb,
+            zdir=zdir
+        )
+    ax.scatter(
+        p3wrist[0, 0], p3wrist[0, 1], p3wrist[0, 2],
+        color=thedata.join_color[0].rgb,
+        zdir=zdir
+    )
+
+
+def draw_raw3d_random(thedata, image_dir, annot_txt, img_id=-1):
+    """ Draw 3D pose of a randomly picked image.
+    """
+    if 0 > img_id:
+        # img_id = randint(1, thedata.num_training)
+        img_id = randint(1, thedata.num_training)
+    # Notice that linecache counts from 1
+    annot_line = linecache.getline(annot_txt, img_id)
+    # annot_line = linecache.getline(annot_txt, 219)  # palm
+    # annot_line = linecache.getline(annot_txt, 465)  # the finger
+    # print(annot_line)
+
+    img_name, pose_raw, _ = dataio.parse_line_pose(annot_line)
+    img_path = os.path.join(image_dir, img_name)
+    print('drawing pose #{:d}: {}'.format(img_id, img_path))
+    img = dataio.read_image(img_path)
+
+    fig_size = (2 * 5, 5)
+    mpplot.subplots(nrows=1, ncols=2, figsize=fig_size)
+    mpplot.subplot(1, 2, 1)
+    mpplot.imshow(img, cmap='bone')
+    draw_pose_xy(thedata, img, pose_raw)
+    mpplot.subplot(1, 2, 2)
+    img_crop_resize, rescen = dataops.crop_resize_pca(
+        img, pose_raw,
+        thedata.centre, thedata.focal, thedata.crop_resize)
+    mpplot.imshow(img_crop_resize, cmap='bone')
+    draw_pose2d(
+        thedata, img_crop_resize,
+        dataops.raw_to_2d(pose_raw, thedata.centre, thedata.focal, rescen))
+    # mpplot.gcf().gca().axis('off')
+    mpplot.tight_layout()
+    mpplot.show()
+    draw_raw3d(thedata, img, pose_raw)
+    return img_id
 
 
 def draw_bbox_random(thedata):
