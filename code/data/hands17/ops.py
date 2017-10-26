@@ -65,11 +65,11 @@ def getbm(base_z, focal, base_margin=20):
     return m
 
 
-def crop_resize_pca(img, pose_raw, centre, focal, crop_resize):
+def crop_resize_pca(img, pose_raw, centre, focal, z_near, z_far, crop_resize):
     box = iso_box()
     box.build(pose_raw)
     points3 = box.pick(
-        img_to_raw(img, centre, focal)
+        img_to_raw(img, centre, focal, z_near, z_far)
     )
     points2 = raw_to_2d(points3, centre, focal)
     rect = iso_rect()
@@ -78,14 +78,6 @@ def crop_resize_pca(img, pose_raw, centre, focal, crop_resize):
     img_crop_resize = cv2resize(img_crop, (crop_resize, crop_resize))
     rescen = np.append(float(crop_resize) / rect.get_sidelen(), rect.cen - rect.len)
     return img_crop_resize, rescen
-
-
-def crop_cube_pca(points3, pose_raw, centre, focal):
-    """ this cube contains all 3d points, and align with their PCA axes
-    """
-    box = iso_box()
-    box.build(pose_raw)
-    return box.pick(points3)
 
 
 def clip_image_border(rect, image_size):
@@ -99,6 +91,20 @@ def clip_image_border(rect, image_size):
     return rect
 
 
+def crop_resize(img, pose_raw, centre, focal, z_near, z_far, image_size, crop_resize):
+    rect = get_rect3(
+        pose_raw, centre, focal, image_size
+    )
+    rect = clip_image_border(rect, image_size)
+    points3 = img_to_raw(img, centre, focal, z_near, z_far)
+    points2 = raw_to_2d(points3, centre, focal)
+    conds = rect.pick(points2)
+    img_crop = rect.print_image(points2[conds, :], points3[conds, 2])
+    img_crop_resize = cv2resize(img_crop, (crop_resize, crop_resize))
+    rescen = np.append(float(crop_resize) / rect.get_sidelen(), rect.cen - rect.len)
+    return img_crop_resize, rescen
+
+
 def get_rect3(points3, centre, focal, image_size):
     """ return a rectangle with margin that 3d points
         NOTE: there is still a perspective problem
@@ -110,11 +116,7 @@ def get_rect3(points3, centre, focal, image_size):
         box.len
     )
     rect = clip_image_border(rect, image_size)
-    sidelen = rect.len * 2
-    return np.vstack((
-        rect.cen - rect.len,
-        np.array([sidelen, sidelen])
-    ))
+    return rect
     # # clip to image border
     # ctl = raw_to_2d((box.cen - box.len).reshape(1, -1), centre, focal)
     # cbr = raw_to_2d((box.cen + box.len).reshape(1, -1), centre, focal)

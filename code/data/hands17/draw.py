@@ -4,8 +4,7 @@ from importlib import import_module
 import numpy as np
 import matplotlib.pyplot as mpplot
 import matplotlib.patches as mppatches
-# from mpl_toolkits import mplot3d
-from mpl_toolkits.mplot3d import Axes3D
+# from mpl_toolkits.mplot3d import Axes3D
 import imageio
 from colour import Color
 from random import randint
@@ -114,11 +113,12 @@ def draw_pose_xy(thedata, img, pose_raw, show_margin=False):
         pose_raw,
         thedata.centre, thedata.focal,
         thedata.image_size)
-    mpplot.gca().add_patch(mppatches.Rectangle(
-        rect[0, :], rect[1, 0], rect[1, 1],
-        linewidth=1, facecolor='none',
-        edgecolor=thedata.bbox_color.rgb)
-    )
+    rect.draw()
+    # mpplot.gca().add_patch(mppatches.Rectangle(
+    #     rect[0, :], rect[1, 0], rect[1, 1],
+    #     linewidth=1, facecolor='none',
+    #     edgecolor=thedata.bbox_color.rgb)
+    # )
 
     img_posed = draw_pose2d(
         thedata, img,
@@ -163,7 +163,7 @@ def draw_pred_random(thedata, image_dir, annot_echt, annot_pred):
             thedata, img,
             dataops.d2z_to_raw(pose_pred, thedata.centre, thedata.focal, rescen_pred),
             show_margin=True)
-    mpplot.gcf().gca().set_title('Prediction')
+    mpplot.gca().set_title('Prediction')
     mpplot.show()
 
 
@@ -216,6 +216,35 @@ def draw_pose_stream(thedata, gif_file, max_draw=100):
                 mpplot.gcf().clear()
 
 
+def draw_raw3d_pose(thedata, pose_raw, zdir='z'):
+    p3wrist = np.array([pose_raw[0, :]])
+    for fii, joints in enumerate(thedata.join_id):
+        p3joints = pose_raw[joints, :]
+        color_v0 = Color(thedata.join_color[fii + 1])
+        color_v0.luminance = 0.3
+        color_range = [C.rgb for C in make_color_range(
+            color_v0, thedata.join_color[fii + 1], len(p3joints) + 1)]
+        for jj, joint in enumerate(p3joints):
+            mpplot.gca().scatter(
+                p3joints[jj, 0], p3joints[jj, 1], p3joints[jj, 2],
+                color=color_range[jj + 1],
+                zdir=zdir
+            )
+        p3joints_w = np.vstack((p3wrist, p3joints))
+        mpplot.plot(
+            p3joints_w[:, 0], p3joints_w[:, 1], p3joints_w[:, 2],
+            '-',
+            linewidth=2.0,
+            color=thedata.join_color[fii + 1].rgb,
+            zdir=zdir
+        )
+    mpplot.gca().scatter(
+        p3wrist[0, 0], p3wrist[0, 1], p3wrist[0, 2],
+        color=thedata.join_color[0].rgb,
+        zdir=zdir
+    )
+
+
 def draw_raw3d(thedata, img, pose_raw):
     box = iso_box()
     box.build(pose_raw)
@@ -237,10 +266,10 @@ def draw_raw3d(thedata, img, pose_raw):
         color=Color('lightsteelblue').rgb)
     ax.view_init(azim=-90, elev=-60)
     ax.set_zlabel('depth (mm)', labelpad=15)
-    draw_raw3d_pose(thedata, ax, pose_raw)
+    draw_raw3d_pose(thedata, pose_raw)
     corners = box.get_corners()
     corners = box.transform_inv(corners)
-    box.draw_wire(corners, ax)
+    box.draw_wire(corners)
     # draw cropped region
     ax = fig.add_subplot(1, 2, 2, projection='3d')
     points3 = box.pick(points3)
@@ -255,9 +284,9 @@ def draw_raw3d(thedata, img, pose_raw):
     ax.scatter(
         points3_sam[:, 0], points3_sam[:, 1], points3_sam[:, 2],
         color=Color('lightsteelblue').rgb)
-    draw_raw3d_pose(thedata, ax, pose_trans)
+    draw_raw3d_pose(thedata, pose_trans)
     corners = box.get_corners()
-    box.draw_wire(corners, ax)
+    box.draw_wire(corners)
     ax.view_init(azim=-120, elev=-150)
     mpplot.tight_layout()
     mpplot.show()
@@ -277,35 +306,6 @@ def draw_raw3d(thedata, img, pose_raw):
     mpplot.show()
 
 
-def draw_raw3d_pose(thedata, ax, pose_raw, zdir='z'):
-    p3wrist = np.array([pose_raw[0, :]])
-    for fii, joints in enumerate(thedata.join_id):
-        p3joints = pose_raw[joints, :]
-        color_v0 = Color(thedata.join_color[fii + 1])
-        color_v0.luminance = 0.3
-        color_range = [C.rgb for C in make_color_range(
-            color_v0, thedata.join_color[fii + 1], len(p3joints) + 1)]
-        for jj, joint in enumerate(p3joints):
-            ax.scatter(
-                p3joints[jj, 0], p3joints[jj, 1], p3joints[jj, 2],
-                color=color_range[jj + 1],
-                zdir=zdir
-            )
-        p3joints_w = np.vstack((p3wrist, p3joints))
-        mpplot.plot(
-            p3joints_w[:, 0], p3joints_w[:, 1], p3joints_w[:, 2],
-            '-',
-            linewidth=2.0,
-            color=thedata.join_color[fii + 1].rgb,
-            zdir=zdir
-        )
-    ax.scatter(
-        p3wrist[0, 0], p3wrist[0, 1], p3wrist[0, 2],
-        color=thedata.join_color[0].rgb,
-        zdir=zdir
-    )
-
-
 def draw_raw3d_random(thedata, image_dir, annot_txt, img_id=-1):
     """ Draw 3D pose of a randomly picked image.
     """
@@ -323,20 +323,34 @@ def draw_raw3d_random(thedata, image_dir, annot_txt, img_id=-1):
     print('drawing pose #{:d}: {}'.format(img_id, img_path))
     img = dataio.read_image(img_path)
 
-    fig_size = (2 * 5, 5)
+    fig_size = (3 * 5, 5)
     mpplot.subplots(nrows=1, ncols=2, figsize=fig_size)
-    mpplot.subplot(1, 2, 1)
+    mpplot.subplot(1, 3, 1)
     mpplot.imshow(img, cmap='bone')
     draw_pose_xy(thedata, img, pose_raw)
-    mpplot.subplot(1, 2, 2)
-    img_crop_resize, rescen = dataops.crop_resize_pca(
+    mpplot.subplot(1, 3, 2)
+    img_crop_resize, rescen = dataops.crop_resize(
         img, pose_raw,
-        thedata.centre, thedata.focal, thedata.crop_resize)
+        thedata.centre, thedata.focal,
+        thedata.min_z, thedata.max_z,
+        thedata.image_size, thedata.crop_resize)
     mpplot.imshow(img_crop_resize, cmap='bone')
     draw_pose2d(
         thedata, img_crop_resize,
         dataops.raw_to_2d(pose_raw, thedata.centre, thedata.focal, rescen))
-    # mpplot.gcf().gca().axis('off')
+    mpplot.gca().set_title('Cropped')
+    mpplot.subplot(1, 3, 3)
+    img_crop_resize, rescen = dataops.crop_resize_pca(
+        img, pose_raw,
+        thedata.centre, thedata.focal,
+        thedata.min_z, thedata.max_z,
+        thedata.crop_resize)
+    mpplot.imshow(img_crop_resize, cmap='bone')
+    draw_pose2d(
+        thedata, img_crop_resize,
+        dataops.raw_to_2d(pose_raw, thedata.centre, thedata.focal, rescen))
+    mpplot.gca().set_title('Cleaned')
+    mpplot.gcf().gca().axis('off')
     mpplot.tight_layout()
     mpplot.show()
     draw_raw3d(thedata, img, pose_raw)
@@ -377,7 +391,7 @@ def draw_hist_random(thedata, image_dir, img_id=-1):
     print('drawing hist: {}'.format(img_path))
     img = dataio.read_image(img_path)
 
-    fig, ax = mpplot.subplots(nrows=2, ncols=2)
+    mpplot.subplots(nrows=2, ncols=2)
     mpplot.subplot(2, 2, 1)
     mpplot.imshow(img, cmap='bone')
     mpplot.subplot(2, 2, 2)

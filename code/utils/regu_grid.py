@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as mpplot
+import matplotlib.patches as mppatches
 from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 from colour import Color
@@ -9,6 +10,16 @@ class iso_rect:
     def __init__(self, cen=np.zeros(2), len=0):
         self.cen = cen
         self.len = len  # half side length
+
+    def pick(self, points2):
+        """ only meaningful when picked in the local coordinates """
+        cmin = self.cen - self.len
+        cmax = self.cen + self.len
+        conds = np.logical_and(
+            np.all(cmin < points2, axis=1),
+            np.all(cmax > points2, axis=1)
+        )
+        return conds
 
     def build(self, points2, m=0.1):
         self.cen = np.mean(points2, axis=0)
@@ -27,6 +38,18 @@ class iso_rect:
         img = np.zeros((sidelen, sidelen))
         img[coord[:, 1], coord[:, 0]] = value  # reverse coordinates!
         return img
+
+    def draw(self, color=Color('orange').rgb):
+        sidelen = self.get_sidelen()
+        rect = np.vstack((
+            self.cen - self.len,
+            np.array([sidelen, sidelen])
+        ))
+        mpplot.gca().add_patch(mppatches.Rectangle(
+            rect[0, :], rect[1, 0], rect[1, 1],
+            linewidth=1, facecolor='none',
+            edgecolor=color
+        ))
 
 
 class iso_box:
@@ -126,7 +149,7 @@ class iso_box:
         ])
         return corners
 
-    def draw(self, corners, ax, alpha='0.25'):
+    def draw(self, corners, alpha='0.25'):
         faces = [
             [corners[0], corners[3], corners[2], corners[1]],
             [corners[0], corners[1], corners[5], corners[4]],
@@ -135,16 +158,16 @@ class iso_box:
             [corners[2], corners[3], corners[7], corners[6]],
             [corners[1], corners[2], corners[6], corners[5]]
         ]
-        ax.add_collection3d(Poly3DCollection(
+        mpplot.gca().add_collection3d(Poly3DCollection(
             faces,
             linewidths=1, edgecolors='red',
             facecolors=Color('orange').rgb, alpha=alpha
         ))
-        ax.scatter(
+        mpplot.gca().scatter(
             corners[:, 0], corners[:, 1], corners[:, 2],
             color=Color('cyan').rgb, alpha=0.5, marker='o')
 
-    def draw_wire(self, corners, ax):
+    def draw_wire(self, corners):
         ring_b = np.array([
             corners[0], corners[1], corners[2], corners[3], corners[0]
         ])
@@ -208,7 +231,7 @@ if __name__ == "__main__":
     box.build(points3)
     fig = mpplot.figure()
     ax = Axes3D(fig)
-    box.draw(ax)
+    box.draw()
     ax.scatter(points3[:, 0], points3[:, 1], points3[:, 2])
     # points3_trans = box.transform(points3)
     # ax.scatter(points3_trans[:, 0], points3_trans[:, 1], points3_trans[:, 2])
