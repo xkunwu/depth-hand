@@ -44,14 +44,19 @@ def img_to_raw(img, centre, focal, z_near=0, z_far=np.inf):
     return points3
 
 
-def raw_to_2d(points3, centre, focal, rescen=np.array([1, 0, 0])):
+def raw_to_2dz(points3, centre, focal, rescen=np.array([1, 0, 0])):
     """ project 3D point onto image plane using camera info
         Args:
             points3: nx3 array, raw input in real world coordinates
     """
-    pose_z = np.array(points3[:, 2]).reshape(-1, 1)
-    pose2d = points3[:, 0:2] / pose_z * focal + centre
-    return (pose2d - rescen[1:3]) * rescen[0]
+    pose_z = points3[:, 2]
+    pose2d = points3[:, 0:2] / pose_z.reshape(-1, 1) * focal + centre
+    return (pose2d - rescen[1:3]) * rescen[0], pose_z
+
+
+def raw_to_2d(points3, centre, focal, rescen=np.array([1, 0, 0])):
+    pose2d, _ = raw_to_2dz(points3, centre, focal, rescen)
+    return pose2d
 
 
 def getbm(base_z, focal, base_margin=20):
@@ -65,18 +70,18 @@ def getbm(base_z, focal, base_margin=20):
     return m
 
 
-def crop_resize_pca(img, pose_raw, centre, focal, z_near, z_far, crop_resize):
+def crop_resize_pca(img, pose_raw, centre, focal, z_near, z_far, crop_size):
     box = iso_box()
     box.build(pose_raw)
     points3 = box.pick(
         img_to_raw(img, centre, focal, z_near, z_far)
     )
-    points2 = raw_to_2d(points3, centre, focal)
+    points2, pose_z = raw_to_2dz(points3, centre, focal)
     rect = iso_rect()
     rect.build(points2, -0.3)  # shrink size, as PCA produced much larger box
-    img_crop = rect.print_image(points2, points3[:, 2])
-    img_crop_resize = cv2resize(img_crop, (crop_resize, crop_resize))
-    rescen = np.append(float(crop_resize) / rect.get_sidelen(), rect.cen - rect.len)
+    img_crop = rect.print_image(points2, pose_z)
+    img_crop_resize = cv2resize(img_crop, (crop_size, crop_size))
+    rescen = np.append(float(crop_size) / rect.get_sidelen(), rect.cen - rect.len)
     return img_crop_resize, rescen
 
 
@@ -91,17 +96,17 @@ def clip_image_border(rect, image_size):
     return rect
 
 
-def crop_resize(img, pose_raw, centre, focal, z_near, z_far, image_size, crop_resize):
+def crop_resize(img, pose_raw, centre, focal, z_near, z_far, image_size, crop_size):
     rect = get_rect3(
         pose_raw, centre, focal, image_size
     )
     rect = clip_image_border(rect, image_size)
     points3 = img_to_raw(img, centre, focal, z_near, z_far)
-    points2 = raw_to_2d(points3, centre, focal)
+    points2, pose_z = raw_to_2dz(points3, centre, focal)
     conds = rect.pick(points2)
-    img_crop = rect.print_image(points2[conds, :], points3[conds, 2])
-    img_crop_resize = cv2resize(img_crop, (crop_resize, crop_resize))
-    rescen = np.append(float(crop_resize) / rect.get_sidelen(), rect.cen - rect.len)
+    img_crop = rect.print_image(points2[conds, :], pose_z[conds])
+    img_crop_resize = cv2resize(img_crop, (crop_size, crop_size))
+    rescen = np.append(float(crop_size) / rect.get_sidelen(), rect.cen - rect.len)
     return img_crop_resize, rescen
 
 
@@ -117,19 +122,6 @@ def get_rect3(points3, centre, focal, image_size):
     )
     rect = clip_image_border(rect, image_size)
     return rect
-    # # clip to image border
-    # ctl = raw_to_2d((box.cen - box.len).reshape(1, -1), centre, focal)
-    # cbr = raw_to_2d((box.cen + box.len).reshape(1, -1), centre, focal)
-    # obm = np.min([ctl, image_size - cbr])
-    # if 0 > obm:
-    #     # print(ctl, image_size - cbr, obm, box.len)
-    #     box.len = box.len + obm
-    # ctl = raw_to_2d((box.cen - box.len).reshape(1, -1), centre, focal)
-    # cbl = box.cen - box.len
-    # cbl[0] += 2 * box.len
-    # cbl = raw_to_2d(cbl.reshape(1, -1), centre, focal)
-    # sidelen = cbl[0, 0] - ctl[0, 0]
-    # return np.vstack((ctl, np.array([sidelen, sidelen])))
 
 
 def get_rect(pose2d, image_size, bm):

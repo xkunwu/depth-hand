@@ -1,35 +1,29 @@
 import os
+from itertools import islice
+import ops as dataops
 import io as dataio
 
 
-def read_train(thedata):
-    return open(thedata.training_annot_train, 'r')
-
-
-def read_test(thedata):
-    return open(thedata.training_annot_test, 'r')
-
-
-def write_predict(thedata):
-    return open(thedata.training_annot_predict, 'w')
-
-
-def close(thedata, file):
-    file.close()
-
-
 def put2d(
-        thedata, next_n_lines, batch_frame, batch_poses,
-        image_names=None, batch_resce=None
+        thedata, fanno, image_dir, batch_size,
+        batch_index, batch_frame, batch_poses, batch_resce
 ):
-    for bi, annot_line in enumerate(next_n_lines):
-        img_name, pose_mat, rescen = dataio.parse_line_pose(
-            annot_line)
-        img = dataio.read_image(os.path.join(
-            thedata.training_cropped, img_name))
-        batch_frame[bi, :, :] = img
-        batch_poses[bi, :] = pose_mat.flatten().T
-        if image_names is not None:
-            image_names.append(img_name)
-        if batch_resce is not None:
-            batch_resce[bi, :] = rescen
+    next_n_lines = list(islice(fanno, batch_size))
+    if not next_n_lines:
+        return -1
+    if len(next_n_lines) < batch_size:
+        return -2
+    for bi, line in enumerate(next_n_lines):
+        img_name, pose_raw = dataio.parse_line_annot(line)
+        img = dataio.read_image(os.path.join(image_dir, img_name))
+        img_crop_resize, rescen = dataops.crop_resize(
+            img, pose_raw,
+            thedata.centre, thedata.focal,
+            thedata.min_z, thedata.max_z,
+            thedata.image_size, thedata.crop_size)
+        # pose2d = dataops.raw_to_2d(pose_raw, thedata.centre, thedata.focal, rescen)
+        batch_index[bi, :] = dataio.imagename2index(img_name)
+        batch_frame[bi, :, :] = img_crop_resize
+        batch_poses[bi, :] = pose_raw.flatten().T
+        batch_resce[bi, :] = rescen
+    return 0

@@ -114,11 +114,6 @@ def draw_pose_xy(thedata, img, pose_raw, show_margin=False):
         thedata.centre, thedata.focal,
         thedata.image_size)
     rect.draw()
-    # mpplot.gca().add_patch(mppatches.Rectangle(
-    #     rect[0, :], rect[1, 0], rect[1, 1],
-    #     linewidth=1, facecolor='none',
-    #     edgecolor=thedata.bbox_color.rgb)
-    # )
 
     img_posed = draw_pose2d(
         thedata, img,
@@ -131,8 +126,8 @@ def draw_pred_random(thedata, image_dir, annot_echt, annot_pred):
     img_id = randint(1, sum(1 for _ in open(annot_pred, 'r')))
     line_echt = linecache.getline(annot_echt, img_id)
     line_pred = linecache.getline(annot_pred, img_id)
-    img_name, pose_echt, rescen_echt = dataio.parse_line_pose(line_echt)
-    _, pose_pred, rescen_pred = dataio.parse_line_pose(line_pred)
+    img_name, pose_echt, rescen_echt = dataio.parse_line_annot(line_echt)
+    _, pose_pred, rescen_pred = dataio.parse_line_annot(line_pred)
     img_path = os.path.join(image_dir, img_name)
     print('drawing pose #{:d}: {}'.format(img_id, img_path))
     img = dataio.read_image(img_path)
@@ -180,10 +175,10 @@ def draw_pose_xy_random(thedata, image_dir, annot_txt, img_id=-1):
     # print(annot_line)
 
     img_name_id = 'image_D{:08d}.png'.format(img_id)
-    img_name, pose_raw, rescen = dataio.parse_line_pose(annot_line)
+    img_name, pose_raw, rescen = dataio.parse_line_annot(annot_line)
     if img_name_id != img_name:
         annot_line = dataio.get_line(annot_txt, img_id)
-        img_name, pose_raw, rescen = dataio.parse_line_pose(annot_line)
+        img_name, pose_raw, rescen = dataio.parse_line_annot(annot_line)
     img_path = os.path.join(image_dir, img_name)
     print('drawing pose #{:d}: {}'.format(img_id, img_path))
     img = dataio.read_image(img_path)
@@ -207,7 +202,7 @@ def draw_pose_stream(thedata, gif_file, max_draw=100):
                 if lii >= max_draw:
                     return
                     # raise coder.break_with.Break
-                img_name, pose_raw, rescen = dataio.parse_line_pose(annot_line)
+                img_name, pose_raw, rescen = dataio.parse_line_annot(annot_line)
                 img = dataio.read_image(os.path.join(thedata.training_images, img_name))
                 mpplot.imshow(img, cmap='bone')
                 img_posed = draw_pose_xy(img, pose_raw)
@@ -318,7 +313,7 @@ def draw_raw3d_random(thedata, image_dir, annot_txt, img_id=-1):
     # annot_line = linecache.getline(annot_txt, 465)  # the finger
     # print(annot_line)
 
-    img_name, pose_raw, _ = dataio.parse_line_pose(annot_line)
+    img_name, pose_raw, _ = dataio.parse_line_annot(annot_line)
     img_path = os.path.join(image_dir, img_name)
     print('drawing pose #{:d}: {}'.format(img_id, img_path))
     img = dataio.read_image(img_path)
@@ -333,7 +328,7 @@ def draw_raw3d_random(thedata, image_dir, annot_txt, img_id=-1):
         img, pose_raw,
         thedata.centre, thedata.focal,
         thedata.min_z, thedata.max_z,
-        thedata.image_size, thedata.crop_resize)
+        thedata.image_size, thedata.crop_size)
     mpplot.imshow(img_crop_resize, cmap='bone')
     draw_pose2d(
         thedata, img_crop_resize,
@@ -344,7 +339,7 @@ def draw_raw3d_random(thedata, image_dir, annot_txt, img_id=-1):
         img, pose_raw,
         thedata.centre, thedata.focal,
         thedata.min_z, thedata.max_z,
-        thedata.crop_resize)
+        thedata.crop_size)
     mpplot.imshow(img_crop_resize, cmap='bone')
     draw_pose2d(
         thedata, img_crop_resize,

@@ -2,7 +2,6 @@ import os
 import numpy as np
 from colour import Color
 import cv2
-from timeit import default_timer as timer
 import random
 from multiprocessing.dummy import Pool as ThreadPool
 # import multiprocessing
@@ -36,7 +35,7 @@ class hands17holder:
 
     # cropped & resized training images
     image_size = [640, 480]
-    crop_resize = 96
+    crop_size = 96
     min_z = 1
     max_z = 3333
     max_distance = 9999  # max distance set to 10m
@@ -48,6 +47,7 @@ class hands17holder:
     # cx = 315.944855
     # cy = 245.287079
 
+    # joints description
     join_name = [
         'Wrist',
         'TMCP', 'IMCP', 'MMCP', 'RMCP', 'PMCP',
@@ -90,7 +90,7 @@ class hands17holder:
         with open(self.training_annot_cleaned, 'w') as writer, \
                 open(self.training_annot_origin, 'r') as reader:
             for annot_line in reader.readlines():
-                _, pose_raw, rescen = dataio.parse_line_pose(annot_line)
+                _, pose_raw = dataio.parse_line_annot(annot_line)
                 pose2d = dataops.raw_to_2d(pose_raw, self.centre, self.focal)
                 if 0 > np.min(pose2d):
                     continue
@@ -105,21 +105,21 @@ class hands17holder:
         random.shuffle(lines)
         with open(self.training_annot_train, 'w') as f:
             for line in lines[self.range_train[0]:self.range_train[1]]:
-                f.write(line + '\n')
+                f.write(line)
         with open(self.training_annot_test, 'w') as f:
             for line in lines[self.range_test[0]:self.range_test[1]]:
                 # name = re.search(r'(image_D\d+\.png)', line).group(1)
                 # shutil.move(
                 #     os.path.join(self.training_cropped, name),
                 #     os.path.join(self.evaluate_cropped, name))
-                f.write(line + '\n')
+                f.write(line)
 
     def get_rect_crop_resize(self, annot_line):
         """
             Returns:
                 p3z_crop: projected 2d coordinates, and original z on the 3rd column
         """
-        img_name, pose_raw, rescen = dataio.parse_line_pose(annot_line)
+        img_name, pose_raw, rescen = dataio.parse_line_annot(annot_line)
         img = dataio.read_image(
             os.path.join(self.training_images, img_name))
         pose2d = dataops.raw_to_2d(
@@ -128,8 +128,8 @@ class hands17holder:
             pose_raw,
             self.centre, self.focal,
             self.image_size, 0.25)
-        crop_resize = self.crop_resize
-        rs = crop_resize / rect[1, 1]
+        crop_size = self.crop_size
+        rs = crop_size / rect[1, 1]
         rescen = np.append(rs, rect[0, :])
         p2d_crop = (pose2d - rect[0, :]) * rs
         p3z_crop = np.hstack((
@@ -141,11 +141,11 @@ class hands17holder:
         ]
         # try:
         # img_crop_resize = spmisc.imresize(
-        #     img_crop, (crop_resize, crop_resize), interp='bilinear')
+        #     img_crop, (crop_size, crop_size), interp='bilinear')
         # img_crop_resize = spndim.interpolation.zoom(img_crop, rs)
-        # img_crop_resize = img_crop_resize[0:crop_resize, 0:crop_resize]
+        # img_crop_resize = img_crop_resize[0:crop_size, 0:crop_size]
         img_crop_resize = cv2.resize(
-            img_crop, (crop_resize, crop_resize))
+            img_crop, (crop_size, crop_size))
         # except:
         #     print(np.hstack((pose_raw, pose2d)))
         # print(np.max(img_crop), np.max(img_crop_resize), img_crop_resize.shape)
@@ -207,7 +207,7 @@ class hands17holder:
         # with open(self.training_annot_shuffled, 'r') as fanno:
         #     annot_line = fanno.readline()
         #     job = thread_pool.apply_async(
-        #         hands17holder.crop_resize_save, (annot_line, opts.crop_resize, messages))
+        #         hands17holder.crop_resize_save, (annot_line, opts.crop_size, messages))
         #     jobs.append(job)
         # for job in jobs:
         #     job.get()
@@ -262,14 +262,10 @@ class hands17holder:
         # print('using cropped and resized images: {}'.format(
         #     self.training_cropped))
 
-    def provide_args(self, args):
-        """ Provide data specific parameters """
-        args.join_num = self.join_num
-
     def __init__(self, args):
         self.data_dir = args.data_dir
         self.out_dir = args.out_dir
-        self.crop_resize = args.crop_resize
+        self.crop_size = args.crop_size
 
         self.training_images = os.path.join(self.data_dir, 'training/images')
         self.frame_images = os.path.join(self.data_dir, 'frame/images')

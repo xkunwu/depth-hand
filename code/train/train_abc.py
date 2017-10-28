@@ -14,6 +14,11 @@ args_holder = getattr(
     import_module('args_holder'),
     'args_holder'
 )
+sys.path.append(os.path.join(BASE_DIR, 'utils'))
+file_pack = getattr(
+    import_module('coder'),
+    'file_pack'
+)
 
 
 class train_abc():
@@ -24,11 +29,11 @@ class train_abc():
     def train(self):
         with tf.Graph().as_default():
             with tf.device('/gpu:' + str(self.args.gpu_id)):
-                batch_frame, pose_out = self.args.model_class.placeholder_inputs(
+                frames_tf, poses_tf = self.args.model_inst.placeholder_inputs(
                     self.args.batch_size,
-                    self.args.crop_resize,
-                    self.args.data_inst.join_num)
-                is_training = tf.placeholder(tf.bool, shape=())
+                    self.args.crop_size,
+                    self.args.model_inst.pose_dim)
+                is_training_tf = tf.placeholder(tf.bool, shape=())
 
                 # Note the global_step=batch parameter to minimize.
                 batch = tf.Variable(0)
@@ -36,9 +41,9 @@ class train_abc():
                 tf.summary.scalar('bn_decay', bn_decay)
 
                 # Get model and loss
-                pred, end_points = self.args.model_class.get_model(
-                    batch_frame, self.args.pose_dim, is_training, bn_decay=bn_decay)
-                loss = self.args.model_class.get_loss(pred, pose_out, end_points)
+                pred, end_points = self.args.model_inst.get_model(
+                    frames_tf, self.args.model_inst.pose_dim, is_training_tf, bn_decay=bn_decay)
+                loss = self.args.model_inst.get_loss(pred, poses_tf, end_points)
                 regre_error = tf.sqrt(loss * 2)
                 tf.summary.scalar('regression_error', regre_error)
 
@@ -72,9 +77,9 @@ class train_abc():
             sess.run(init)
 
             ops = {
-                'batch_frame': batch_frame,
-                'pose_out': pose_out,
-                'is_training': is_training,
+                'batch_frame': frames_tf,
+                'batch_poses': poses_tf,
+                'is_training': is_training_tf,
                 'merged': merged,
                 'step': batch,
                 'train_op': train_op,
@@ -104,10 +109,11 @@ class train_abc():
     def train_one_epoch(self, sess, ops, train_writer):
         """ ops: dict mapping from string to tf ops """
         is_training = True
-        batch_size = self.args.batch_size
-        image_size = self.args.crop_resize
-        batch_frame = np.empty(shape=(batch_size, image_size, image_size))
-        batch_poses = np.empty(shape=(batch_size, self.args.pose_dim))
+        # batch_size = self.args.batch_size
+        # image_size = self.args.crop_size
+        with file_pack() as filepack:
+            self.args.model_inst.start_train(self.args.batch_size, filepack)
+            batch_frame, batch_poses = self.args.model_inst.fetch_batch()
         # with open(self.args.data_inst.training_annot_train, 'r') as fanno:
         fanno = self.args.data_provider.read_train(self.args.data_inst)
         try:
@@ -119,19 +125,19 @@ class train_abc():
                 if len(next_n_lines) < batch_size:
                     break
                 # for bi, annot_line in enumerate(next_n_lines):
-                #     img_name, pose_mat, _ = self.args.data_inst.parse_line_pose(
+                #     img_name, pose_raw, _ = self.args.data_inst.parse_line_annot(
                 #         annot_line)
                 #     img = self.args.data_inst.read_image(os.path.join(
                 #         self.args.data_inst.training_cropped, img_name))
                 #     batch_frame[bi, :, :] = img
-                #     batch_poses[bi, :] = pose_mat.flatten().T
+                #     batch_poses[bi, :] = pose_raw.flatten().T
                 self.args.data_provider.put2d(
                     self.args.data_inst, next_n_lines,
                     batch_frame, batch_poses
                 )
                 feed_dict = {
-                    ops['batch_frame']: batch_frame,
-                    ops['pose_out']: batch_poses,
+                    ops['batch_frame']: self.args.model_inst.batch_frame,
+                    ops['batch_poses']: self.args.model_inst.batch_poses,
                     ops['is_training']: is_training
                 }
                 summary, step, _, loss_val, _ = sess.run(
@@ -149,9 +155,9 @@ class train_abc():
         """ ops: dict mapping from string to tf ops """
         is_training = False
         batch_size = self.args.batch_size
-        image_size = self.args.crop_resize
+        image_size = self.args.crop_size
         batch_frame = np.empty(shape=(batch_size, image_size, image_size))
-        batch_poses = np.empty(shape=(batch_size, self.args.pose_dim))
+        batch_poses = np.empty(shape=(batch_size, self.args.model_inst.pose_dim))
         # with open(self.args.data_inst.training_annot_test, 'r') as fanno:
         fanno = self.args.data_provider.read_test(self.args.data_inst)
         try:
@@ -164,19 +170,19 @@ class train_abc():
                 if len(next_n_lines) < batch_size:
                     break
                 # for bi, annot_line in enumerate(next_n_lines):
-                #     img_name, pose_mat, _ = self.args.data_inst.parse_line_pose(
+                #     img_name, pose_raw, _ = self.args.data_inst.parse_line_annot(
                 #         annot_line)
                 #     img = self.args.data_inst.read_image(os.path.join(
                 #         self.args.data_inst.training_cropped, img_name))
                 #     batch_frame[bi, :, :] = img
-                #     batch_poses[bi, :] = pose_mat.flatten().T
+                #     batch_poses[bi, :] = pose_raw.flatten().T
                 self.args.data_provider.put2d(
                     self.args.data_inst, next_n_lines,
                     batch_frame, batch_poses
                 )
                 feed_dict = {
-                    ops['batch_frame']: batch_frame,
-                    ops['pose_out']: batch_poses,
+                    ops['batch_frame']: self.args.model_inst.batch_frame,
+                    ops['batch_poses']: self.args.model_inst.batch_poses,
                     ops['is_training']: is_training
                 }
                 summary, step, loss_val, _ = sess.run(
@@ -196,16 +202,16 @@ class train_abc():
 
     def evaluate(self):
         with tf.device('/gpu:' + str(self.args.gpu_id)):
-            batch_frame, pose_out = self.args.model_class.placeholder_inputs(
+            frames_tf, poses_tf = self.args.model_inst.placeholder_inputs(
                 self.args.batch_size,
-                self.args.crop_resize,
-                self.args.data_inst.join_num)
-            is_training = tf.placeholder(tf.bool, shape=())
+                self.args.crop_size,
+                self.args.model_inst.pose_dim)
+            is_training_tf = tf.placeholder(tf.bool, shape=())
 
             # Get model and loss
-            pred, end_points = self.args.model_class.get_model(
-                batch_frame, self.args.pose_dim, is_training)
-            loss = self.args.model_class.get_loss(pred, pose_out, end_points)
+            pred, end_points = self.args.model_inst.get_model(
+                frames_tf, self.args.model_inst.pose_dim, is_training_tf)
+            loss = self.args.model_inst.get_loss(pred, poses_tf, end_points)
 
             # Add ops to save and restore all the variables.
             saver = tf.train.Saver()
@@ -223,9 +229,9 @@ class train_abc():
         self.logger.info("Model restored from: {}.".format(model_path))
 
         ops = {
-            'batch_frame': batch_frame,
-            'pose_out': pose_out,
-            'is_training': is_training,
+            'batch_frame': frames_tf,
+            'batch_poses': poses_tf,
+            'is_training': is_training_tf,
             'loss': loss,
             'pred': pred
         }
@@ -236,9 +242,9 @@ class train_abc():
     def eval_one_epoch_write(self, sess, ops):
         is_training = False
         batch_size = self.args.batch_size
-        image_size = self.args.crop_resize
+        image_size = self.args.crop_size
         batch_frame = np.empty(shape=(batch_size, image_size, image_size))
-        batch_poses = np.empty(shape=(batch_size, self.args.pose_dim))
+        batch_poses = np.empty(shape=(batch_size, self.args.model_inst.pose_dim))
         batch_resce = np.empty(shape=(batch_size, 3))
         # with open(self.args.data_inst.training_annot_test, 'r') as fanno:
         fanno = self.args.data_provider.read_test(self.args.data_inst)
@@ -254,12 +260,12 @@ class train_abc():
                     break
                 image_names = []
                 # for bi, annot_line in enumerate(next_n_lines):
-                #     img_name, pose_mat, rescen = self.args.data_inst.parse_line_pose(
+                #     img_name, pose_raw, rescen = self.args.data_inst.parse_line_annot(
                 #         annot_line)
                 #     img = self.args.data_inst.read_image(os.path.join(
                 #         self.args.data_inst.training_cropped, img_name))
                 #     batch_frame[bi, :, :] = img
-                #     batch_poses[bi, :] = pose_mat.flatten().T
+                #     batch_poses[bi, :] = pose_raw.flatten().T
                 #     image_names.append(img_name)
                 #     batch_resce[bi, :] = rescen
                 self.args.data_provider.put2d(
@@ -267,8 +273,8 @@ class train_abc():
                     batch_frame, batch_poses, image_names, batch_resce
                 )
                 feed_dict = {
-                    ops['batch_frame']: batch_frame,
-                    ops['pose_out']: batch_poses,
+                    ops['batch_frame']: self.args.model_inst.batch_frame,
+                    ops['batch_poses']: self.args.model_inst.batch_poses,
                     ops['is_training']: is_training
                 }
                 loss_val, pred_val = sess.run(

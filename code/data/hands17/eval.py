@@ -14,8 +14,8 @@ def compare_error(thedata, fname_echt, fname_pred):
         sour_lines = [x.strip() for x in file_s.readlines()]
         targ_lines = [x.strip() for x in file_t.readlines()]
         for li, line_t in enumerate(targ_lines):
-            name_s, pose_s, scen_s = dataio.parse_line_pose(sour_lines[li])
-            name_t, pose_t, scen_t = dataio.parse_line_pose(line_t)
+            name_s, pose_s, scen_s = dataio.parse_line_annot(sour_lines[li])
+            name_t, pose_t, scen_t = dataio.parse_line_annot(line_t)
             if name_s != name_t:
                 print('different names: {} - {}'.format(name_s, name_t))
                 return

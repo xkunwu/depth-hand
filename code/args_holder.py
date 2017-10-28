@@ -40,7 +40,7 @@ class args_holder:
 
         # input preprocessing
         # self.parser.add_argument(
-        #     '--crop_resize', type=int, default=96,
+        #     '--crop_size', type=int, default=96,
         #     help='Resized image size of cropped area [default: 96]')
         # self.parser.add_argument(
         #     '--pose_dim', type=int, default=63,
@@ -84,11 +84,12 @@ class args_holder:
             os.makedirs(self.args.out_dir)
         self.args.log_dir = os.path.join(self.args.out_dir, 'log')
         self.args.cpu_count = multiprocessing.cpu_count()
-        self.args.model_class = getattr(
+        model_class = getattr(
             import_module('train.' + self.args.model_name),
             self.args.model_name
         )
-        self.args.model_class.tweak_args(self.args)
+        self.args.model_inst = model_class(self.args.out_dir)
+        self.args.model_inst.tweak_args(self.args)
 
     def create_instance(self):
         self.args.data_module = import_module(
@@ -103,8 +104,7 @@ class args_holder:
         self.args.data_inst.init_data(
             self.args.rebuild_data
         )
-        self.args.data_inst.provide_args(self.args)
-        self.args.model_class.receive_args(self.args)
+        self.args.model_inst.receive_data(self.args.data_inst, self.args)
 
 
 if __name__ == "__main__":
@@ -112,4 +112,5 @@ if __name__ == "__main__":
     argsholder.parse_args()
     ARGS = argsholder.args
     ARGS.rebuild_data = True
+    ARGS.batch_size = 16
     argsholder.create_instance()
