@@ -3,7 +3,9 @@ import os
 import sys
 from importlib import import_module
 import numpy as np
+import progressbar
 from timeit import default_timer as timer
+import h5py
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 BASE_DIR = os.path.abspath(os.path.join(BASE_DIR, os.pardir))
@@ -41,7 +43,7 @@ class base_regre():
         """ Tweak algorithm specific parameters """
         args.crop_size = self.crop_size
 
-    def prepare_data(self, thedata, file_annot, file_appen):
+    def prepare_data(self, thedata, file_annot, name_appen):
         batch_size = self.batch_size
         num_line = int(sum(1 for line in file_annot))
         file_annot.seek(0)
@@ -56,6 +58,13 @@ class base_regre():
         # for bi in range(num_batches):
         #     batch_0 = batch_size * bi
         #     batch_1 = batch_size * (bi + 1)
+        timerbar = progressbar.ProgressBar(
+            maxval=num_batches,
+            widgets=[
+                progressbar.Percentage(),
+                ' ', progressbar.Bar('=', '[', ']'),
+                ' ', progressbar.ETA()]
+        ).start()
         bi = 0
         while True:
             res = self.provider.put2d(
@@ -68,19 +77,23 @@ class base_regre():
             all_frame[bi, :, :, :] = self.batch_frame
             all_poses[bi, :, :] = self.batch_poses
             all_resce[bi, :] = self.batch_resce
+            filen_bi = '{}_{:d}.h5'.format(name_appen, bi)
+            with h5py.File(filen_bi, 'w') as h5file:
+                h5file.create_dataset(
+                    'index', data=all_index, dtype=float
+                )
+                h5file.create_dataset(
+                    'frame', data=all_frame, dtype=float
+                )
+                h5file.create_dataset(
+                    'poses', data=all_poses, dtype=float
+                )
+                h5file.create_dataset(
+                    'resce', data=all_resce, dtype=float
+                )
+            timerbar.update(bi)
             bi += 1
-            sys.stdout.write('.')
-            sys.stdout.flush()
-        sys.stdout.write('\n')
-        file_appen.create_dataset(
-            'frame', data=all_frame, dtype=float
-        )
-        file_appen.create_dataset(
-            'poses', data=all_poses, dtype=float
-        )
-        file_appen.create_dataset(
-            'resce', data=all_resce, dtype=float
-        )
+        timerbar.finish()
 
     def receive_data(self, thedata, args):
         """ Receive parameters specific to the data """
@@ -100,18 +113,12 @@ class base_regre():
         if not first_run:
             return
         self.preallocate(self.batch_size, self.crop_size, self.pose_dim)
-        time_s = timer()
         with file_pack() as filepack:
             file_annot = filepack.push_file(thedata.training_annot_train)
-            file_appen = filepack.push_h5(self.appen_train, "w")
-            self.prepare_data(thedata, file_annot, file_appen)
-        print('training data prepared: {:.4f}'.format(timer() - time_s))
-        time_s = timer()
+            self.prepare_data(thedata, file_annot, self.appen_train)
         with file_pack() as filepack:
             file_annot = filepack.push_file(thedata.training_annot_test)
-            file_appen = filepack.push_h5(self.appen_test, "w")
-            self.prepare_data(thedata, file_annot, file_appen)
-        print('testing data prepared: {:.4f}'.format(timer() - time_s))
+            self.prepare_data(thedata, file_annot, self.appen_test)
 
     @staticmethod
     def placeholder_inputs(batch_size, image_size, pose_dim):

@@ -19,8 +19,8 @@ def compare_error(thedata, fname_echt, fname_pred):
             if name_s != name_t:
                 print('different names: {} - {}'.format(name_s, name_t))
                 return
-            p3d_s = dataops.d2z_to_raw(pose_s, thedata.centre, thedata.focal, scen_s)
-            p3d_t = dataops.d2z_to_raw(pose_t, thedata.centre, thedata.focal, scen_t)
+            p3d_s = dataops.d2z_to_raw(pose_s, thedata, scen_s)
+            p3d_t = dataops.d2z_to_raw(pose_t, thedata, scen_t)
             error_l.append(np.sqrt(
                 np.sum((p3d_s - p3d_t) ** 2, axis=1)
             ))

@@ -17,11 +17,8 @@ def put2d(
         img_name, pose_raw = dataio.parse_line_annot(line)
         img = dataio.read_image(os.path.join(image_dir, img_name))
         img_crop_resize, rescen = dataops.crop_resize(
-            img, pose_raw,
-            thedata.centre, thedata.focal,
-            thedata.min_z, thedata.max_z,
-            thedata.image_size, thedata.crop_size)
-        # pose2d = dataops.raw_to_2d(pose_raw, thedata.centre, thedata.focal, rescen)
+            img, pose_raw, thedata)
+        # pose2d = dataops.raw_to_2d(pose_raw, thedata, rescen)
         batch_index[bi, :] = dataio.imagename2index(img_name)
         batch_frame[bi, :, :] = img_crop_resize
         batch_poses[bi, :] = pose_raw.flatten().T

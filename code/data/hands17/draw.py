@@ -100,19 +100,17 @@ def draw_pose_xy(thedata, img, pose_raw, show_margin=False):
         Args:
             pose_raw: nx3 array
     """
-    pose2d = dataops.raw_to_2d(pose_raw, thedata.centre, thedata.focal)
+    pose2d = dataops.raw_to_2d(pose_raw, thedata)
     # indz = np.hstack((
     #     pose2d,
     #     pose_raw[:, 2].reshape(-1, 1))
     # )
-    # points3 = dataops.d2z_to_raw(indz, thedata.centre, thedata.focal)
+    # points3 = dataops.d2z_to_raw(indz, thedata)
     # print(pose_raw - points3)
 
     # draw bounding box
     rect = dataops.get_rect3(
-        pose_raw,
-        thedata.centre, thedata.focal,
-        thedata.image_size)
+        pose_raw, thedata)
     rect.draw()
 
     img_posed = draw_pose2d(
@@ -143,7 +141,7 @@ def draw_pred_random(thedata, image_dir, annot_echt, annot_pred):
     else:
         draw_pose_xy(
             thedata, img,
-            dataops.d2z_to_raw(pose_echt, thedata.centre, thedata.focal, rescen_echt),
+            dataops.d2z_to_raw(pose_echt, thedata, rescen_echt),
             show_margin=True)
     mpplot.gcf().gca().set_title('Ground truth')
     mpplot.subplot(1, 2, 2)
@@ -156,7 +154,7 @@ def draw_pred_random(thedata, image_dir, annot_echt, annot_pred):
     else:
         draw_pose_xy(
             thedata, img,
-            dataops.d2z_to_raw(pose_pred, thedata.centre, thedata.focal, rescen_pred),
+            dataops.d2z_to_raw(pose_pred, thedata, rescen_pred),
             show_margin=True)
     mpplot.gca().set_title('Prediction')
     mpplot.show()
@@ -247,8 +245,7 @@ def draw_raw3d(thedata, img, pose_raw):
     fig_size = (2 * 6, 6)
     fig = mpplot.figure(figsize=fig_size)
     points3 = dataops.img_to_raw(
-        img, thedata.centre, thedata.focal,
-        thedata.min_z, thedata.max_z)
+        img, thedata)
     numpts = points3.shape[0]
     if 1000 < numpts:
         samid = randsample(range(numpts), 1000)
@@ -325,25 +322,19 @@ def draw_raw3d_random(thedata, image_dir, annot_txt, img_id=-1):
     draw_pose_xy(thedata, img, pose_raw)
     mpplot.subplot(1, 3, 2)
     img_crop_resize, rescen = dataops.crop_resize(
-        img, pose_raw,
-        thedata.centre, thedata.focal,
-        thedata.min_z, thedata.max_z,
-        thedata.image_size, thedata.crop_size)
+        img, pose_raw, thedata)
     mpplot.imshow(img_crop_resize, cmap='bone')
     draw_pose2d(
         thedata, img_crop_resize,
-        dataops.raw_to_2d(pose_raw, thedata.centre, thedata.focal, rescen))
+        dataops.raw_to_2d(pose_raw, thedata, rescen))
     mpplot.gca().set_title('Cropped')
     mpplot.subplot(1, 3, 3)
     img_crop_resize, rescen = dataops.crop_resize_pca(
-        img, pose_raw,
-        thedata.centre, thedata.focal,
-        thedata.min_z, thedata.max_z,
-        thedata.crop_size)
+        img, pose_raw, thedata)
     mpplot.imshow(img_crop_resize, cmap='bone')
     draw_pose2d(
         thedata, img_crop_resize,
-        dataops.raw_to_2d(pose_raw, thedata.centre, thedata.focal, rescen))
+        dataops.raw_to_2d(pose_raw, thedata, rescen))
     mpplot.gca().set_title('Cleaned')
     mpplot.gcf().gca().axis('off')
     mpplot.tight_layout()
@@ -395,7 +386,7 @@ def draw_hist_random(thedata, image_dir, img_id=-1):
     mpplot.hist(img_val)
     mpplot.subplot(2, 2, 3)
     img_matt = img
-    img_matt[2 > img_matt] = thedata.max_distance
+    img_matt[2 > img_matt] = thedata.z_max
     mpplot.imshow(img_matt, cmap='bone')
     mpplot.subplot(2, 2, 4)
     img_val = [v for v in img_matt.flatten() if (10 > v)]

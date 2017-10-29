@@ -36,9 +36,9 @@ class hands17holder:
     # cropped & resized training images
     image_size = [640, 480]
     crop_size = 96
-    min_z = 1
-    max_z = 3333
-    max_distance = 9999  # max distance set to 10m
+    z_near = 1
+    z_far = 3333
+    z_max = 9999  # max distance set to 10m
     # camera info
     focal = (475.065948, 475.065857)
     centre = (315.944855, 245.287079)
@@ -91,7 +91,7 @@ class hands17holder:
                 open(self.training_annot_origin, 'r') as reader:
             for annot_line in reader.readlines():
                 _, pose_raw = dataio.parse_line_annot(annot_line)
-                pose2d = dataops.raw_to_2d(pose_raw, self.centre, self.focal)
+                pose2d = dataops.raw_to_2d(pose_raw, self)
                 if 0 > np.min(pose2d):
                     continue
                 if 0 > np.min(self.image_size - pose2d):
@@ -122,12 +122,8 @@ class hands17holder:
         img_name, pose_raw, rescen = dataio.parse_line_annot(annot_line)
         img = dataio.read_image(
             os.path.join(self.training_images, img_name))
-        pose2d = dataops.raw_to_2d(
-            pose_raw, self.centre, self.focal)
-        rect = dataops.get_rect3(
-            pose_raw,
-            self.centre, self.focal,
-            self.image_size, 0.25)
+        pose2d = dataops.raw_to_2d(pose_raw, self)
+        rect = dataops.get_rect3(pose_raw, self)
         crop_size = self.crop_size
         rs = crop_size / rect[1, 1]
         rescen = np.append(rs, rect[0, :])
@@ -155,8 +151,8 @@ class hands17holder:
     def crop_resize_save(self, annot_line, messages=None):
         img_name, img_crop, p3z_crop, rescen = self.get_rect_crop_resize(
             annot_line)
-        img_crop[self.min_z > img_crop] = self.max_distance
-        img_crop[self.max_z < img_crop] = self.max_distance
+        img_crop[self.z_near > img_crop] = self.z_max
+        img_crop[self.z_far < img_crop] = self.z_max
         dataio.save_image(
             os.path.join(self.training_cropped, img_name),
             img_crop
