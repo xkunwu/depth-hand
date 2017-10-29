@@ -4,7 +4,6 @@ import sys
 from importlib import import_module
 import numpy as np
 import progressbar
-from timeit import default_timer as timer
 import h5py
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -23,15 +22,26 @@ class base_regre():
     """
     def __init__(self, out_dir):
         self.train_dir = os.path.join(out_dir, 'cropped')
-        self.appen_train = os.path.join(self.train_dir, 'appen_train.h5')
-        self.appen_test = os.path.join(self.train_dir, 'appen_test.h5')
+        self.appen_train = os.path.join(self.train_dir, 'appen_train')
+        self.appen_test = os.path.join(self.train_dir, 'appen_test')
         self.crop_size = 96
 
-    def preallocate(self, batch_size, image_size, pose_dim):
-        self.batch_index = np.empty(shape=(batch_size, 1))
-        self.batch_frame = np.empty(shape=(batch_size, image_size, image_size))
-        self.batch_poses = np.empty(shape=(batch_size, pose_dim))
-        self.batch_resce = np.empty(shape=(batch_size, 3))
+    class batch_allot:
+        def __init__(self, batch_size, image_size, pose_dim):
+            self.batch_size = batch_size
+            self.image_size = image_size
+            self.pose_dim = pose_dim
+            self.batch_index = np.empty(
+                shape=(batch_size, 1), dtype=np.uint32)
+            self.batch_frame = np.empty(
+                shape=(batch_size, image_size, image_size), dtype=np.float32)
+            self.batch_poses = np.empty(
+                shape=(batch_size, pose_dim), dtype=np.float32)
+            self.batch_resce = np.empty(
+                shape=(batch_size, 3), dtype=np.float32)
+            self.batch_bytes = \
+                self.batch_index.nbytes + self.batch_frame.nbytes + \
+                self.batch_poses.nbytes + self.batch_resce.nbytes
 
     def start_train(self, filepack):
         pass
@@ -43,23 +53,19 @@ class base_regre():
         """ Tweak algorithm specific parameters """
         args.crop_size = self.crop_size
 
-    def prepare_data(self, thedata, file_annot, name_appen):
-        batch_size = self.batch_size
+    def prepare_data(self, thedata, batchallot, file_annot, name_appen):
+        batch_size = batchallot.batch_size
         num_line = int(sum(1 for line in file_annot))
         file_annot.seek(0)
-        num_batches = int(float(num_line) // batch_size)
-        print('preparing data: {:d} lines, subdivided into {:d} batches (batch size {:d}) ...'.format(
-            num_line, num_batches, batch_size
+        num_stores = int(np.ceil(float(num_line) / batch_size))
+        print('preparing data: {:d} lines, subdivided into {:d} batches (store size {:.4f} GB) ...'.format(
+            num_line, num_stores, float(batchallot.batch_bytes) / (2 << 30)
         ))
-        all_index = np.empty(shape=(num_batches, batch_size, 1))
-        all_frame = np.empty(shape=(num_batches, batch_size, self.crop_size, self.crop_size))
-        all_poses = np.empty(shape=(num_batches, batch_size, self.pose_dim))
-        all_resce = np.empty(shape=(num_batches, batch_size, 3))
-        # for bi in range(num_batches):
+        # for bi in range(num_stores):
         #     batch_0 = batch_size * bi
         #     batch_1 = batch_size * (bi + 1)
         timerbar = progressbar.ProgressBar(
-            maxval=num_batches,
+            maxval=num_stores,
             widgets=[
                 progressbar.Percentage(),
                 ' ', progressbar.Bar('=', '[', ']'),
@@ -67,29 +73,24 @@ class base_regre():
         ).start()
         bi = 0
         while True:
-            res = self.provider.put2d(
-                thedata, file_annot, self.image_dir, self.batch_size,
-                self.batch_index, self.batch_frame, self.batch_poses, self.batch_resce
+            resline = self.provider.put2d_mt(
+                file_annot, thedata, self.image_dir, batchallot
             )
-            if 0 > res:
+            if 0 > resline:
                 break
-            all_index[bi, :] = self.batch_index
-            all_frame[bi, :, :, :] = self.batch_frame
-            all_poses[bi, :, :] = self.batch_poses
-            all_resce[bi, :] = self.batch_resce
-            filen_bi = '{}_{:d}.h5'.format(name_appen, bi)
+            filen_bi = '{}_{:d}'.format(name_appen, bi)
             with h5py.File(filen_bi, 'w') as h5file:
                 h5file.create_dataset(
-                    'index', data=all_index, dtype=float
+                    'index', data=batchallot.batch_index[0:resline, ...], dtype=np.uint32
                 )
                 h5file.create_dataset(
-                    'frame', data=all_frame, dtype=float
+                    'frame', data=batchallot.batch_frame[0:resline, ...], dtype=np.float32
                 )
                 h5file.create_dataset(
-                    'poses', data=all_poses, dtype=float
+                    'poses', data=batchallot.batch_poses[0:resline, ...], dtype=np.float32
                 )
                 h5file.create_dataset(
-                    'resce', data=all_resce, dtype=float
+                    'resce', data=batchallot.batch_resce[0:resline, ...], dtype=np.float32
                 )
             timerbar.update(bi)
             bi += 1
@@ -105,20 +106,18 @@ class base_regre():
         if not os.path.exists(self.train_dir):
             first_run = True
             os.makedirs(self.train_dir)
-        if ((not os.path.exists(self.appen_train)) or
-                (not os.path.exists(self.appen_test))):
-            first_run = True
         if args.rebuild_data:
             first_run = True
         if not first_run:
             return
-        self.preallocate(self.batch_size, self.crop_size, self.pose_dim)
+        self.batchallot = self.batch_allot(args.store_size, self.crop_size, self.pose_dim)
         with file_pack() as filepack:
             file_annot = filepack.push_file(thedata.training_annot_train)
-            self.prepare_data(thedata, file_annot, self.appen_train)
+            self.prepare_data(thedata, self.batchallot, file_annot, self.appen_train)
         with file_pack() as filepack:
             file_annot = filepack.push_file(thedata.training_annot_test)
-            self.prepare_data(thedata, file_annot, self.appen_test)
+            self.prepare_data(thedata, self.batchallot, file_annot, self.appen_test)
+        self.batchallot = self.batch_allot(self.batch_size, self.crop_size, self.pose_dim)
 
     @staticmethod
     def placeholder_inputs(batch_size, image_size, pose_dim):

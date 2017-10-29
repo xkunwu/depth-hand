@@ -52,7 +52,10 @@ class args_holder:
             help='Epoch to run [default: 10]')
         self.parser.add_argument(
             '--batch_size', type=int, default=64,
-            help='Batch Size during training [default: 64]')
+            help='Batch size during training [default: 64]')
+        self.parser.add_argument(
+            '--store_size', type=int, default=(2 << 16),
+            help='Splited file size for storage')
         # self.parser.add_argument(
         #     '--optimizer', default='adam',
         #     help='Only using adam currently [default: adam]')
@@ -112,5 +115,4 @@ if __name__ == "__main__":
     argsholder.parse_args()
     ARGS = argsholder.args
     ARGS.rebuild_data = True
-    ARGS.batch_size = 16
     argsholder.create_instance()

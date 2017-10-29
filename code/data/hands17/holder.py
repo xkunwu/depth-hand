@@ -1,8 +1,10 @@
 import os
+import sys
 import numpy as np
 from colour import Color
 import cv2
 import random
+import progressbar
 from multiprocessing.dummy import Pool as ThreadPool
 # import multiprocessing
 # from multiprocessing import Manager as ThreadManager
@@ -89,7 +91,7 @@ class hands17holder:
         self.num_training = int(0)
         with open(self.training_annot_cleaned, 'w') as writer, \
                 open(self.training_annot_origin, 'r') as reader:
-            for annot_line in reader.readlines():
+            for li, annot_line in enumerate(reader.readlines()):
                 _, pose_raw = dataio.parse_line_annot(annot_line)
                 pose2d = dataops.raw_to_2d(pose_raw, self)
                 if 0 > np.min(pose2d):
@@ -98,6 +100,10 @@ class hands17holder:
                     continue
                 writer.write(annot_line)
                 self.num_training += 1
+                if 0 == (li % 10e4):
+                    sys.stdout.write('.')
+                    sys.stdout.flush()
+        sys.stdout.write('\n')
 
     def shuffle_split(self):
         with open(self.training_annot_cleaned, 'r') as source:
@@ -220,6 +226,7 @@ class hands17holder:
 
     def init_data(self, rebuild=False):
         if rebuild or (not os.path.exists(self.training_annot_cleaned)):
+            print('cleaning data ...')
             self.remove_out_frame_annot()
             print('data cleaned, using: {}'.format(
                 self.training_annot_cleaned))
