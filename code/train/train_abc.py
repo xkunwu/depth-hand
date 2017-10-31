@@ -87,14 +87,17 @@ class train_abc():
                 'pred': pred
             }
 
+            self.args.model_inst.start_train(self.args.batch_size)
             for epoch in range(self.args.max_epoch):
                 self.logger.info('**** Epoch #{:03d} ****'.format(epoch))
                 sys.stdout.flush()
 
                 time_s = datetime.now()
+                self.args.model_inst.start_epoch_train()
                 self.logger.info('** Training **')
                 self.train_one_epoch(sess, ops, train_writer)
-                self.logger.info('** Evaluate **')
+                self.args.model_inst.start_epoch_test()
+                self.logger.info('** Testing **')
                 self.test_one_epoch(sess, ops, test_writer)
                 self.logger.info('Epoch #{:03d} processing time: {}'.format(
                     epoch,
@@ -109,96 +112,50 @@ class train_abc():
     def train_one_epoch(self, sess, ops, train_writer):
         """ ops: dict mapping from string to tf ops """
         is_training = True
-        # batch_size = self.args.batch_size
-        # image_size = self.args.crop_size
-        with file_pack() as filepack:
-            self.args.model_inst.start_train(self.args.batch_size, filepack)
-            batch_frame, batch_poses = self.args.model_inst.fetch_batch()
-        # with open(self.args.data_inst.training_annot_train, 'r') as fanno:
-        fanno = self.args.data_provider.read_train(self.args.data_inst)
-        try:
-            # batch_count = 0
-            while True:
-                next_n_lines = list(islice(fanno, batch_size))
-                if not next_n_lines:
-                    break
-                if len(next_n_lines) < batch_size:
-                    break
-                # for bi, annot_line in enumerate(next_n_lines):
-                #     img_name, pose_raw, _ = self.args.data_inst.parse_line_annot(
-                #         annot_line)
-                #     img = self.args.data_inst.read_image(os.path.join(
-                #         self.args.data_inst.training_cropped, img_name))
-                #     batch_frame[bi, :, :] = img
-                #     batch_poses[bi, :] = pose_raw.flatten().T
-                self.args.data_provider.put2d(
-                    self.args.data_inst, next_n_lines,
-                    batch_frame, batch_poses
-                )
-                feed_dict = {
-                    ops['batch_frame']: self.args.model_inst.batch_frame,
-                    ops['batch_poses']: self.args.model_inst.batch_poses,
-                    ops['is_training']: is_training
-                }
-                summary, step, _, loss_val, _ = sess.run(
-                    [ops['merged'], ops['step'], ops['train_op'],
-                        ops['loss'], ops['pred']],
-                    feed_dict=feed_dict)
-                train_writer.add_summary(summary, step)
-                # batch_count += 1
-                self.logger.info('batch training loss (half-squared): {}'.format(
-                    loss_val))
-        finally:
-            self.args.data_provider.close(self.args.data_inst, fanno)
+        while True:
+            batch_data = self.args.model_inst.fetch_batch_train()
+            if batch_data is None:
+                break
+            feed_dict = {
+                ops['batch_frame']: batch_data['batch_frame'],
+                ops['batch_poses']: batch_data['batch_poses'],
+                ops['is_training']: is_training
+            }
+            summary, step, _, loss_val, _ = sess.run(
+                [ops['merged'], ops['step'], ops['train_op'],
+                    ops['loss'], ops['pred']],
+                feed_dict=feed_dict)
+            train_writer.add_summary(summary, step)
+            # batch_count += 1
+            self.logger.info('batch training loss (half-squared): {}'.format(
+                loss_val))
 
     def test_one_epoch(self, sess, ops, test_writer):
         """ ops: dict mapping from string to tf ops """
         is_training = False
-        batch_size = self.args.batch_size
-        image_size = self.args.crop_size
-        batch_frame = np.empty(shape=(batch_size, image_size, image_size))
-        batch_poses = np.empty(shape=(batch_size, self.args.model_inst.pose_dim))
-        # with open(self.args.data_inst.training_annot_test, 'r') as fanno:
-        fanno = self.args.data_provider.read_test(self.args.data_inst)
-        try:
-            batch_count = 0
-            loss_sum = 0
-            while True:
-                next_n_lines = list(islice(fanno, batch_size))
-                if not next_n_lines:
-                    break
-                if len(next_n_lines) < batch_size:
-                    break
-                # for bi, annot_line in enumerate(next_n_lines):
-                #     img_name, pose_raw, _ = self.args.data_inst.parse_line_annot(
-                #         annot_line)
-                #     img = self.args.data_inst.read_image(os.path.join(
-                #         self.args.data_inst.training_cropped, img_name))
-                #     batch_frame[bi, :, :] = img
-                #     batch_poses[bi, :] = pose_raw.flatten().T
-                self.args.data_provider.put2d(
-                    self.args.data_inst, next_n_lines,
-                    batch_frame, batch_poses
-                )
-                feed_dict = {
-                    ops['batch_frame']: self.args.model_inst.batch_frame,
-                    ops['batch_poses']: self.args.model_inst.batch_poses,
-                    ops['is_training']: is_training
-                }
-                summary, step, loss_val, _ = sess.run(
-                    [ops['merged'], ops['step'],
-                        ops['loss'], ops['pred']],
-                    feed_dict=feed_dict)
-                test_writer.add_summary(summary, step)
-                batch_count += 1
-                loss_sum += loss_val
-                sys.stdout.write('.')
-                sys.stdout.flush()
-            print('\n')
-            self.logger.info('epoch evaluate mean loss (half-squared): {}'.format(
-                loss_sum / batch_count))
-        finally:
-            self.args.data_provider.close(self.args.data_inst, fanno)
+        batch_count = 0
+        loss_sum = 0
+        while True:
+            batch_data = self.args.model_inst.fetch_batch_test()
+            if batch_data is None:
+                break
+            feed_dict = {
+                ops['batch_frame']: batch_data['batch_frame'],
+                ops['batch_poses']: batch_data['batch_poses'],
+                ops['is_training']: is_training
+            }
+            summary, step, loss_val, _ = sess.run(
+                [ops['merged'], ops['step'],
+                    ops['loss'], ops['pred']],
+                feed_dict=feed_dict)
+            test_writer.add_summary(summary, step)
+            batch_count += 1
+            loss_sum += loss_val
+            sys.stdout.write('.')
+            sys.stdout.flush()
+        print('\n')
+        self.logger.info('epoch evaluate mean loss (half-squared): {}'.format(
+            loss_sum / batch_count))
 
     def evaluate(self):
         with tf.device('/gpu:' + str(self.args.gpu_id)):
@@ -360,7 +317,7 @@ if __name__ == "__main__":
     argsholder.parse_args()
     ARGS = argsholder.args
     ARGS.batch_size = 16
-    ARGS.max_epoch = 1
+    ARGS.max_epoch = 2
     argsholder.create_instance()
     trainer = train_abc(argsholder.args)
     trainer.train()

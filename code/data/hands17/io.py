@@ -18,7 +18,7 @@ def save_image(image_name, img):
 
 
 def imagename2index(image_name):
-    return int(re.search(r'image_D(\d)+\.png', image_name).group(1))
+    return int(re.match(r'^image_D(\d+)\.png', image_name).group(1))
 
 
 def parse_line_annot(line):

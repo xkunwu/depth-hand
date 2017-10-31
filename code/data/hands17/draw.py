@@ -310,7 +310,7 @@ def draw_raw3d_random(thedata, image_dir, annot_txt, img_id=-1):
     # annot_line = linecache.getline(annot_txt, 465)  # the finger
     # print(annot_line)
 
-    img_name, pose_raw, _ = dataio.parse_line_annot(annot_line)
+    img_name, pose_raw = dataio.parse_line_annot(annot_line)
     img_path = os.path.join(image_dir, img_name)
     print('drawing pose #{:d}: {}'.format(img_id, img_path))
     img = dataio.read_image(img_path)

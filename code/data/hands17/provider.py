@@ -23,7 +23,7 @@ def put2d_worker(args, thedata, image_dir, batchallot):
 def put2d_mt(
         fanno, thedata, image_dir, batchallot
 ):
-    next_n_lines = list(islice(fanno, batchallot.batch_size))
+    next_n_lines = list(islice(fanno, batchallot.store_size))
     if not next_n_lines:
         return -1
     num_line = len(next_n_lines)
@@ -31,6 +31,8 @@ def put2d_mt(
     thread_pool.map(
         partial(put2d_worker, thedata=thedata, image_dir=image_dir, batchallot=batchallot),
         zip(range(num_line), next_n_lines))
+    thread_pool.close()
+    thread_pool.join()
     # import numpy as np
     # import copy
     # test_copy = copy.deepcopy(batchallot)

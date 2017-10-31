@@ -54,8 +54,8 @@ class args_holder:
             '--batch_size', type=int, default=64,
             help='Batch size during training [default: 64]')
         self.parser.add_argument(
-            '--store_size', type=int, default=(2 << 16),
-            help='Splited file size for storage')
+            '--store_level', type=int, default=16,
+            help='Batch size for storage [default: 16, means 2<<16 frames]')
         # self.parser.add_argument(
         #     '--optimizer', default='adam',
         #     help='Only using adam currently [default: adam]')
@@ -87,6 +87,7 @@ class args_holder:
             os.makedirs(self.args.out_dir)
         self.args.log_dir = os.path.join(self.args.out_dir, 'log')
         self.args.cpu_count = multiprocessing.cpu_count()
+        self.args.store_level = (2 << self.args.store_level)
         model_class = getattr(
             import_module('train.' + self.args.model_name),
             self.args.model_name
