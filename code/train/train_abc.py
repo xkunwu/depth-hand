@@ -2,10 +2,9 @@ import os
 import sys
 from importlib import import_module
 import logging
+from timeit import default_timer as timer
 from datetime import datetime
 import tensorflow as tf
-import numpy as np
-from itertools import islice
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 BASE_DIR = os.path.abspath(os.path.join(BASE_DIR, os.pardir))
@@ -92,7 +91,7 @@ class train_abc():
                 self.logger.info('**** Epoch #{:03d} ****'.format(epoch))
                 sys.stdout.flush()
 
-                time_s = datetime.now()
+                time_s = timer()
                 self.args.model_inst.start_epoch_train()
                 self.logger.info('** Training **')
                 self.train_one_epoch(sess, ops, train_writer)
@@ -101,7 +100,7 @@ class train_abc():
                 self.test_one_epoch(sess, ops, test_writer)
                 self.logger.info('Epoch #{:03d} processing time: {}'.format(
                     epoch,
-                    datetime.now() - time_s))
+                    timer() - time_s))
 
                 # Save the variables to disk.
                 if epoch % 10 == 0:
@@ -193,56 +192,39 @@ class train_abc():
             'pred': pred
         }
 
-        # with open(self.args.data_inst.training_annot_predict, 'w') as writer:
+        self.args.model_inst.start_train(self.args.batch_size)
+        self.args.model_inst.start_epoch_test()
         self.eval_one_epoch_write(sess, ops)
 
     def eval_one_epoch_write(self, sess, ops):
         is_training = False
-        batch_size = self.args.batch_size
-        image_size = self.args.crop_size
-        batch_frame = np.empty(shape=(batch_size, image_size, image_size))
-        batch_poses = np.empty(shape=(batch_size, self.args.model_inst.pose_dim))
-        batch_resce = np.empty(shape=(batch_size, 3))
-        # with open(self.args.data_inst.training_annot_test, 'r') as fanno:
-        fanno = self.args.data_provider.read_test(self.args.data_inst)
-        writer = self.args.data_provider.write_predict(self.args.data_inst)
-        try:
-            batch_count = 0
-            loss_sum = 0
+        batch_count = 0
+        loss_sum = 0
+        with file_pack() as filepack:
+            writer = filepack.push_file(self.args.model_inst.predict_file, 'w')
             while True:
-                next_n_lines = list(islice(fanno, batch_size))
-                if not next_n_lines:
+                batch_data = self.args.model_inst.fetch_batch_test()
+                if batch_data is None:
                     break
-                if len(next_n_lines) < batch_size:
-                    break
-                image_names = []
-                # for bi, annot_line in enumerate(next_n_lines):
-                #     img_name, pose_raw, rescen = self.args.data_inst.parse_line_annot(
-                #         annot_line)
-                #     img = self.args.data_inst.read_image(os.path.join(
-                #         self.args.data_inst.training_cropped, img_name))
-                #     batch_frame[bi, :, :] = img
-                #     batch_poses[bi, :] = pose_raw.flatten().T
-                #     image_names.append(img_name)
-                #     batch_resce[bi, :] = rescen
-                self.args.data_provider.put2d(
-                    self.args.data_inst, next_n_lines,
-                    batch_frame, batch_poses, image_names, batch_resce
-                )
                 feed_dict = {
-                    ops['batch_frame']: self.args.model_inst.batch_frame,
-                    ops['batch_poses']: self.args.model_inst.batch_poses,
+                    ops['batch_frame']: batch_data['batch_frame'],
+                    ops['batch_poses']: batch_data['batch_poses'],
                     ops['is_training']: is_training
                 }
                 loss_val, pred_val = sess.run(
                     [ops['loss'], ops['pred']],
                     feed_dict=feed_dict)
-                for bi, _ in enumerate(next_n_lines):
-                    out_list = np.append(
-                        pred_val[bi, :].flatten(),
-                        batch_resce[bi, :].flatten()).flatten()
-                    crimg_line = ''.join("%12.4f" % x for x in out_list)
-                    writer.write(image_names[bi] + crimg_line + '\n')
+                self.args.data_provider.write2d(
+                    writer,
+                    batch_data['batch_index'],
+                    pred_val
+                )
+                # for bi, _ in enumerate(next_n_lines):
+                #     out_list = np.append(
+                #         pred_val[bi, :].flatten(),
+                #         batch_resce[bi, :].flatten()).flatten()
+                #     crimg_line = ''.join("%12.4f" % x for x in out_list)
+                #     writer.write(image_names[bi] + crimg_line + '\n')
                 batch_count += 1
                 loss_sum += loss_val
                 sys.stdout.write('.')
@@ -250,8 +232,6 @@ class train_abc():
             # print('\n')
             self.logger.info('epoch evaluate mean loss (half-squared): {}'.format(
                 loss_sum / batch_count))
-        finally:
-            self.args.data_provider.close(self.args.data_inst, fanno)
 
     def get_learning_rate(self, batch):
         learning_rate = tf.train.exponential_decay(
@@ -313,11 +293,10 @@ class train_abc():
 
 
 if __name__ == "__main__":
+    # python train_abc.py --max_epoch=2 --batch_size=16 --store_level=6 --model_name=base_regre
     argsholder = args_holder()
     argsholder.parse_args()
-    ARGS = argsholder.args
-    ARGS.batch_size = 16
-    ARGS.max_epoch = 2
     argsholder.create_instance()
     trainer = train_abc(argsholder.args)
     trainer.train()
+    trainer.evaluate()

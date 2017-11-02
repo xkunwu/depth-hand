@@ -14,13 +14,13 @@ def compare_error(thedata, fname_echt, fname_pred):
         sour_lines = [x.strip() for x in file_s.readlines()]
         targ_lines = [x.strip() for x in file_t.readlines()]
         for li, line_t in enumerate(targ_lines):
-            name_s, pose_s, scen_s = dataio.parse_line_annot(sour_lines[li])
-            name_t, pose_t, scen_t = dataio.parse_line_annot(line_t)
+            name_s, pose_s = dataio.parse_line_annot(sour_lines[li])
+            name_t, pose_t = dataio.parse_line_annot(line_t)
             if name_s != name_t:
                 print('different names: {} - {}'.format(name_s, name_t))
                 return
-            p3d_s = dataops.d2z_to_raw(pose_s, thedata, scen_s)
-            p3d_t = dataops.d2z_to_raw(pose_t, thedata, scen_t)
+            p3d_s = dataops.d2z_to_raw(pose_s, thedata)
+            p3d_t = dataops.d2z_to_raw(pose_t, thedata)
             error_l.append(np.sqrt(
                 np.sum((p3d_s - p3d_t) ** 2, axis=1)
             ))

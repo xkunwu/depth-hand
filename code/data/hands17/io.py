@@ -21,6 +21,10 @@ def imagename2index(image_name):
     return int(re.match(r'^image_D(\d+)\.png', image_name).group(1))
 
 
+def index2imagename(index):
+    return 'image_D{:08d}.png'.format(index)
+
+
 def parse_line_annot(line):
     """ parse raw annotation, and appendix for crop-resize """
     annot_list = re.split(r'\s+', line.strip())
@@ -37,12 +41,12 @@ def parse_line_annot(line):
 
 def parse_line_appen2(line):
     append_list = re.split(r'\s+', line.strip())
-    rescen = np.array([float(i) for i in append_list])
-    return rescen
+    resce = np.array([float(i) for i in append_list])
+    return resce
 
 
 def get_line(filename, img_id):
-    img_name_id = 'image_D{:08d}.png'.format(img_id)
+    img_name_id = index2imagename(img_id)
     with open(filename, 'r') as f:
         for line_number, line in enumerate(f):
             img_name, _, _ = parse_line_annot(line)

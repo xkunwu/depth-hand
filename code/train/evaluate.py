@@ -18,9 +18,11 @@ ARGS.batch_size = 16
 ARGS.max_epoch = 1
 argsholder.create_instance()
 data_inst = ARGS.data_inst
+# ARGS.model_inst.draw_random(data_inst, ARGS)
+# sys.exit()
 
 trainer = train_abc(ARGS, False)
-if (not os.path.exists(data_inst.training_annot_predict)):
+if (not os.path.exists(ARGS.model_inst.predict_file)):
     trainer.evaluate()
 # trainer.evaluate()
 
@@ -29,35 +31,35 @@ datadraw = import_module(
 dataeval = import_module(
     'data.' + ARGS.data_name + '.eval')
 
-fig_size = (2 * 5, 5)
-mpplot.subplots(nrows=1, ncols=2, figsize=fig_size)
-mpplot.subplot(1, 2, 1)
-datadraw.draw_pose_xy_random(
-    data_inst,
-    data_inst.training_images,
-    data_inst.training_annot_cleaned,
-    219  # palm
-)
-mpplot.subplot(1, 2, 2)
-datadraw.draw_pose_xy_random(
-    data_inst,
-    data_inst.training_cropped,
-    data_inst.training_annot_cropped,
-    219  # palm
-)
-mpplot.show()
+# fig_size = (2 * 5, 5)
+# mpplot.subplots(nrows=1, ncols=2, figsize=fig_size)
+# mpplot.subplot(1, 2, 1)
+# datadraw.draw_pose_raw_random(
+#     data_inst,
+#     data_inst.training_images,
+#     data_inst.training_annot_cleaned,
+#     219  # palm
+# )
+# mpplot.subplot(1, 2, 2)
+# datadraw.draw_pose_raw_random(
+#     data_inst,
+#     data_inst.training_cropped,
+#     data_inst.training_annot_cropped,
+#     219  # palm
+# )
+# mpplot.show()
 
 datadraw.draw_pred_random(
     data_inst,
     data_inst.training_images,
     data_inst.training_annot_test,
-    data_inst.training_annot_predict
+    ARGS.model_inst.predict_file
 )
 
 errors = dataeval.compare_error(
     data_inst,
     data_inst.training_annot_test,
-    data_inst.training_annot_predict
+    ARGS.model_inst.predict_file
 )
 draw_sum = 3
 draw_i = 1

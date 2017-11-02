@@ -35,8 +35,9 @@ class args_holder:
             '--gpu_id', type=int, default=0,
             help='GPU to use [default: GPU 0]')
         self.parser.add_argument(
-            '--model_name', default='base_regre',
-            help='Model name [default: base_regre]')
+            # '--model_name', default='ortho3view',
+            '--model_name', default='base_clean',
+            help='Model name [default: base_clean]')
 
         # input preprocessing
         # self.parser.add_argument(
@@ -100,6 +101,12 @@ class args_holder:
             'data.' + self.args.data_name)
         self.args.data_provider = import_module(
             'data.' + self.args.data_name + '.provider')
+        self.args.data_draw = import_module(
+            'data.' + self.args.data_name + '.draw')
+        self.args.data_ops = import_module(
+            'data.' + self.args.data_name + '.ops')
+        self.args.data_io = import_module(
+            'data.' + self.args.data_name + '.io')
         self.args.data_class = getattr(
             import_module('data.' + self.args.data_name + '.holder'),
             self.args.data_name + 'holder'
@@ -112,8 +119,9 @@ class args_holder:
 
 
 if __name__ == "__main__":
+    # python args_holder.py --batch_size=16 --store_level=6
     argsholder = args_holder()
     argsholder.parse_args()
     ARGS = argsholder.args
-    ARGS.rebuild_data = True
+    ARGS.rebuild_data = True  # this is very slow
     argsholder.create_instance()

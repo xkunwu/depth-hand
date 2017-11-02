@@ -27,7 +27,7 @@ fig2data = getattr(
     'fig2data'
 )
 iso_box = getattr(
-    import_module('regu_grid'),
+    import_module('iso_boxes'),
     'iso_box'
 )
 
@@ -95,7 +95,7 @@ def draw_pose2d(thedata, img, pose2d, show_margin=False):
     return fig2data(mpplot.gcf(), show_margin)
 
 
-def draw_pose_xy(thedata, img, pose_raw, show_margin=False):
+def draw_pose_raw(thedata, img, pose_raw, show_margin=False):
     """ Draw 3D pose onto 2D image domain: using only (x, y).
         Args:
             pose_raw: nx3 array
@@ -109,8 +109,7 @@ def draw_pose_xy(thedata, img, pose_raw, show_margin=False):
     # print(pose_raw - points3)
 
     # draw bounding box
-    rect = dataops.get_rect3(
-        pose_raw, thedata)
+    rect = dataops.get_rect3(pose_raw, thedata)
     rect.draw()
 
     img_posed = draw_pose2d(
@@ -124,8 +123,8 @@ def draw_pred_random(thedata, image_dir, annot_echt, annot_pred):
     img_id = randint(1, sum(1 for _ in open(annot_pred, 'r')))
     line_echt = linecache.getline(annot_echt, img_id)
     line_pred = linecache.getline(annot_pred, img_id)
-    img_name, pose_echt, rescen_echt = dataio.parse_line_annot(line_echt)
-    _, pose_pred, rescen_pred = dataio.parse_line_annot(line_pred)
+    img_name, pose_echt = dataio.parse_line_annot(line_echt)
+    _, pose_pred = dataio.parse_line_annot(line_pred)
     img_path = os.path.join(image_dir, img_name)
     print('drawing pose #{:d}: {}'.format(img_id, img_path))
     img = dataio.read_image(img_path)
@@ -133,34 +132,32 @@ def draw_pred_random(thedata, image_dir, annot_echt, annot_pred):
     fig, ax = mpplot.subplots(nrows=1, ncols=2)
     mpplot.subplot(1, 2, 1)
     mpplot.imshow(img, cmap='bone')
-    if rescen_echt is None:
-        draw_pose_xy(
-            thedata, img,
-            pose_echt,
-            show_margin=True)
-    else:
-        draw_pose_xy(
-            thedata, img,
-            dataops.d2z_to_raw(pose_echt, thedata, rescen_echt),
-            show_margin=True)
+    draw_pose_raw(
+        thedata, img,
+        pose_echt,
+        show_margin=True)
+    # else:
+    #     draw_pose_raw(
+    #         thedata, img,
+    #         dataops.d2z_to_raw(pose_echt, thedata, rescen_echt),
+    #         show_margin=True)
     mpplot.gcf().gca().set_title('Ground truth')
     mpplot.subplot(1, 2, 2)
     mpplot.imshow(img, cmap='bone')
-    if rescen_pred is None:
-        draw_pose_xy(
-            thedata, img,
-            pose_pred,
-            show_margin=True)
-    else:
-        draw_pose_xy(
-            thedata, img,
-            dataops.d2z_to_raw(pose_pred, thedata, rescen_pred),
-            show_margin=True)
+    draw_pose_raw(
+        thedata, img,
+        pose_pred,
+        show_margin=True)
+    # else:
+    #     draw_pose_raw(
+    #         thedata, img,
+    #         dataops.d2z_to_raw(pose_pred, thedata, rescen_pred),
+    #         show_margin=True)
     mpplot.gca().set_title('Prediction')
     mpplot.show()
 
 
-def draw_pose_xy_random(thedata, image_dir, annot_txt, img_id=-1):
+def draw_pose_raw_random(thedata, image_dir, annot_txt, img_id=-1):
     """ Draw pose in the frontal view of a randomly picked image.
     """
     if 1 > img_id:
@@ -172,20 +169,20 @@ def draw_pose_xy_random(thedata, image_dir, annot_txt, img_id=-1):
     # annot_line = linecache.getline(annot_txt, 465)  # the finger
     # print(annot_line)
 
-    img_name_id = 'image_D{:08d}.png'.format(img_id)
-    img_name, pose_raw, rescen = dataio.parse_line_annot(annot_line)
+    img_name_id = dataio.index2imagename(img_id)
+    img_name, pose_raw = dataio.parse_line_annot(annot_line)
     if img_name_id != img_name:
         annot_line = dataio.get_line(annot_txt, img_id)
-        img_name, pose_raw, rescen = dataio.parse_line_annot(annot_line)
+        img_name, pose_raw = dataio.parse_line_annot(annot_line)
     img_path = os.path.join(image_dir, img_name)
     print('drawing pose #{:d}: {}'.format(img_id, img_path))
     img = dataio.read_image(img_path)
 
     mpplot.imshow(img, cmap='bone')
-    if rescen is None:
-        draw_pose_xy(thedata, img, pose_raw)
-    else:
-        draw_pose2d(thedata, img, pose_raw[:, 0:2])
+    # if resce is None:
+    draw_pose_raw(thedata, img, pose_raw)
+    # else:
+    #     draw_pose2d(thedata, img, pose_raw[:, 0:2])
     # mpplot.show()
     return img_id
 
@@ -200,10 +197,10 @@ def draw_pose_stream(thedata, gif_file, max_draw=100):
                 if lii >= max_draw:
                     return
                     # raise coder.break_with.Break
-                img_name, pose_raw, rescen = dataio.parse_line_annot(annot_line)
+                img_name, pose_raw, resce = dataio.parse_line_annot(annot_line)
                 img = dataio.read_image(os.path.join(thedata.training_images, img_name))
                 mpplot.imshow(img, cmap='bone')
-                img_posed = draw_pose_xy(img, pose_raw)
+                img_posed = draw_pose_raw(img, pose_raw)
                 # mpplot.show()
                 gif_writer.append_data(img_posed)
                 mpplot.gcf().clear()
@@ -244,8 +241,7 @@ def draw_raw3d(thedata, img, pose_raw):
     # draw full image
     fig_size = (2 * 6, 6)
     fig = mpplot.figure(figsize=fig_size)
-    points3 = dataops.img_to_raw(
-        img, thedata)
+    points3 = dataops.img_to_raw(img, thedata)
     numpts = points3.shape[0]
     if 1000 < numpts:
         samid = randsample(range(numpts), 1000)
@@ -319,22 +315,22 @@ def draw_raw3d_random(thedata, image_dir, annot_txt, img_id=-1):
     mpplot.subplots(nrows=1, ncols=2, figsize=fig_size)
     mpplot.subplot(1, 3, 1)
     mpplot.imshow(img, cmap='bone')
-    draw_pose_xy(thedata, img, pose_raw)
+    draw_pose_raw(thedata, img, pose_raw)
     mpplot.subplot(1, 3, 2)
-    img_crop_resize, rescen = dataops.crop_resize(
+    img_crop_resize, resce = dataops.crop_resize(
         img, pose_raw, thedata)
     mpplot.imshow(img_crop_resize, cmap='bone')
     draw_pose2d(
         thedata, img_crop_resize,
-        dataops.raw_to_2d(pose_raw, thedata, rescen))
+        dataops.raw_to_2d(pose_raw, thedata, resce))
     mpplot.gca().set_title('Cropped')
     mpplot.subplot(1, 3, 3)
-    img_crop_resize, rescen = dataops.crop_resize_pca(
+    img_crop_resize, resce = dataops.crop_resize_pca(
         img, pose_raw, thedata)
     mpplot.imshow(img_crop_resize, cmap='bone')
     draw_pose2d(
         thedata, img_crop_resize,
-        dataops.raw_to_2d(pose_raw, thedata, rescen))
+        dataops.raw_to_2d(pose_raw, thedata, resce))
     mpplot.gca().set_title('Cleaned')
     mpplot.gcf().gca().axis('off')
     mpplot.tight_layout()
@@ -372,7 +368,7 @@ def draw_bbox_random(thedata):
 def draw_hist_random(thedata, image_dir, img_id=-1):
     if 0 > img_id:
         img_id = randint(1, thedata.num_training)
-    img_name = 'image_D{:08d}.png'.format(img_id)
+    img_name = dataio.index2imagename(img_id)
     img_path = os.path.join(image_dir, img_name)
     print('drawing hist: {}'.format(img_path))
     img = dataio.read_image(img_path)

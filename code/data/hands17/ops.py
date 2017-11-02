@@ -9,20 +9,20 @@ BASE_DIR = os.path.abspath(os.path.join(BASE_DIR, os.pardir))
 BASE_DIR = os.path.abspath(os.path.join(BASE_DIR, os.pardir))
 sys.path.append(os.path.join(BASE_DIR, 'utils'))
 iso_box = getattr(
-    import_module('regu_grid'),
+    import_module('iso_boxes'),
     'iso_box'
 )
 iso_rect = getattr(
-    import_module('regu_grid'),
+    import_module('iso_boxes'),
     'iso_rect'
 )
 
 
-def d2z_to_raw(p2z, caminfo, rescen=np.array([1, 0, 0])):
+def d2z_to_raw(p2z, caminfo, resce=np.array([1, 0, 0])):
     """ reproject 2d poses to 3d.
         p2z: nx3 array, 2d position and real z
     """
-    pose2d = p2z[:, 0:2] / rescen[0] + rescen[1:3]
+    pose2d = p2z[:, 0:2] / resce[0] + resce[1:3]
     pose_z = np.array(p2z[:, 2]).reshape(-1, 1)
     pose3d = (pose2d - caminfo.centre) / caminfo.focal * pose_z
     # pose3d = (pose2d - caminfo.centre) / (-caminfo.focal[0], caminfo.focal[1]) * pose_z
@@ -37,25 +37,25 @@ def img_to_raw(img, caminfo):
     indx = np.where(conds)[::-1]  # need to reverse image plane coordinates
     zval = np.array(img[conds])
     indz = np.hstack((
-        np.asarray(indx).T,
+        np.asarray(indx).astype(float).T,
         zval.reshape(-1, 1))
     )
     points3 = d2z_to_raw(indz, caminfo)
     return points3
 
 
-def raw_to_2dz(points3, caminfo, rescen=np.array([1, 0, 0])):
+def raw_to_2dz(points3, caminfo, resce=np.array([1, 0, 0])):
     """ project 3D point onto image plane using camera info
         Args:
             points3: nx3 array, raw input in real world coordinates
     """
     pose_z = points3[:, 2]
     pose2d = points3[:, 0:2] / pose_z.reshape(-1, 1) * caminfo.focal + caminfo.centre
-    return (pose2d - rescen[1:3]) * rescen[0], pose_z
+    return (pose2d - resce[1:3]) * resce[0], pose_z
 
 
-def raw_to_2d(points3, caminfo, rescen=np.array([1, 0, 0])):
-    pose2d, _ = raw_to_2dz(points3, caminfo, rescen)
+def raw_to_2d(points3, caminfo, resce=np.array([1, 0, 0])):
+    pose2d, _ = raw_to_2dz(points3, caminfo, resce)
     return pose2d
 
 
@@ -70,21 +70,6 @@ def getbm(base_z, caminfo, base_margin=20):
     return m
 
 
-def crop_resize_pca(img, pose_raw, caminfo):
-    box = iso_box()
-    box.build(pose_raw)
-    points3 = box.pick(
-        img_to_raw(img, caminfo)
-    )
-    points2, pose_z = raw_to_2dz(points3, caminfo)
-    rect = iso_rect()
-    rect.build(points2, -0.3)  # shrink size, as PCA produced much larger box
-    img_crop = rect.print_image(points2, pose_z)
-    img_crop_resize = cv2resize(img_crop, (caminfo.crop_size, caminfo.crop_size))
-    rescen = np.append(float(caminfo.crop_size) / rect.get_sidelen(), rect.cen - rect.len)
-    return img_crop_resize, rescen
-
-
 def clip_image_border(rect, caminfo):
     # clip to image border
     ctl = rect.cen - rect.len
@@ -94,6 +79,42 @@ def clip_image_border(rect, caminfo):
         # print(ctl, caminfo.image_size - cbr, obm, rect.len)
         rect.len += obm
     return rect
+
+
+def proj_ortho3(img, pose_raw, caminfo):
+    box = iso_box()
+    box.build(pose_raw)
+    points3 = box.pick(img_to_raw(img, caminfo))
+    points3_trans = box.transform(points3)
+    img_crop_resize = []
+    for spi in range(3):
+        coord, depth = box.project_pca(points3_trans, roll=spi)
+        img_crop = box.print_image(coord, depth)
+        img_crop_resize.append(
+            cv2resize(img_crop, (caminfo.crop_size, caminfo.crop_size))
+        )
+        # pose2d, _ = box.project_pca(pose_trans, roll=spi, sort=False)
+    resce = np.append(
+        float(caminfo.crop_size) / box.get_sidelen(),
+        raw_to_2d(box.cen.reshape(1, -1), caminfo) - box.len)
+    return np.stack(img_crop_resize, axis=2), resce
+
+
+def crop_resize_pca(img, pose_raw, caminfo):
+    box = iso_box()
+    box.build(pose_raw)
+    points3 = box.pick(img_to_raw(img, caminfo))
+    points2, pose_z = raw_to_2dz(points3, caminfo)
+    rect = iso_rect()
+    rect.build(points2, 0.5)
+    rect = clip_image_border(rect, caminfo)
+    conds = rect.pick(points2)
+    img_crop = rect.print_image(points2[conds, :], pose_z[conds])
+    img_crop_resize = cv2resize(img_crop, (caminfo.crop_size, caminfo.crop_size))
+    resce = np.append(
+        float(caminfo.crop_size) / rect.get_sidelen(),
+        rect.cen - rect.len)
+    return img_crop_resize, resce
 
 
 def crop_resize(img, pose_raw, caminfo):
@@ -106,8 +127,8 @@ def crop_resize(img, pose_raw, caminfo):
     conds = rect.pick(points2)
     img_crop = rect.print_image(points2[conds, :], pose_z[conds])
     img_crop_resize = cv2resize(img_crop, (caminfo.crop_size, caminfo.crop_size))
-    rescen = np.append(float(caminfo.crop_size) / rect.get_sidelen(), rect.cen - rect.len)
-    return img_crop_resize, rescen
+    resce = np.append(float(caminfo.crop_size) / rect.get_sidelen(), rect.cen - rect.len)
+    return img_crop_resize, resce
 
 
 def get_rect3(points3, caminfo):

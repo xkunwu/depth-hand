@@ -1,5 +1,6 @@
 import os
 # import sys
+import shutil
 import numpy as np
 from colour import Color
 import random
@@ -21,7 +22,6 @@ class hands17holder:
     training_annot_cleaned = ''
     training_annot_train = ''
     training_annot_test = ''
-    training_annot_predict = ''
     frame_bbox = ''
 
     # num_training = int(957032)
@@ -124,7 +124,7 @@ class hands17holder:
                 f.write(line)
 
     # def crop_resize_save(self, annot_line, messages=None):
-    #     img_name, img_crop, p3z_crop, rescen = self.get_rect_crop_resize(
+    #     img_name, img_crop, p3z_crop, resce = self.get_rect_crop_resize(
     #         annot_line)
     #     img_crop[self.z_near > img_crop] = self.z_max
     #     img_crop[self.z_far < img_crop] = self.z_max
@@ -133,7 +133,7 @@ class hands17holder:
     #         img_crop
     #     )
     #     # self.draw_hist_random(self.training_cropped, img_name)
-    #     out_list = np.append(p3z_crop.flatten(), rescen.flatten()).flatten()
+    #     out_list = np.append(p3z_crop.flatten(), resce.flatten()).flatten()
     #     crimg_line = ''.join("%12.4f" % x for x in out_list)
     #     pose_l = img_name + crimg_line + '\n'
     #     if messages is not None:
@@ -141,7 +141,10 @@ class hands17holder:
     #     return pose_l
 
     def init_data(self, rebuild=False):
-        if rebuild or (not os.path.exists(self.training_annot_cleaned)):
+        if rebuild:
+            shutil.rmtree(self.out_dir)
+            os.makedirs(self.out_dir)
+        if (not os.path.exists(self.training_annot_cleaned)):
             print('cleaning data ...')
             # from timeit import default_timer as timer
             self.remove_out_frame_annot()
@@ -161,26 +164,11 @@ class hands17holder:
         print('splitted data: {} training, {} test.'.format(
             self.range_train, self.range_test))
 
-        if (rebuild or (not os.path.exists(self.training_annot_train)) or
+        if ((not os.path.exists(self.training_annot_train)) or
                 (not os.path.exists(self.training_annot_test))):
             self.shuffle_split()
         print('images are splitted out for evaluation: {:d} portions'.format(
             self.tt_split))
-
-        # # if rebuild:  # just over-write, this detete operation is slow
-        # #     if os.path.exists(self.training_cropped):
-        # #         shutil.rmtree(self.training_cropped)
-        # if (rebuild or (not os.path.exists(self.training_annot_cropped)) or
-        #         (not os.path.exists(self.training_cropped))):
-        #     print('running cropping code (be patient) ...')
-        #     # time_s = timer()
-        #     # self.crop_resize_training_images()
-        #     # print('single tread time: {:.4f}'.format(timer() - time_s))
-        #     time_s = timer()
-        #     self.crop_resize_training_images_mt()
-        #     print('multiprocessing time: {:.4f}'.format(timer() - time_s))
-        # print('using cropped and resized images: {}'.format(
-        #     self.training_cropped))
 
     def __init__(self, args):
         self.data_dir = args.data_dir
@@ -198,6 +186,4 @@ class hands17holder:
             self.out_dir, 'training_train.txt')
         self.training_annot_test = os.path.join(
             self.out_dir, 'training_test.txt')
-        self.training_annot_predict = os.path.join(
-            self.out_dir, 'training_predict.txt')
         self.frame_bbox = os.path.join(self.data_dir, 'frame/BoundingBox.txt')
