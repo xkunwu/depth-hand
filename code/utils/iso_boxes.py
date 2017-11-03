@@ -7,14 +7,14 @@ from colour import Color
 
 
 class iso_rect:
-    def __init__(self, cen=np.zeros(2), len=0):
-        self.cen = cen
-        self.len = len  # half side length
+    def __init__(self, cll=np.zeros(2), len=0.):
+        self.cll = cll
+        self.len = len
 
     def pick(self, points2):
         """ only meaningful when picked in the local coordinates """
-        cmin = self.cen - self.len
-        cmax = self.cen + self.len
+        cmin = self.cll
+        cmax = self.cll + self.len
         conds = np.logical_and(
             np.all(cmin < points2, axis=1),
             np.all(cmax > points2, axis=1)
@@ -22,37 +22,33 @@ class iso_rect:
         return conds
 
     def build(self, points2, m=0.1):
-        self.cen = np.mean(points2, axis=0)
-        self.len = np.max(np.ptp(points2, axis=0)) / 2
+        pmin = np.min(points2, axis=0)
+        pmax = np.max(points2, axis=0)
+        cen = (pmin + pmax) / 2
+        self.len = np.max(pmax - pmin)
+        # cen = np.mean(points2, axis=0)
+        # self.len = np.max(np.ptp(points2, axis=0))
         if 1 > m and -1 < m:
             m = self.len * m
         self.len += m
-
-    def get_sidelen(self):
-        return np.ceil(2 * self.len).astype(int) + 1
+        self.cll = cen - self.len / 2
 
     def print_image(self, coord, value):
-        cll = self.cen - self.len - 0.5
-        coord = np.floor(coord - cll).astype(int)
-        sidelen = self.get_sidelen()
+        coord = np.floor(coord - self.cll + 0.5).astype(int)
+        sidelen = np.ceil(self.len).astype(int) + 1
         img = np.zeros((sidelen, sidelen))
         img[coord[:, 1], coord[:, 0]] = value  # reverse coordinates!
         return img
 
     def draw(self, color=Color('orange').rgb):
-        sidelen = self.get_sidelen()
-        rect = np.vstack((
-            self.cen - self.len,
-            np.array([sidelen, sidelen])
-        ))
         mpplot.gca().add_patch(mppatches.Rectangle(
-            rect[0, :], rect[1, 0], rect[1, 1],
+            self.cll, self.len, self.len,
             linewidth=1, facecolor='none',
             edgecolor=color
         ))
 
 
-class iso_box:
+class iso_cube:
     def __init__(self, cen=np.zeros(3), len=0):
         self.cen = cen
         self.len = len  # half side length
@@ -78,8 +74,12 @@ class iso_box:
         # points3_trans_skl = pca.fit_transform(points3)  # bias might be wrong
         # print(pca.explained_variance_)
         # print(np.ptp(points3_trans_skl, axis=0))
-        self.cen = np.mean(points3, axis=0)
+        pmin = np.min(points3, axis=0)
+        pmax = np.max(points3, axis=0)
+        self.cen = (pmin + pmax) / 2
+        # self.cen = np.mean(points3, axis=0)
         C = np.cov((points3 - self.cen), rowvar=False)
+        print(C)
         # evals, evecs = np.linalg.eigh(C)
         _, evecs = np.linalg.eigh(C)
         # idx = np.argsort(evals)[::-1]
@@ -87,7 +87,8 @@ class iso_box:
         # evals = evals[idx]
         # print(evals)
         points3_trans = self.transform(points3)
-        ptp = np.ptp(points3_trans, axis=0)
+        # ptp = np.ptp(points3_trans, axis=0)
+        ptp = pmax - pmin
         idx = np.argsort(ptp)[::-1]
         evecs = evecs[idx, :]
         ptp = ptp[idx]
@@ -97,7 +98,7 @@ class iso_box:
         self.evecs = evecs
         if 1 > m:
             m = self.len * m
-        self.add_margin(m)
+        self.len += m
         return points3_trans
 
     def transform(self, points3):
@@ -109,9 +110,6 @@ class iso_box:
         """ to world coordinates """
         points3_trans = np.dot(points3, self.evecs.T) + self.cen
         return points3_trans
-
-    def add_margin(self, m):
-        self.len += m
 
     def project_pca(self, ps3_pca, roll=0, sort=True):
         ar3 = np.roll(np.arange(3), roll)
@@ -221,7 +219,7 @@ class iso_box:
 
 
 if __name__ == "__main__":
-    box = iso_box()
+    box = iso_cube()
     # points3 = np.random.randn(1000, 3)
     points3 = np.random.rand(1000, 3) * 6
     box.build(points3)

@@ -2,19 +2,28 @@ import os
 import sys
 from importlib import import_module
 import numpy as np
+import skfmm
 from cv2 import resize as cv2resize
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 BASE_DIR = os.path.abspath(os.path.join(BASE_DIR, os.pardir))
 BASE_DIR = os.path.abspath(os.path.join(BASE_DIR, os.pardir))
 sys.path.append(os.path.join(BASE_DIR, 'utils'))
-iso_box = getattr(
+iso_cube = getattr(
     import_module('iso_boxes'),
-    'iso_box'
+    'iso_cube'
 )
 iso_rect = getattr(
     import_module('iso_boxes'),
     'iso_rect'
+)
+regu_grid = getattr(
+    import_module('regu_grid'),
+    'regu_grid'
+)
+grid_cell = getattr(
+    import_module('regu_grid'),
+    'grid_cell'
 )
 
 
@@ -72,17 +81,59 @@ def getbm(base_z, caminfo, base_margin=20):
 
 def clip_image_border(rect, caminfo):
     # clip to image border
-    ctl = rect.cen - rect.len
-    cbr = rect.cen + rect.len
+    ctl = rect.cll
+    cbr = rect.cll + rect.len
+    cen = rect.cll + rect.len / 2
     obm = np.min([ctl, caminfo.image_size - cbr])
     if 0 > obm:
         # print(ctl, caminfo.image_size - cbr, obm, rect.len)
         rect.len += obm
+        rect.cll = cen - rect.len / 2
     return rect
 
 
+def fill_grid(img, pose_raw, step, caminfo):
+    box = iso_cube()
+    box.build(pose_raw)
+    points3 = box.pick(img_to_raw(img, caminfo))
+    points3_trans = box.transform(points3) + box.len  # 0-based
+    cell = grid_cell()
+    cell.build(points3_trans)
+    grid = regu_grid()
+    grid.build(cell, step)
+    grid.fill(points3_trans)
+    resce = np.append(
+        grid.cll.flatten(),
+        grid.len
+    )
+    return grid.pcnt, resce
+
+
+def trunc_belief(pcnt):
+    size = pcnt.shape[0]
+    # print(pcnt.shape, np.max(pcnt))
+    phi = np.ones_like(pcnt)
+    z0front = np.ones((size, size)) * (size - 1)
+    # print(z0front)
+    # print(pcnt[..., 15])
+    # print(np.where(0 < pcnt))
+    for index in zip(*np.where(0 < pcnt)):
+        if z0front[index[0:2]] > index[2]:
+            z0front[index[0:2]] = index[2]
+    zrange = np.repeat(np.arange(size), size * size).reshape(size, size, size)
+    phi[(z0front == zrange)] = 0
+    phi[(z0front < zrange)] = -1
+    bef = skfmm.distance(phi, dx=1e-2, narrow=0.3)
+    # plt.title('Distance calculation limited to narrow band')
+    # plt.contour(X, Y, phi, [0], linewidths=(3), colors='black')
+    # plt.contour(X, Y, d, 15)
+    # plt.colorbar()
+    # plt.show()
+    return bef
+
+
 def proj_ortho3(img, pose_raw, caminfo):
-    box = iso_box()
+    box = iso_cube()
     box.build(pose_raw)
     points3 = box.pick(img_to_raw(img, caminfo))
     points3_trans = box.transform(points3)
@@ -96,12 +147,16 @@ def proj_ortho3(img, pose_raw, caminfo):
         # pose2d, _ = box.project_pca(pose_trans, roll=spi, sort=False)
     resce = np.append(
         float(caminfo.crop_size) / box.get_sidelen(),
-        raw_to_2d(box.cen.reshape(1, -1), caminfo) - box.len)
+        box.cen
+    )
+    resce = np.concatenate((
+        resce,
+        box.evecs.flatten()))
     return np.stack(img_crop_resize, axis=2), resce
 
 
 def crop_resize_pca(img, pose_raw, caminfo):
-    box = iso_box()
+    box = iso_cube()
     box.build(pose_raw)
     points3 = box.pick(img_to_raw(img, caminfo))
     points2, pose_z = raw_to_2dz(points3, caminfo)
@@ -112,8 +167,8 @@ def crop_resize_pca(img, pose_raw, caminfo):
     img_crop = rect.print_image(points2[conds, :], pose_z[conds])
     img_crop_resize = cv2resize(img_crop, (caminfo.crop_size, caminfo.crop_size))
     resce = np.append(
-        float(caminfo.crop_size) / rect.get_sidelen(),
-        rect.cen - rect.len)
+        float(caminfo.crop_size) / rect.len,
+        rect.cll)
     return img_crop_resize, resce
 
 
@@ -121,13 +176,12 @@ def crop_resize(img, pose_raw, caminfo):
     rect = get_rect3(
         pose_raw, caminfo
     )
-    rect = clip_image_border(rect, caminfo)
     points3 = img_to_raw(img, caminfo)
     points2, pose_z = raw_to_2dz(points3, caminfo)
     conds = rect.pick(points2)
     img_crop = rect.print_image(points2[conds, :], pose_z[conds])
     img_crop_resize = cv2resize(img_crop, (caminfo.crop_size, caminfo.crop_size))
-    resce = np.append(float(caminfo.crop_size) / rect.get_sidelen(), rect.cen - rect.len)
+    resce = np.append(float(caminfo.crop_size) / rect.len, rect.cll)
     return img_crop_resize, resce
 
 
@@ -135,11 +189,12 @@ def get_rect3(points3, caminfo):
     """ return a rectangle with margin that 3d points
         NOTE: there is still a perspective problem
     """
-    box = iso_box()
+    box = iso_cube()
     box.build(points3)
+    cen = raw_to_2d(box.cen.reshape(1, -1), caminfo).flatten()
     rect = iso_rect(
-        raw_to_2d(box.cen.reshape(1, -1), caminfo),
-        box.len
+        cen - box.len,
+        box.get_sidelen()
     )
     rect = clip_image_border(rect, caminfo)
     return rect

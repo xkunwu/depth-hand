@@ -5,6 +5,31 @@ import ops as dataops
 import io as dataio
 
 
+def put3df_worker(args, thedata, image_dir, batchallot):
+    bi = args[0]
+    line = args[1]
+    img_name, pose_raw = dataio.parse_line_annot(line)
+    img = dataio.read_image(os.path.join(image_dir, img_name))
+    pcnt, resce = dataops.fill_grid(img, pose_raw, batchallot.image_size, thedata)
+    bef = dataops.trunc_belief(pcnt)
+    batchallot.batch_index[bi, :] = dataio.imagename2index(img_name)
+    batchallot.batch_frame[bi, ...] = np.expand_dims(bef, axis=3)
+    batchallot.batch_poses[bi, :] = pose_raw.flatten().T
+    batchallot.batch_resce[bi, :] = resce
+
+
+def put3v_worker(args, thedata, image_dir, batchallot):
+    bi = args[0]
+    line = args[1]
+    img_name, pose_raw = dataio.parse_line_annot(line)
+    img = dataio.read_image(os.path.join(image_dir, img_name))
+    pcnt, resce = dataops.fill_grid(img, pose_raw, batchallot.image_size, thedata)
+    batchallot.batch_index[bi, :] = dataio.imagename2index(img_name)
+    batchallot.batch_frame[bi, ...] = np.expand_dims(pcnt, axis=3)
+    batchallot.batch_poses[bi, :] = pose_raw.flatten().T
+    batchallot.batch_resce[bi, :] = resce
+
+
 def put3o_worker(args, thedata, image_dir, batchallot):
     bi = args[0]
     line = args[1]

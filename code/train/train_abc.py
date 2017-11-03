@@ -176,7 +176,7 @@ class train_abc():
         config = tf.ConfigProto()
         config.gpu_options.allow_growth = True
         config.allow_soft_placement = True
-        config.log_device_placement = True
+        config.log_device_placement = False
         sess = tf.Session(config=config)
 
         # Restore variables from disk.
@@ -229,7 +229,7 @@ class train_abc():
                 loss_sum += loss_val
                 sys.stdout.write('.')
                 sys.stdout.flush()
-            # print('\n')
+            print('\n')
             self.logger.info('epoch evaluate mean loss (half-squared): {}'.format(
                 loss_sum / batch_count))
 

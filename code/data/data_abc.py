@@ -13,9 +13,8 @@ args_holder = getattr(
 argsholder = args_holder()
 argsholder.parse_args()
 ARGS = argsholder.args
-ARGS.batch_size = 16
-ARGS.max_epoch = 1
 argsholder.create_instance()
+data_name = ARGS.data_name
 data_inst = ARGS.data_inst
 
 datadraw = import_module(

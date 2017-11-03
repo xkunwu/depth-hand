@@ -25,8 +25,11 @@ class base_regre(object):
         self.train_dir = os.path.join(out_dir, 'cropped')
         self.appen_train = 'appen_train'
         self.appen_test = 'appen_test'
+        self.predict_dir = os.path.join(out_dir, 'predict')
+        if not os.path.exists(self.predict_dir):
+            os.mkdir(self.predict_dir)
         self.predict_file = os.path.join(
-            out_dir, 'predict_{}'.format(self.__class__.__name__))
+            self.predict_dir, 'predict_{}'.format(self.__class__.__name__))
         self.crop_size = 96
         self.batch_size = -1
         self.batchallot = None
@@ -90,7 +93,7 @@ class base_regre(object):
             store_size = h5file['index'][:].shape[0]
             # print(h5file['index'][:])
             # batch_index = h5file['index'][:]
-            self.batchallot = base_regre.batch_allot(
+            self.batchallot = self.batch_allot(
                 store_size, self.crop_size, self.pose_dim, self.batch_size)
             self.batchallot.assign(
                 h5file['index'][:],
@@ -201,7 +204,7 @@ class base_regre(object):
             first_run = True
         if not first_run:
             return
-        batchallot = base_regre.batch_allot(
+        batchallot = self.batch_allot(
             args.store_level, self.crop_size, self.pose_dim, args.store_level)
         batchallot.allot(1, 3)
         with file_pack() as filepack:
@@ -227,7 +230,7 @@ class base_regre(object):
         filename = os.path.join(self.train_dir, random.choice(filelist))
         with h5py.File(filename, 'r') as h5file:
             store_size = h5file['index'][:].shape[0]
-            batchallot = base_regre.batch_allot(
+            batchallot = self.batch_allot(
                 store_size, self.crop_size, self.pose_dim, self.batch_size)
             batchallot.assign(
                 h5file['index'][:],
@@ -236,15 +239,10 @@ class base_regre(object):
                 h5file['resce'][:]
             )
             frame_id = random.randrange(store_size)
-            print(frame_id)
             img_id = batchallot.batch_index[frame_id, 0]
-            print(img_id)
             img_crop_resize = np.squeeze(batchallot.batch_frame[frame_id, ...], -1)
-            print(img_crop_resize)
             pose_raw = batchallot.batch_poses[frame_id, ...].reshape(-1, 3)
-            print(pose_raw)
             resce = batchallot.batch_resce[frame_id, ...]
-            print(resce)
 
         import matplotlib.pyplot as mpplot
         print('drawing pose #{:d}'.format(img_id))
@@ -256,9 +254,12 @@ class base_regre(object):
             thedata, img_crop_resize,
             args.data_ops.raw_to_2d(pose_raw, thedata, resce))
         mpplot.subplot(1, 2, 1)
-        # mpplot.imshow(img, cmap='bone')
-        # args.data_draw.draw_pose_raw(thedata, img, pose_raw)
-        mpplot.gca().set_title('Cropped')
+        args.data_draw.draw_pose_raw_random(
+            thedata,
+            thedata.training_images,
+            thedata.training_annot_cleaned,
+            img_id
+        )
         mpplot.show()
 
     @staticmethod
@@ -280,14 +281,13 @@ class base_regre(object):
         # input_image = tf.expand_dims(frames_tf, -1)
         input_image = frames_tf
 
-        # Point functions (MLP implemented as conv2d)
         net = tf_util.conv2d(
-            input_image, 16, [3, 3],
+            input_image, 16, [5, 5],
             padding='VALID', stride=[1, 1],
             bn=True, is_training=is_training,
             scope='conv1', bn_decay=bn_decay)
         net = tf_util.max_pool2d(
-            net, [2, 2],
+            net, [4, 4],
             padding='VALID', scope='maxpool1')
         net = tf_util.conv2d(
             net, 64, [3, 3],
@@ -305,8 +305,8 @@ class base_regre(object):
         net = tf_util.max_pool2d(
             net, [2, 2],
             padding='VALID', scope='maxpool3')
+        # print(net.shape)
 
-        # MLP on global point cloud vector
         net = tf.reshape(net, [batch_size, -1])
         net = tf_util.fully_connected(
             net, 4096, bn=True, is_training=is_training,
@@ -314,12 +314,6 @@ class base_regre(object):
         net = tf_util.dropout(
             net, keep_prob=0.5, is_training=is_training,
             scope='dp1')
-        net = tf_util.fully_connected(
-            net, 512, bn=True, is_training=is_training,
-            scope='fc2', bn_decay=bn_decay)
-        net = tf_util.dropout(
-            net, keep_prob=0.5, is_training=is_training,
-            scope='dp2')
         net = tf_util.fully_connected(
             net, pose_dim, activation_fn=None, scope='fc3')
 

@@ -26,9 +26,9 @@ fig2data = getattr(
     import_module('image_ops'),
     'fig2data'
 )
-iso_box = getattr(
+iso_cube = getattr(
     import_module('iso_boxes'),
-    'iso_box'
+    'iso_cube'
 )
 
 
@@ -236,7 +236,7 @@ def draw_raw3d_pose(thedata, pose_raw, zdir='z'):
 
 
 def draw_raw3d(thedata, img, pose_raw):
-    box = iso_box()
+    box = iso_cube()
     box.build(pose_raw)
     # draw full image
     fig_size = (2 * 6, 6)
@@ -311,6 +311,7 @@ def draw_raw3d_random(thedata, image_dir, annot_txt, img_id=-1):
     print('drawing pose #{:d}: {}'.format(img_id, img_path))
     img = dataio.read_image(img_path)
 
+    draw_raw3d(thedata, img, pose_raw)
     fig_size = (3 * 5, 5)
     mpplot.subplots(nrows=1, ncols=2, figsize=fig_size)
     mpplot.subplot(1, 3, 1)
@@ -335,7 +336,6 @@ def draw_raw3d_random(thedata, image_dir, annot_txt, img_id=-1):
     mpplot.gcf().gca().axis('off')
     mpplot.tight_layout()
     mpplot.show()
-    draw_raw3d(thedata, img, pose_raw)
     return img_id
 
 

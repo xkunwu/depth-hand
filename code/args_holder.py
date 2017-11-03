@@ -34,10 +34,13 @@ class args_holder:
         self.parser.add_argument(
             '--gpu_id', type=int, default=0,
             help='GPU to use [default: GPU 0]')
+        # [base_regre, base_clean, ortho3view, base_conv3, trunc_dist]
         self.parser.add_argument(
-            # '--model_name', default='ortho3view',
-            '--model_name', default='base_clean',
-            help='Model name [default: base_clean]')
+            '--model_name', default='ortho3view',
+            # '--model_name', default='base_clean',
+            help='Model name [default: base_clean], from \
+            [base_regre, base_clean, ortho3view, base_conv3, trunc_dist]'
+        )
 
         # input preprocessing
         # self.parser.add_argument(
@@ -49,10 +52,10 @@ class args_holder:
 
         # learning parameters
         self.parser.add_argument(
-            '--max_epoch', type=int, default=10,
+            '--max_epoch', type=int, default=2,
             help='Epoch to run [default: 10]')
         self.parser.add_argument(
-            '--batch_size', type=int, default=64,
+            '--batch_size', type=int, default=128,
             help='Batch size during training [default: 64]')
         self.parser.add_argument(
             '--store_level', type=int, default=16,
@@ -89,14 +92,14 @@ class args_holder:
         self.args.log_dir = os.path.join(self.args.out_dir, 'log')
         self.args.cpu_count = multiprocessing.cpu_count()
         self.args.store_level = (2 << self.args.store_level)
+
+    def create_instance(self):
         model_class = getattr(
             import_module('train.' + self.args.model_name),
             self.args.model_name
         )
         self.args.model_inst = model_class(self.args.out_dir)
         self.args.model_inst.tweak_args(self.args)
-
-    def create_instance(self):
         self.args.data_module = import_module(
             'data.' + self.args.data_name)
         self.args.data_provider = import_module(
