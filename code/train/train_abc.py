@@ -26,6 +26,7 @@ class train_abc():
     """
 
     def train(self):
+        tf.reset_default_graph()
         with tf.Graph().as_default():
             with tf.device('/gpu:' + str(self.args.gpu_id)):
                 frames_tf, poses_tf = self.args.model_inst.placeholder_inputs(
@@ -61,52 +62,51 @@ class train_abc():
             config.gpu_options.allow_growth = True
             config.allow_soft_placement = True
             config.log_device_placement = False
-            sess = tf.Session(config=config)
+            with tf.Session(config=config) as sess:
+                # Add summary writers
+                merged = tf.summary.merge_all()
+                train_writer = tf.summary.FileWriter(
+                    os.path.join(self.log_dir_t, 'train'),
+                    sess.graph)
+                test_writer = tf.summary.FileWriter(
+                    os.path.join(self.log_dir_t, 'test'))
 
-            # Add summary writers
-            merged = tf.summary.merge_all()
-            train_writer = tf.summary.FileWriter(
-                os.path.join(self.log_dir_t, 'train'),
-                sess.graph)
-            test_writer = tf.summary.FileWriter(
-                os.path.join(self.log_dir_t, 'test'))
+                # Init variables
+                init = tf.global_variables_initializer()
+                sess.run(init)
 
-            # Init variables
-            init = tf.global_variables_initializer()
-            sess.run(init)
+                ops = {
+                    'batch_frame': frames_tf,
+                    'batch_poses': poses_tf,
+                    'is_training': is_training_tf,
+                    'merged': merged,
+                    'step': batch,
+                    'train_op': train_op,
+                    'loss': loss,
+                    'pred': pred
+                }
 
-            ops = {
-                'batch_frame': frames_tf,
-                'batch_poses': poses_tf,
-                'is_training': is_training_tf,
-                'merged': merged,
-                'step': batch,
-                'train_op': train_op,
-                'loss': loss,
-                'pred': pred
-            }
+                self.args.model_inst.start_train(self.args.batch_size)
+                for epoch in range(self.args.max_epoch):
+                    self.logger.info('**** Epoch #{:03d} ****'.format(epoch))
+                    sys.stdout.flush()
 
-            self.args.model_inst.start_train(self.args.batch_size)
-            for epoch in range(self.args.max_epoch):
-                self.logger.info('**** Epoch #{:03d} ****'.format(epoch))
-                sys.stdout.flush()
+                    time_s = timer()
+                    self.args.model_inst.start_epoch_train()
+                    self.logger.info('** Training **')
+                    self.train_one_epoch(sess, ops, train_writer)
+                    self.args.model_inst.start_epoch_test()
+                    self.logger.info('** Testing **')
+                    self.test_one_epoch(sess, ops, test_writer)
+                    self.logger.info('Epoch #{:03d} processing time: {}'.format(
+                        epoch,
+                        timer() - time_s))
 
-                time_s = timer()
-                self.args.model_inst.start_epoch_train()
-                self.logger.info('** Training **')
-                self.train_one_epoch(sess, ops, train_writer)
-                self.args.model_inst.start_epoch_test()
-                self.logger.info('** Testing **')
-                self.test_one_epoch(sess, ops, test_writer)
-                self.logger.info('Epoch #{:03d} processing time: {}'.format(
-                    epoch,
-                    timer() - time_s))
-
-                # Save the variables to disk.
-                if epoch % 10 == 0:
-                    save_path = saver.save(
-                        sess, os.path.join(self.log_dir_t, self.args.model_ckpt))
-                    self.logger.info("Model saved in file: {}".format(save_path))
+                    # Save the variables to disk.
+                    if epoch % 10 == 0:
+                        save_path = saver.save(
+                            sess, os.path.join(self.log_dir_t, self.args.model_ckpt))
+                        self.logger.info("Model saved in file: {}".format(save_path))
 
     def train_one_epoch(self, sess, ops, train_writer):
         """ ops: dict mapping from string to tf ops """
@@ -177,24 +177,23 @@ class train_abc():
         config.gpu_options.allow_growth = True
         config.allow_soft_placement = True
         config.log_device_placement = False
-        sess = tf.Session(config=config)
+        with tf.Session(config=config) as sess:
+            # Restore variables from disk.
+            model_path = os.path.join(self.log_dir_t, self.args.model_ckpt)
+            saver.restore(sess, model_path)
+            self.logger.info("Model restored from: {}.".format(model_path))
 
-        # Restore variables from disk.
-        model_path = os.path.join(self.log_dir_t, self.args.model_ckpt)
-        saver.restore(sess, model_path)
-        self.logger.info("Model restored from: {}.".format(model_path))
+            ops = {
+                'batch_frame': frames_tf,
+                'batch_poses': poses_tf,
+                'is_training': is_training_tf,
+                'loss': loss,
+                'pred': pred
+            }
 
-        ops = {
-            'batch_frame': frames_tf,
-            'batch_poses': poses_tf,
-            'is_training': is_training_tf,
-            'loss': loss,
-            'pred': pred
-        }
-
-        self.args.model_inst.start_train(self.args.batch_size)
-        self.args.model_inst.start_epoch_test()
-        self.eval_one_epoch_write(sess, ops)
+            self.args.model_inst.start_train(self.args.batch_size)
+            self.args.model_inst.start_epoch_test()
+            self.eval_one_epoch_write(sess, ops)
 
     def eval_one_epoch_write(self, sess, ops):
         is_training = False
@@ -291,9 +290,23 @@ class train_abc():
         consoleHandler.setFormatter(logFormatter)
         self.logger.addHandler(consoleHandler)
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        handlers = self.logger.handlers[:]
+        for handler in handlers:
+            handler.close()
+            self.logger.removeHandler(handler)
+        logging.shutdown()
+        del self.logger
+        if exc_type is not None:
+            print(exc_type, exc_value, exc_traceback)
+        return self
+
 
 if __name__ == "__main__":
-    # python train_abc.py --max_epoch=2 --batch_size=16 --store_level=6 --model_name=base_regre
+    # python train_abc.py --max_epoch=1 --batch_size=16 --store_level=6 --model_name=base_regre
     argsholder = args_holder()
     argsholder.parse_args()
     argsholder.create_instance()

@@ -273,7 +273,7 @@ class base_regre(object):
     @staticmethod
     def get_model(frames_tf, pose_dim, is_training, bn_decay=None):
         """ directly predict all joints' location using regression
-            frames_tf: BxHxW
+            frames_tf: BxHxWx1
             pose_dim: BxJ, where J is flattened 3D locations
         """
         batch_size = frames_tf.get_shape()[0].value

@@ -1,7 +1,9 @@
 import os
 import sys
 from importlib import import_module
+import numpy as np
 import matplotlib.pyplot as mpplot
+import re
 from train_abc import train_abc
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -26,20 +28,18 @@ def run_one(args):
     # )
     # sys.exit()
 
-    trainer = train_abc(args, False)
-    if (not os.path.exists(os.path.join(
-            trainer.log_dir_t, args.model_ckpt + '.index'))):
-        trainer.train()
-    # trainer.train()
-    if (not os.path.exists(args.model_inst.predict_file)):
-        trainer.evaluate()
-    # trainer.evaluate()
+    with train_abc(args, False) as trainer:
+        if (not os.path.exists(os.path.join(
+                trainer.log_dir_t, args.model_ckpt + '.index'))):
+            trainer.train()
+        # trainer.train()
+        if (not os.path.exists(args.model_inst.predict_file)):
+            trainer.evaluate()
+        # trainer.evaluate()
 
     print('evaluating {} ...'.format(args.model_name))
-    datadraw = import_module(
-        'data.' + args.data_name + '.draw')
-    dataeval = import_module(
-        'data.' + args.data_name + '.eval')
+    # datadraw = import_module(
+    #     'data.' + args.data_name + '.draw')
 
     # fig_size = (2 * 5, 5)
     # mpplot.subplots(nrows=1, ncols=2, figsize=fig_size)
@@ -59,31 +59,36 @@ def run_one(args):
     # )
     # mpplot.show()
 
-    datadraw.draw_pred_random(
-        data_inst,
-        data_inst.training_images,
-        data_inst.training_annot_test,
-        args.model_inst.predict_file
-    )
+    # datadraw.draw_pred_random(
+    #     data_inst,
+    #     data_inst.training_images,
+    #     data_inst.training_annot_test,
+    #     args.model_inst.predict_file
+    # )
 
+    dataeval = import_module(
+        'data.' + args.data_name + '.eval')
     errors = dataeval.compare_error(
         data_inst,
         data_inst.training_annot_test,
         args.model_inst.predict_file
     )
 
-    mpplot.figure()
-    dataeval.draw_error_percentage_curve(errors, mpplot.gca())
+    dataeval.draw_error_percentage_curve(
+        errors, [args.model_name], mpplot.gca())
     fname = '{}_error_rate.png'.format(args.model_name)
     mpplot.savefig(os.path.join(args.model_inst.predict_dir, fname))
-    mpplot.figure()
-    dataeval.draw_error_per_joint(errors, mpplot.gca(), data_inst.join_name)
+    mpplot.gcf().clear()
+    dataeval.draw_error_per_joint(
+        errors, [args.model_name], mpplot.gca(), data_inst.join_name)
     fname = '{}_error_bar.png'.format(args.model_name)
     mpplot.savefig(os.path.join(args.model_inst.predict_dir, fname))
-    mpplot.figure()
-    dataeval.draw_mean_error_distribution(errors, mpplot.gca())
+    mpplot.gcf().clear()
+    dataeval.draw_mean_error_distribution(
+        errors, mpplot.gca())
     fname = '{}_error_dist.png'.format(args.model_name)
     mpplot.savefig(os.path.join(args.model_inst.predict_dir, fname))
+    mpplot.gcf().clear()
     print('figures saved')
 
     # draw_sum = 3
@@ -101,20 +106,58 @@ def run_one(args):
     # draw_i += 1
     # mpplot.show()
 
+
+def draw_compare(args):
+    argsholder.create_instance()
+    dataeval = import_module(
+        'data.' + args.data_name + '.eval')
+    predict_dir = args.model_inst.predict_dir
+    predictions = []
+    methods = []
+    for file in os.listdir(predict_dir):
+        m = re.match(r'^predict_(.+)', file)
+        if m:
+            predictions.append(os.path.join(predict_dir, file))
+            methods.append(m.group(1))
+    annot_test = args.data_inst.training_annot_test
+    error_l = None
+    for predict in predictions:
+        errors = dataeval.compare_error(
+            args.data_inst,
+            annot_test,
+            args.model_inst.predict_file
+        )
+        if error_l is None:
+            error_l = errors
+        else:
+            error_l = np.concatenate((error_l, errors), axis=0)
+    dataeval.draw_error_percentage_curve(
+        error_l, methods, mpplot.gca())
+    mpplot.savefig(os.path.join(args.model_inst.predict_dir, 'error_rate.png'))
+    mpplot.show()
+    mpplot.subplot()
+    dataeval.draw_error_per_joint(
+        error_l, methods, mpplot.gca(), args.data_inst.join_name)
+    mpplot.savefig(os.path.join(args.model_inst.predict_dir, 'error_bar.png'))
+    mpplot.show()
+    print('figures saved')
+
+
 if __name__ == "__main__":
+    # python evaluate.py --max_epoch=1 --batch_size=16 --store_level=6 --model_name=base_conv3
     argsholder = args_holder()
     argsholder.parse_args()
     args = argsholder.args
-    # args.rebuild_data = True  # this is very slow
-    run_one(args)
+    # run_one(args)
     # sys.exit()
     methlist = [
         'base_regre',
         'base_clean',
         'ortho3view',
         'base_conv3',
-        'trunc_dist'
+        # 'trunc_dist'
     ]
     for meth in methlist:
         args.model_name = meth
         run_one(args)
+    draw_compare(args)

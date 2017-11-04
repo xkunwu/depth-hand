@@ -155,6 +155,7 @@ def draw_pred_random(thedata, image_dir, annot_echt, annot_pred):
     #         show_margin=True)
     mpplot.gca().set_title('Prediction')
     mpplot.show()
+    mpplot.gcf().clear()
 
 
 def draw_pose_raw_random(thedata, image_dir, annot_txt, img_id=-1):

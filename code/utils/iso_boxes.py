@@ -79,7 +79,6 @@ class iso_cube:
         self.cen = (pmin + pmax) / 2
         # self.cen = np.mean(points3, axis=0)
         C = np.cov((points3 - self.cen), rowvar=False)
-        print(C)
         # evals, evecs = np.linalg.eigh(C)
         _, evecs = np.linalg.eigh(C)
         # idx = np.argsort(evals)[::-1]

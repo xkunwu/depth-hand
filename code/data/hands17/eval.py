@@ -24,10 +24,11 @@ def compare_error(thedata, fname_echt, fname_pred):
             error_l.append(np.sqrt(
                 np.sum((p3d_s - p3d_t) ** 2, axis=1)
             ))
-    return np.array(error_l)
+    return np.expand_dims(error_l, axis=0)
 
 
 def draw_mean_error_distribution(errors, ax):
+    errors = np.squeeze(errors, 0)
     err_mean = np.mean(errors, axis=1)
     mpplot.hist(
         err_mean, 100,
@@ -39,52 +40,97 @@ def draw_mean_error_distribution(errors, ax):
     # ax.set_xlim(left=0)
 
 
-def draw_error_percentage_curve(errors, ax):
-    err_max = np.max(errors, axis=1).tolist()
-    num_v = len(err_max)
+def draw_error_percentage_curve(errors, methods, ax):
+    err_max = np.max(errors, axis=-1)
+    num_v = err_max.shape[1]
+    num_m = err_max.shape[0]
+    if len(methods) != num_m:
+        print('ERROR - dimension not matching!')
+        return
     percent = np.arange(num_v + 1) * 100 / num_v
-    err_max = np.concatenate(([0], np.sort(err_max)))
-    # fig, ax = mpplot.subplots()
-    mpplot.plot(
-        err_max, percent,
-        '-',
-        linewidth=2.0
+    err_max = np.concatenate((
+        np.zeros(shape=(num_m, 1)),
+        np.sort(err_max, 1)),
+        axis=1
     )
+    for err in err_max:
+        mpplot.plot(
+            err, percent,
+            '-',
+            linewidth=2.0
+        )
+    # mpplot.plot(
+    #     err_max, np.tile(percent, (num_m, 1)),
+    #     '-',
+    #     linewidth=2.0
+    # )
     ax.set_ylabel('Percentage (%)')
     ax.set_ylim([0, 100])
     ax.set_xlabel('Maximal error of single joint (mm)')
     ax.set_xlim(left=0)
+    ax.set_xlim(right=100)
+    mpplot.legend(methods, loc='lower right')
     # ax.set_xlim(right=50)
     # mpplot.show()
 
 
-def draw_error_per_joint(errors, ax, join_name=None):
-    err_mean = np.mean(errors, axis=0)
-    err_max = np.max(errors, axis=0)
-    err_min = np.min(errors, axis=0)
-    err_mean = np.append(err_mean, np.mean(err_mean))
-    err_max = np.append(err_max, np.mean(err_max))
-    err_min = np.append(err_min, np.mean(err_min))
-    err_m2m = [
-        (err_mean - err_min).tolist(),
-        (err_max - err_mean).tolist()
-    ]
-    err_mean = err_mean.tolist()
-    jid = range(len(err_mean))
+def draw_error_per_joint(errors, methods, ax, join_name=None, draw_std=False):
+    err_mean = np.mean(errors, axis=1)
+    err_max = np.max(errors, axis=1)
+    err_min = np.min(errors, axis=1)
+    num_v = err_max.shape[1]
+    num_m = err_max.shape[0]
+    if len(methods) != num_m:
+        print('ERROR - dimension not matching!')
+        return
+    err_mean = np.append(
+        err_mean,
+        np.mean(err_mean, axis=1).reshape(-1, 1), axis=1)
+    err_max = np.append(
+        err_max,
+        np.mean(err_max, axis=1).reshape(-1, 1), axis=1)
+    err_min = np.append(
+        err_min,
+        np.mean(err_min, axis=1).reshape(-1, 1), axis=1)
+    err_m2m = np.concatenate((
+        np.expand_dims(err_mean - err_min, -1),
+        np.expand_dims(err_max - err_mean, -1)
+    ), axis=-1)
+    # err_m2m = [
+    #     (err_mean - err_min).tolist(),
+    #     (err_max - err_mean).tolist()
+    # ]
+    # err_mean = err_mean.tolist()
+    jid = np.arange(num_v + 1)
     jtick = join_name
     if join_name is None:
         jtick = [str(x) for x in jid]
         jtick[-1] = 'Mean'
     else:
         jtick.append('Mean')
-    # fig, ax = mpplot.subplots()
-    mpplot.bar(
-        jid, err_mean, yerr=err_m2m, align='center',
-        error_kw=dict(ecolor='gray', lw=1, capsize=3, capthick=2)
-    )
+    wb = 0.2
+    wsl = float(num_m - 1) * wb / 2
+    for ei, err in enumerate(err_mean):
+        if draw_std:
+            mpplot.bar(
+                jid + wb * ei - wsl, err, width=wb, align='center',
+                yerr=err_m2m,
+                error_kw=dict(ecolor='gray', lw=1, capsize=3, capthick=2)
+            )
+        else:
+            mpplot.bar(
+                jid + wb * ei - wsl, err, width=wb, align='center'
+            )
+    # mpplot.bar(
+    #     jid, err_mean, yerr=err_m2m, align='center',
+    #     error_kw=dict(ecolor='gray', lw=1, capsize=3, capthick=2)
+    # )
+    ylim_top = min(np.max(err_mean[:, 0:7]), np.max(err_mean))
     ax.set_ylabel('Mean error (mm)')
     ax.set_ylim(bottom=0)
+    ax.set_ylim(top=ylim_top + float(num_m) * ylim_top * 0.1)
     ax.set_xlim([-1, 22])
     mpplot.xticks(jid, jtick, rotation='vertical')
     mpplot.margins(0.1)
+    mpplot.legend(methods, loc='upper left')
     # mpplot.show()
