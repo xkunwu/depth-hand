@@ -18,77 +18,54 @@ args_holder = getattr(
 def run_one(args):
     argsholder.create_instance()
     data_inst = args.data_inst
-    # args.model_inst.draw_random(data_inst, args)
-    # datadraw = import_module(
-    #     'data.' + args.data_name + '.draw')
-    # datadraw.draw_raw3d_random(
-    #     data_inst,
-    #     data_inst.training_images,
-    #     data_inst.training_annot_cleaned
-    # )
-    # sys.exit()
+    predict_file = os.path.join(
+        data_inst.predict_dir, args.model_inst.predict_file)
 
     with train_abc(args, False) as trainer:
         if (not os.path.exists(os.path.join(
                 trainer.log_dir_t, args.model_ckpt + '.index'))):
             trainer.train()
         # trainer.train()
-        if (not os.path.exists(args.model_inst.predict_file)):
+        if (not os.path.exists(predict_file)):
             trainer.evaluate()
         # trainer.evaluate()
 
     print('evaluating {} ...'.format(args.model_name))
-    # datadraw = import_module(
-    #     'data.' + args.data_name + '.draw')
 
-    # fig_size = (2 * 5, 5)
-    # mpplot.subplots(nrows=1, ncols=2, figsize=fig_size)
-    # mpplot.subplot(1, 2, 1)
-    # datadraw.draw_pose_raw_random(
-    #     data_inst,
-    #     data_inst.training_images,
-    #     data_inst.training_annot_cleaned,
-    #     219  # palm
-    # )
-    # mpplot.subplot(1, 2, 2)
-    # datadraw.draw_pose_raw_random(
-    #     data_inst,
-    #     data_inst.training_cropped,
-    #     data_inst.training_annot_cropped,
-    #     219  # palm
-    # )
-    # mpplot.show()
-
-    # datadraw.draw_pred_random(
-    #     data_inst,
-    #     data_inst.training_images,
-    #     data_inst.training_annot_test,
-    #     args.model_inst.predict_file
-    # )
+    datadraw = import_module(
+        'data.' + args.data_name + '.draw')
+    mpplot.gcf().clear()
+    datadraw.draw_pred_random(
+        data_inst,
+        data_inst.training_images,
+        data_inst.training_annot_test,
+        predict_file
+    )
+    fname = '{}_prediction.png'.format(args.model_name)
+    mpplot.savefig(os.path.join(args.data_inst.predict_dir, fname))
 
     dataeval = import_module(
         'data.' + args.data_name + '.eval')
     errors = dataeval.compare_error(
         data_inst,
         data_inst.training_annot_test,
-        args.model_inst.predict_file
+        predict_file
     )
-
+    mpplot.gcf().clear()
     dataeval.draw_error_percentage_curve(
         errors, [args.model_name], mpplot.gca())
     fname = '{}_error_rate.png'.format(args.model_name)
-    mpplot.savefig(os.path.join(args.model_inst.predict_dir, fname))
+    mpplot.savefig(os.path.join(args.data_inst.predict_dir, fname))
     mpplot.gcf().clear()
     dataeval.draw_error_per_joint(
         errors, [args.model_name], mpplot.gca(), data_inst.join_name)
     fname = '{}_error_bar.png'.format(args.model_name)
-    mpplot.savefig(os.path.join(args.model_inst.predict_dir, fname))
+    mpplot.savefig(os.path.join(args.data_inst.predict_dir, fname))
     mpplot.gcf().clear()
     dataeval.draw_mean_error_distribution(
         errors, mpplot.gca())
     fname = '{}_error_dist.png'.format(args.model_name)
-    mpplot.savefig(os.path.join(args.model_inst.predict_dir, fname))
-    mpplot.gcf().clear()
+    mpplot.savefig(os.path.join(args.data_inst.predict_dir, fname))
     print('figures saved')
 
     # draw_sum = 3
@@ -107,11 +84,12 @@ def run_one(args):
     # mpplot.show()
 
 
-def draw_compare(args):
+def draw_compare(args, predict_dir=None):
     argsholder.create_instance()
     dataeval = import_module(
         'data.' + args.data_name + '.eval')
-    predict_dir = args.model_inst.predict_dir
+    if predict_dir is None:
+        predict_dir = args.data_inst.predict_dir
     predictions = []
     methods = []
     for file in os.listdir(predict_dir):
@@ -125,7 +103,7 @@ def draw_compare(args):
         errors = dataeval.compare_error(
             args.data_inst,
             annot_test,
-            args.model_inst.predict_file
+            predict
         )
         if error_l is None:
             error_l = errors
@@ -133,14 +111,48 @@ def draw_compare(args):
             error_l = np.concatenate((error_l, errors), axis=0)
     dataeval.draw_error_percentage_curve(
         error_l, methods, mpplot.gca())
-    mpplot.savefig(os.path.join(args.model_inst.predict_dir, 'error_rate.png'))
-    mpplot.show()
-    mpplot.subplot()
+    mpplot.savefig(os.path.join(args.data_inst.predict_dir, 'error_rate.png'))
+    # mpplot.show()
     dataeval.draw_error_per_joint(
         error_l, methods, mpplot.gca(), args.data_inst.join_name)
-    mpplot.savefig(os.path.join(args.model_inst.predict_dir, 'error_bar.png'))
-    mpplot.show()
+    mpplot.savefig(os.path.join(args.data_inst.predict_dir, 'error_bar.png'))
+    # mpplot.show()
     print('figures saved')
+
+
+def test_dataops(args):
+    argsholder.create_instance()
+    data_inst = args.data_inst
+
+    datadraw = import_module(
+        'data.' + args.data_name + '.draw')
+    # datadraw.draw_raw3d_random(
+    #     data_inst,
+    #     data_inst.training_images,
+    #     data_inst.training_annot_cleaned
+    # )
+    # sys.exit()
+
+    args.model_inst.draw_random(data_inst, args)
+
+    # mpplot.gcf().clear()
+    # fig_size = (2 * 5, 5)
+    # mpplot.subplots(nrows=1, ncols=2, figsize=fig_size)
+    # mpplot.subplot(1, 2, 1)
+    # datadraw.draw_pose_raw_random(
+    #     data_inst,
+    #     data_inst.training_images,
+    #     data_inst.training_annot_cleaned,
+    #     219  # palm
+    # )
+    # mpplot.subplot(1, 2, 2)
+    # datadraw.draw_pose_raw_random(
+    #     data_inst,
+    #     data_inst.training_cropped,
+    #     data_inst.training_annot_cropped,
+    #     219  # palm
+    # )
+    # mpplot.show()
 
 
 if __name__ == "__main__":
@@ -148,16 +160,24 @@ if __name__ == "__main__":
     argsholder = args_holder()
     argsholder.parse_args()
     args = argsholder.args
+
+    test_dataops(args)
+    sys.exit()
+
     # run_one(args)
     # sys.exit()
-    methlist = [
-        'base_regre',
-        'base_clean',
-        'ortho3view',
-        'base_conv3',
-        # 'trunc_dist'
-    ]
-    for meth in methlist:
-        args.model_name = meth
-        run_one(args)
-    draw_compare(args)
+
+    # methlist = [
+    #     'base_regre',
+    #     'base_clean',
+    #     'ortho3view',
+    #     'base_conv3',
+    #     # 'trunc_dist'
+    # ]
+    # for meth in methlist:
+    #     args.model_name = meth
+    #     run_one(args)
+    #
+    # draw_compare(args)
+    scp_t = os.path.join(args.out_dir, 'predict_remote')
+    draw_compare(args, scp_t)

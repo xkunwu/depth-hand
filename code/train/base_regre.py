@@ -16,6 +16,10 @@ file_pack = getattr(
     import_module('coder'),
     'file_pack'
 )
+iso_aabb = getattr(
+    import_module('iso_boxes'),
+    'iso_aabb'
+)
 
 
 class base_regre(object):
@@ -25,11 +29,7 @@ class base_regre(object):
         self.train_dir = os.path.join(out_dir, 'cropped')
         self.appen_train = 'appen_train'
         self.appen_test = 'appen_test'
-        self.predict_dir = os.path.join(out_dir, 'predict')
-        if not os.path.exists(self.predict_dir):
-            os.mkdir(self.predict_dir)
-        self.predict_file = os.path.join(
-            self.predict_dir, 'predict_{}'.format(self.__class__.__name__))
+        self.predict_file = 'predict_{}'.format(self.__class__.__name__)
         self.crop_size = 96
         self.batch_size = -1
         self.batchallot = None
@@ -171,9 +171,9 @@ class base_regre(object):
         ).start()
         bi = 0
         while True:
-            resline = self.provider.put2d_mt(
+            resline = self.provider.puttensor_mt(
                 file_annot, self.provider_worker,
-                thedata, self.image_dir, batchallot
+                self.image_dir, thedata, batchallot
             )
             if 0 > resline:
                 break
@@ -206,7 +206,7 @@ class base_regre(object):
             return
         batchallot = self.batch_allot(
             args.store_level, self.crop_size, self.pose_dim, args.store_level)
-        batchallot.allot(1, 3)
+        batchallot.allot(1, 5)
         with file_pack() as filepack:
             file_annot = filepack.push_file(thedata.training_annot_train)
             self.prepare_data(thedata, batchallot, file_annot, self.appen_train)
@@ -219,8 +219,9 @@ class base_regre(object):
         """ Receive parameters specific to the data """
         self.pose_dim = thedata.join_num * 3
         self.image_dir = thedata.training_images
+        self.caminfo = thedata
         self.provider = args.data_provider
-        self.provider_worker = args.data_provider.put2d_worker
+        self.provider_worker = self.provider.prow_cropped
         self.check_dir(thedata, args)
 
     def draw_random(self, thedata, args):
@@ -241,24 +242,42 @@ class base_regre(object):
             frame_id = random.randrange(store_size)
             img_id = batchallot.batch_index[frame_id, 0]
             img_crop_resize = np.squeeze(batchallot.batch_frame[frame_id, ...], -1)
-            pose_raw = batchallot.batch_poses[frame_id, ...].reshape(-1, 3)
+            pose_local = batchallot.batch_poses[frame_id, ...].reshape(-1, 3)
             resce = batchallot.batch_resce[frame_id, ...]
 
         import matplotlib.pyplot as mpplot
         print('drawing pose #{:d}'.format(img_id))
-        fig_size = (2 * 5, 5)
+        aabb = iso_aabb(resce[2:5], resce[1])
+        rect = args.data_ops.get_rect2(aabb, thedata)
+        resce2 = np.append(resce[0], rect.cll)
+        resce3 = resce[1:5]
+        fig_size = (3 * 5, 5)
         mpplot.subplots(nrows=1, ncols=2, figsize=fig_size)
-        mpplot.subplot(1, 2, 2)
+        mpplot.subplot(1, 3, 3)
         mpplot.imshow(img_crop_resize, cmap='bone')
+        pose_raw = args.data_ops.local_to_raw(pose_local, resce3)
         args.data_draw.draw_pose2d(
             thedata, img_crop_resize,
-            args.data_ops.raw_to_2d(pose_raw, thedata, resce))
-        mpplot.subplot(1, 2, 1)
-        args.data_draw.draw_pose_raw_random(
-            thedata,
-            thedata.training_images,
-            thedata.training_annot_cleaned,
-            img_id
+            args.data_ops.raw_to_2d(pose_raw, thedata, resce2)
+        )
+        mpplot.subplot(1, 3, 1)
+        annot_line = args.data_io.get_line(
+            thedata.training_annot_cleaned, img_id)
+        img_name, pose_raw = args.data_io.parse_line_annot(annot_line)
+        img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
+        mpplot.imshow(img, cmap='bone')
+        rect.draw()
+        args.data_draw.draw_pose2d(
+            thedata, img,
+            args.data_ops.raw_to_2d(pose_raw, thedata))
+        mpplot.subplot(1, 3, 2)
+        img_name, frame, poses, resce = self.provider_worker(
+            annot_line, self.image_dir, thedata)
+        mpplot.imshow(np.squeeze(frame, axis=2), cmap='bone')
+        pose_raw = args.data_ops.local_to_raw(pose_local, resce3)
+        args.data_draw.draw_pose2d(
+            thedata, img_crop_resize,
+            args.data_ops.raw_to_2d(pose_raw, thedata, resce2)
         )
         mpplot.show()
 
@@ -290,7 +309,7 @@ class base_regre(object):
             net, [4, 4],
             padding='VALID', scope='maxpool1')
         net = tf_util.conv2d(
-            net, 64, [3, 3],
+            net, 32, [3, 3],
             padding='VALID', stride=[1, 1],
             bn=True, is_training=is_training,
             scope='conv2', bn_decay=bn_decay)
@@ -298,7 +317,7 @@ class base_regre(object):
             net, [2, 2],
             padding='VALID', scope='maxpool2')
         net = tf_util.conv2d(
-            net, 256, [3, 3],
+            net, 64, [3, 3],
             padding='VALID', stride=[1, 1],
             bn=True, is_training=is_training,
             scope='conv3', bn_decay=bn_decay)
@@ -309,7 +328,7 @@ class base_regre(object):
 
         net = tf.reshape(net, [batch_size, -1])
         net = tf_util.fully_connected(
-            net, 4096, bn=True, is_training=is_training,
+            net, 1024, bn=True, is_training=is_training,
             scope='fc1', bn_decay=bn_decay)
         net = tf_util.dropout(
             net, keep_prob=0.5, is_training=is_training,

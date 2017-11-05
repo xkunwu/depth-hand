@@ -9,13 +9,17 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 BASE_DIR = os.path.abspath(os.path.join(BASE_DIR, os.pardir))
 BASE_DIR = os.path.abspath(os.path.join(BASE_DIR, os.pardir))
 sys.path.append(os.path.join(BASE_DIR, 'utils'))
-iso_cube = getattr(
-    import_module('iso_boxes'),
-    'iso_cube'
-)
 iso_rect = getattr(
     import_module('iso_boxes'),
     'iso_rect'
+)
+iso_aabb = getattr(
+    import_module('iso_boxes'),
+    'iso_aabb'
+)
+iso_cube = getattr(
+    import_module('iso_boxes'),
+    'iso_cube'
 )
 regu_grid = getattr(
     import_module('regu_grid'),
@@ -25,6 +29,14 @@ grid_cell = getattr(
     import_module('regu_grid'),
     'grid_cell'
 )
+
+
+def raw_to_local(points3, resce=np.array([1, 0, 0, 0])):
+    return (points3 - resce[1:4]) / resce[0]
+
+
+def local_to_raw(points3, resce=np.array([1, 0, 0, 0])):
+    return points3 * resce[0] + resce[1:4]
 
 
 def d2z_to_raw(p2z, caminfo, resce=np.array([1, 0, 0])):
@@ -87,7 +99,7 @@ def clip_image_border(rect, caminfo):
     obm = np.min([ctl, caminfo.image_size - cbr])
     if 0 > obm:
         # print(ctl, caminfo.image_size - cbr, obm, rect.len)
-        rect.len += obm
+        rect.len += obm * 2
         rect.cll = cen - rect.len / 2
     return rect
 
@@ -173,24 +185,50 @@ def crop_resize_pca(img, pose_raw, caminfo):
 
 
 def crop_resize(img, pose_raw, caminfo):
-    rect = get_rect3(
-        pose_raw, caminfo
-    )
-    points3 = img_to_raw(img, caminfo)
-    points2, pose_z = raw_to_2dz(points3, caminfo)
-    conds = rect.pick(points2)
-    img_crop = rect.print_image(points2[conds, :], pose_z[conds])
+    aabb = iso_aabb()
+    aabb.build(pose_raw)
+    rect = get_rect2(aabb, caminfo)
+    cll_i = np.floor(rect.cll).astype(int)
+    bl_i = np.floor(rect.len).astype(int)
+    img_crop = img[
+        cll_i[1]:cll_i[1] + bl_i,
+        cll_i[0]:cll_i[0] + bl_i,
+    ]
+
+    # points2 = raw_to_2d(pose_raw, caminfo)
+    # rect = get_rect(points2, caminfo)
+    # cll = np.floor(rect.cll).astype(int)
+    # bl = np.floor(rect.len).astype(int)
+    # img_crop = img[
+    #     cll[0]:cll[0] + bl,
+    #     cll[1]:cll[1] + bl,
+    # ]
+
+    # rect = get_rect3(
+    #     pose_raw, caminfo
+    # )
+    # points3 = img_to_raw(img, caminfo)
+    # points2, pose_z = raw_to_2dz(points3, caminfo)
+    # conds = rect.pick(points2)
+    # img_crop = rect.print_image(points2[conds, :], pose_z[conds])
+
     img_crop_resize = cv2resize(img_crop, (caminfo.crop_size, caminfo.crop_size))
-    resce = np.append(float(caminfo.crop_size) / rect.len, rect.cll)
+    # cen = (np.min(pose_raw, axis=0) + np.max(pose_raw, axis=0)) / 2
+    # cen2, cenz = raw_to_2dz(np.expand_dims(cen, axis=0), caminfo)
+    # cen2 = (cll + ctr) / 2
+    resce = np.append(
+        float(caminfo.crop_size) / rect.len,
+        np.append(aabb.len, aabb.cll)
+    )
     return img_crop_resize, resce
 
 
-def get_rect3(points3, caminfo):
+def get_rect3(points3, caminfo, m=0.6):
     """ return a rectangle with margin that 3d points
         NOTE: there is still a perspective problem
     """
     box = iso_cube()
-    box.build(points3)
+    box.build(points3, m)
     cen = raw_to_2d(box.cen.reshape(1, -1), caminfo).flatten()
     rect = iso_rect(
         cen - box.len,
@@ -200,22 +238,27 @@ def get_rect3(points3, caminfo):
     return rect
 
 
-def get_rect(pose2d, caminfo, bm):
+def get_rect2(aabb, caminfo, m=0.2):
+    cen = aabb.cll + aabb.len / 2
+    c3a = np.array([
+        np.append(cen[:2] - aabb.len / 2, aabb.cll[2]),
+        np.append(cen[:2] + aabb.len / 2, aabb.cll[2]),
+        # aabb.cll,
+        # np.append(aabb.cll[:2] + aabb.len, aabb.cll[2]),
+        # aabb.cll + aabb.len / 2
+    ])
+    c2a = raw_to_2d(c3a, caminfo)
+    cll = c2a[0, :]
+    ctr = c2a[1, :]
+    rect = iso_rect(cll, np.max(ctr - cll), m)
+    rect = clip_image_border(rect, caminfo)
+    return rect
+
+
+def get_rect(pose2d, caminfo, bm=0.6):
     """ return a rectangle with margin that contains 2d point set
     """
-    ptp = np.ptp(pose2d, axis=0)
-    ctl = np.min(pose2d, axis=0)
-    cen = ctl + ptp / 2
-    ptp_m = max(ptp)
-    if 1 > bm:
-        bm = ptp_m * bm
-    ptp_m = ptp_m + 2 * bm
-    # clip to image border
-    ctl = cen - ptp_m / 2
-    cbr = ctl + ptp_m
-    obm = np.min([ctl, caminfo.image_size - cbr])
-    if 0 > obm:
-        # print(ctl, caminfo.image_size - cbr, obm, ptp_m)
-        ptp_m = ptp_m + 2 * obm
-    ctl = cen - ptp_m / 2
-    return np.vstack((ctl, np.array([ptp_m, ptp_m])))
+    rect = iso_rect()
+    rect.build(pose2d, bm)
+    rect = clip_image_border(rect, caminfo)
+    return rect

@@ -120,6 +120,12 @@ class args_holder:
         )
         self.args.model_inst.receive_data(self.args.data_inst, self.args)
 
+    def write_args(self, log_dir):
+        with open(os.path.join(log_dir, 'args.txt'), 'w') as writer:
+            for arg in vars(self.args):
+                writer.write('--{}={}'.format(arg, getattr(self.args, arg)))
+                # print(arg, getattr(self.args, arg))
+
 
 if __name__ == "__main__":
     # python args_holder.py --batch_size=16 --store_level=6

@@ -129,7 +129,7 @@ def draw_pred_random(thedata, image_dir, annot_echt, annot_pred):
     print('drawing pose #{:d}: {}'.format(img_id, img_path))
     img = dataio.read_image(img_path)
 
-    fig, ax = mpplot.subplots(nrows=1, ncols=2)
+    mpplot.subplots(nrows=1, ncols=2)
     mpplot.subplot(1, 2, 1)
     mpplot.imshow(img, cmap='bone')
     draw_pose_raw(
@@ -154,8 +154,6 @@ def draw_pred_random(thedata, image_dir, annot_echt, annot_pred):
     #         dataops.d2z_to_raw(pose_pred, thedata, rescen_pred),
     #         show_margin=True)
     mpplot.gca().set_title('Prediction')
-    mpplot.show()
-    mpplot.gcf().clear()
 
 
 def draw_pose_raw_random(thedata, image_dir, annot_txt, img_id=-1):

@@ -3,7 +3,6 @@ import os
 import shutil
 import numpy as np
 from colour import Color
-import random
 import progressbar
 import ops as dataops
 import io as dataio
@@ -15,6 +14,7 @@ class hands17holder:
     # dataset info
     data_dir = ''
     out_dir = ''
+    predict_dir = ''
     training_images = ''
     frame_images = ''
     training_cropped = ''
@@ -111,7 +111,8 @@ class hands17holder:
     def shuffle_split(self):
         with open(self.training_annot_cleaned, 'r') as source:
             lines = source.readlines()
-        random.shuffle(lines)
+        # import random
+        # random.shuffle(lines)
         with open(self.training_annot_train, 'w') as f:
             for line in lines[self.range_train[0]:self.range_train[1]]:
                 f.write(line)
@@ -167,6 +168,9 @@ class hands17holder:
         if ((not os.path.exists(self.training_annot_train)) or
                 (not os.path.exists(self.training_annot_test))):
             self.shuffle_split()
+        test_file = os.path.basename(self.training_annot_test)
+        if not os.path.exists(os.path.join(self.predict_dir, test_file)):
+            shutil.copy2(self.training_annot_test, self.predict_dir)
         print('images are splitted out for evaluation: {:d} portions'.format(
             self.tt_split))
 
@@ -174,7 +178,9 @@ class hands17holder:
         self.data_dir = args.data_dir
         self.out_dir = args.out_dir
         self.crop_size = args.crop_size
-
+        self.predict_dir = os.path.join(self.out_dir, 'predict')
+        if not os.path.exists(self.predict_dir):
+            os.mkdir(self.predict_dir)
         self.training_images = os.path.join(self.data_dir, 'training/images')
         self.frame_images = os.path.join(self.data_dir, 'frame/images')
         self.training_cropped = os.path.join(self.out_dir, 'cropped')

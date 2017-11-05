@@ -7,9 +7,13 @@ from colour import Color
 
 
 class iso_rect:
-    def __init__(self, cll=np.zeros(2), len=0.):
+    def __init__(self, cll=np.zeros(2), len=0., m=0.):
         self.cll = cll
         self.len = len
+        self.add_margan(m)
+
+    def show_dims(self):
+        print(self.cll, self.len)
 
     def pick(self, points2):
         """ only meaningful when picked in the local coordinates """
@@ -28,10 +32,13 @@ class iso_rect:
         self.len = np.max(pmax - pmin)
         # cen = np.mean(points2, axis=0)
         # self.len = np.max(np.ptp(points2, axis=0))
+        self.add_margan(m)
+        self.cll = cen - self.len / 2
+
+    def add_margan(self, m=0.1):
         if 1 > m and -1 < m:
             m = self.len * m
         self.len += m
-        self.cll = cen - self.len / 2
 
     def print_image(self, coord, value):
         coord = np.floor(coord - self.cll + 0.5).astype(int)
@@ -48,11 +55,39 @@ class iso_rect:
         ))
 
 
+class iso_aabb:
+    def __init__(self, cll=np.zeros(3), len=0., m=0.):
+        self.cll = cll
+        self.len = len
+        self.add_margan(m)
+
+    def show_dims(self):
+        print(self.cen, self.len)
+
+    def build(self, points3, m=0.1):
+        pmin = np.min(points3, axis=0)
+        pmax = np.max(points3, axis=0)
+        cen = (pmin + pmax) / 2
+        self.len = np.max(pmax - pmin)
+        self.add_margan(m)
+        self.cll = cen - self.len / 2
+
+    def add_margan(self, m=0.1):
+        if 1 > m and -1 < m:
+            m = self.len * m
+        self.len += m
+
+
 class iso_cube:
-    def __init__(self, cen=np.zeros(3), len=0):
+    def __init__(self, cen=np.zeros(3), len=0., m=0.):
         self.cen = cen
         self.len = len  # half side length
         self.evecs = np.eye(3)
+        self.add_margan(m)
+
+    def show_dims(self):
+        print(self.cen, self.len)
+        print(self.evecs)
 
     def get_sidelen(self):
         return np.ceil(2 * self.len).astype(int) + 1
@@ -95,10 +130,13 @@ class iso_cube:
         self.len = np.max(ptp) / 2
         # print(self.len)
         self.evecs = evecs
-        if 1 > m:
+        self.add_margan(m)
+        return points3_trans
+
+    def add_margan(self, m=0.1):
+        if 1 > m and -1 < m:
             m = self.len * m
         self.len += m
-        return points3_trans
 
     def transform(self, points3):
         """ to local coordinates """

@@ -46,7 +46,7 @@ class ortho3view(base_regre):
         self.pose_dim = thedata.join_num * 3
         self.image_dir = thedata.training_images
         self.provider = args.data_provider
-        self.provider_worker = args.data_provider.put3o_worker
+        self.provider_worker = args.data_provider.prow_ortho3v
         self.check_dir(thedata, args)
 
     def draw_random(self, thedata, args):

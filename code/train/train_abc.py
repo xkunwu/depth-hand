@@ -157,6 +157,7 @@ class train_abc():
             loss_sum / batch_count))
 
     def evaluate(self):
+        tf.reset_default_graph()
         with tf.device('/gpu:' + str(self.args.gpu_id)):
             frames_tf, poses_tf = self.args.model_inst.placeholder_inputs(
                 self.args.batch_size,
@@ -200,7 +201,9 @@ class train_abc():
         batch_count = 0
         loss_sum = 0
         with file_pack() as filepack:
-            writer = filepack.push_file(self.args.model_inst.predict_file, 'w')
+            predict_file = os.path.join(
+                self.args.data_inst.predict_dir, self.args.model_inst.predict_file)
+            writer = filepack.push_file(predict_file, 'w')
             while True:
                 batch_data = self.args.model_inst.fetch_batch_test()
                 if batch_data is None:
@@ -257,6 +260,13 @@ class train_abc():
         bn_decay = 1 - tf.maximum(1e-2, bn_momentum)
         return bn_decay
 
+    @staticmethod
+    def write_args(log_dir, args):
+        with open(os.path.join(log_dir, 'args.txt'), 'w') as writer:
+            for arg in vars(args):
+                writer.write('--{}={}\n'.format(arg, getattr(args, arg)))
+                # print(arg, getattr(args, arg))
+
     def make_new_log(self):
         log_time = datetime.now().strftime('%y%m%d-%H%M%S')
         # git_hash = subprocess.check_output(
@@ -270,12 +280,16 @@ class train_abc():
 
     def __init__(self, args, new_log=True):
         self.args = args
-        self.log_dir_ln = "{}/log-{}".format(
-            self.args.log_dir, self.args.model_name)
+        blinks = os.path.join(self.args.log_dir, 'blinks')
+        if not os.path.exists(blinks):
+            os.makedirs(blinks)
+        self.log_dir_ln = os.path.join(
+            blinks, self.args.model_name)
         if (not os.path.exists(self.log_dir_ln) or new_log):
             self.make_new_log()
         else:
             self.log_dir_t = os.readlink(self.log_dir_ln)
+        self.write_args(self.log_dir_t, args)
 
         # add both console and file logging
         logFormatter = logging.Formatter(

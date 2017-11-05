@@ -14,5 +14,5 @@ class base_clean(base_regre):
         self.pose_dim = thedata.join_num * 3
         self.image_dir = thedata.training_images
         self.provider = args.data_provider
-        self.provider_worker = args.data_provider.put2dc_worker
+        self.provider_worker = args.data_provider.prow_cleaned
         self.check_dir(thedata, args)
