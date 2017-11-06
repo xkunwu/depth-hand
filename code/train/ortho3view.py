@@ -45,8 +45,10 @@ class ortho3view(base_regre):
         """ Receive parameters specific to the data """
         self.pose_dim = thedata.join_num * 3
         self.image_dir = thedata.training_images
+        self.caminfo = thedata
         self.provider = args.data_provider
         self.provider_worker = args.data_provider.prow_ortho3v
+        self.yanker = self.provider.yank_ortho3v
         self.check_dir(thedata, args)
 
     def draw_random(self, thedata, args):
@@ -67,8 +69,8 @@ class ortho3view(base_regre):
             frame_id = random.randrange(store_size)
             img_id = batchallot.batch_index[frame_id, 0]
             img_crop_resize = batchallot.batch_frame[frame_id, ...]
-            # pose_raw = batchallot.batch_poses[frame_id, ...].reshape(-1, 3)
-            # resce = batchallot.batch_resce[frame_id, ...]
+            pose_raw = batchallot.batch_poses[frame_id, ...].reshape(-1, 3)
+            resce = batchallot.batch_resce[frame_id, ...]
 
         import matplotlib.pyplot as mpplot
         print('drawing pose #{:d}'.format(img_id))

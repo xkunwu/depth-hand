@@ -218,7 +218,9 @@ class train_abc():
                     feed_dict=feed_dict)
                 self.args.data_provider.write2d(
                     writer,
+                    self.args.model_inst.yanker,
                     batch_data['batch_index'],
+                    batch_data['batch_resce'],
                     pred_val
                 )
                 # for bi, _ in enumerate(next_n_lines):

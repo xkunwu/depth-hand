@@ -1,4 +1,5 @@
 import numpy as np
+from pyquaternion import Quaternion
 import matplotlib.pyplot as mpplot
 import matplotlib.patches as mppatches
 from mpl_toolkits.mplot3d import Axes3D
@@ -11,6 +12,13 @@ class iso_rect:
         self.cll = cll
         self.len = len
         self.add_margan(m)
+
+    def dump(self):
+        return np.append(self.len, self.cll)
+
+    def load(self, args):
+        self.cll = args[1:3]
+        self.len = args[0]
 
     def show_dims(self):
         print(self.cll, self.len)
@@ -61,6 +69,13 @@ class iso_aabb:
         self.len = len
         self.add_margan(m)
 
+    def dump(self):
+        return np.append(self.len, self.cll)
+
+    def load(self, args):
+        self.cll = args[1:3]
+        self.len = args[0]
+
     def show_dims(self):
         print(self.cen, self.len)
 
@@ -84,6 +99,17 @@ class iso_cube:
         self.len = len  # half side length
         self.evecs = np.eye(3)
         self.add_margan(m)
+
+    def dump(self):
+        return np.concatenate((
+            np.array([self.len]), self.cen,
+            Quaternion(matrix=self.evecs).elements
+        ))
+
+    def load(self, args):
+        self.len = args[0]
+        self.cen = args[1:4]
+        self.evecs = Quaternion(args[4:8]).rotation_matrix
 
     def show_dims(self):
         print(self.cen, self.len)
@@ -120,7 +146,7 @@ class iso_cube:
         # evecs = evecs[idx, :]
         # evals = evals[idx]
         # print(evals)
-        points3_trans = self.transform(points3)
+        points3_trans = np.dot(points3 - self.cen, evecs)
         # ptp = np.ptp(points3_trans, axis=0)
         ptp = pmax - pmin
         idx = np.argsort(ptp)[::-1]
@@ -130,6 +156,9 @@ class iso_cube:
         self.len = np.max(ptp) / 2
         # print(self.len)
         self.evecs = evecs
+        if 0 > np.linalg.det(evecs):
+            evecs[2, :] *= -1
+        # self.qrot = Quaternion(matrix=evecs)
         self.add_margan(m)
         return points3_trans
 
@@ -140,13 +169,13 @@ class iso_cube:
 
     def transform(self, points3):
         """ to local coordinates """
-        points3_trans = np.dot(points3 - self.cen, self.evecs)
-        return points3_trans
+        return np.dot(points3 - self.cen, self.evecs)
+        # return self.qrot.rotate(points3 - self.cen)
 
     def transform_inv(self, points3):
         """ to world coordinates """
-        points3_trans = np.dot(points3, self.evecs.T) + self.cen
-        return points3_trans
+        return np.dot(points3, self.evecs.T) + self.cen
+        # return self.qrot.inverse.rotate(points3 - self.cen)
 
     def project_pca(self, ps3_pca, roll=0, sort=True):
         ar3 = np.roll(np.arange(3), roll)

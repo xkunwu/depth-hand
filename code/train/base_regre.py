@@ -16,6 +16,10 @@ file_pack = getattr(
     import_module('coder'),
     'file_pack'
 )
+iso_rect = getattr(
+    import_module('iso_boxes'),
+    'iso_rect'
+)
 iso_aabb = getattr(
     import_module('iso_boxes'),
     'iso_aabb'
@@ -206,7 +210,7 @@ class base_regre(object):
             return
         batchallot = self.batch_allot(
             args.store_level, self.crop_size, self.pose_dim, args.store_level)
-        batchallot.allot(1, 5)
+        batchallot.allot(1, 7)
         with file_pack() as filepack:
             file_annot = filepack.push_file(thedata.training_annot_train)
             self.prepare_data(thedata, batchallot, file_annot, self.appen_train)
@@ -222,6 +226,7 @@ class base_regre(object):
         self.caminfo = thedata
         self.provider = args.data_provider
         self.provider_worker = self.provider.prow_cropped
+        self.yanker = self.provider.yank_cropped
         self.check_dir(thedata, args)
 
     def draw_random(self, thedata, args):
@@ -246,11 +251,13 @@ class base_regre(object):
             resce = batchallot.batch_resce[frame_id, ...]
 
         import matplotlib.pyplot as mpplot
-        print('drawing pose #{:d}'.format(img_id))
-        aabb = iso_aabb(resce[2:5], resce[1])
-        rect = args.data_ops.get_rect2(aabb, thedata)
-        resce2 = np.append(resce[0], rect.cll)
-        resce3 = resce[1:5]
+        print('[{}] drawing pose #{:d}'.format(self.__class__.__name__, img_id))
+        # aabb = iso_aabb(resce[2:5], resce[1])
+        # rect = args.data_ops.get_rect2(aabb, thedata)
+        # resce2 = np.append(resce[0], rect.cll)
+        rect = iso_rect(resce[1:3], self.crop_size / resce[0])
+        resce2 = resce[0:3]
+        resce3 = resce[3:7]
         fig_size = (3 * 5, 5)
         mpplot.subplots(nrows=1, ncols=2, figsize=fig_size)
         mpplot.subplot(1, 3, 3)

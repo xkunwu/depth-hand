@@ -36,8 +36,8 @@ class args_holder:
             help='GPU to use [default: GPU 0]')
         # [base_regre, base_clean, ortho3view, base_conv3, trunc_dist]
         self.parser.add_argument(
-            '--model_name', default='ortho3view',
-            # '--model_name', default='base_clean',
+            # '--model_name', default='ortho3view',
+            '--model_name', default='base_clean',
             help='Model name [default: base_clean], from \
             [base_regre, base_clean, ortho3view, base_conv3, trunc_dist]'
         )
@@ -94,11 +94,11 @@ class args_holder:
         self.args.store_level = (2 << self.args.store_level)
 
     def create_instance(self):
-        model_class = getattr(
+        self.args.model_class = getattr(
             import_module('train.' + self.args.model_name),
             self.args.model_name
         )
-        self.args.model_inst = model_class(self.args.out_dir)
+        self.args.model_inst = self.args.model_class(self.args.out_dir)
         self.args.model_inst.tweak_args(self.args)
         self.args.data_module = import_module(
             'data.' + self.args.data_name)

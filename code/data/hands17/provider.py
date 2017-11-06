@@ -5,57 +5,46 @@ import ops as dataops
 import io as dataio
 
 
-def prow_truncdf(args, image_dir, caminfo, batchallot):
-    bi = args[0]
-    line = args[1]
+def prow_truncdf(line, image_dir, caminfo):
     img_name, pose_raw = dataio.parse_line_annot(line)
     img = dataio.read_image(os.path.join(image_dir, img_name))
     pcnt, resce = dataops.fill_grid(img, pose_raw, batchallot.image_size, caminfo)
     bef = dataops.trunc_belief(pcnt)
-    batchallot.batch_index[bi, :] = dataio.imagename2index(img_name)
-    batchallot.batch_frame[bi, ...] = np.expand_dims(bef, axis=3)
-    batchallot.batch_poses[bi, :] = pose_raw.flatten().T
-    batchallot.batch_resce[bi, :] = resce
+    return (img_name, np.expand_dims(img_crop_resize, axis=2),
+            poses.flatten().T, resce)
 
 
-def prow_conv3d(args, image_dir, caminfo, batchallot):
-    bi = args[0]
-    line = args[1]
+def prow_conv3d(line, image_dir, caminfo):
     img_name, pose_raw = dataio.parse_line_annot(line)
     img = dataio.read_image(os.path.join(image_dir, img_name))
     pcnt, resce = dataops.fill_grid(img, pose_raw, batchallot.image_size, caminfo)
-    batchallot.batch_index[bi, :] = dataio.imagename2index(img_name)
-    batchallot.batch_frame[bi, ...] = np.expand_dims(pcnt, axis=3)
-    batchallot.batch_poses[bi, :] = pose_raw.flatten().T
-    batchallot.batch_resce[bi, :] = resce
+    return (img_name, np.expand_dims(img_crop_resize, axis=2),
+            poses.flatten().T, resce)
 
 
-def prow_ortho3v(args, image_dir, caminfo, batchallot):
-    bi = args[0]
-    line = args[1]
+def prow_ortho3v(line, image_dir, caminfo):
     img_name, pose_raw = dataio.parse_line_annot(line)
     img = dataio.read_image(os.path.join(image_dir, img_name))
     img_crop_resize, resce = dataops.proj_ortho3(
         img, pose_raw, caminfo)
     # pose2d = dataops.raw_to_2d(pose_raw, caminfo, resce)
-    batchallot.batch_index[bi, :] = dataio.imagename2index(img_name)
-    batchallot.batch_frame[bi, ...] = img_crop_resize
-    batchallot.batch_poses[bi, :] = pose_raw.flatten().T
-    batchallot.batch_resce[bi, :] = resce
+    return (img_name, np.expand_dims(img_crop_resize, axis=2),
+            poses.flatten().T, resce)
 
 
-def prow_cleaned(args, image_dir, caminfo, batchallot):
-    bi = args[0]
-    line = args[1]
+def prow_cleaned(line, image_dir, caminfo):
     img_name, pose_raw = dataio.parse_line_annot(line)
     img = dataio.read_image(os.path.join(image_dir, img_name))
     img_crop_resize, resce = dataops.crop_resize_pca(
         img, pose_raw, caminfo)
-    # pose2d = dataops.raw_to_2d(pose_raw, caminfo, resce)
-    batchallot.batch_index[bi, :] = dataio.imagename2index(img_name)
-    batchallot.batch_frame[bi, ...] = np.expand_dims(img_crop_resize, axis=2)
-    batchallot.batch_poses[bi, :] = pose_raw.flatten().T
-    batchallot.batch_resce[bi, :] = resce
+    pose_pca = dataops.raw_to_pca(pose_raw, resce[3:11])
+    return (img_name, np.expand_dims(img_crop_resize, axis=2),
+            pose_pca.flatten().T, resce)
+
+
+def yank_cleaned(pose_local, resce):
+    resce3 = resce[3:11]
+    return dataops.pca_to_raw(pose_local, resce3)
 
 
 def prow_cropped(line, image_dir, caminfo):
@@ -63,21 +52,14 @@ def prow_cropped(line, image_dir, caminfo):
     img = dataio.read_image(os.path.join(image_dir, img_name))
     img_crop_resize, resce = dataops.crop_resize(
         img, pose_raw, caminfo)
-    poses = dataops.raw_to_local(pose_raw, resce[1:5])
+    pose_local = dataops.raw_to_local(pose_raw, resce[3:7])
     return (img_name, np.expand_dims(img_crop_resize, axis=2),
-            poses.flatten().T, resce)
-# def prow_cropped(args, image_dir, caminfo, batchallot):
-    # bi = args[0]
-    # line = args[1]
-    # img_name, pose_raw = dataio.parse_line_annot(line)
-    # img = dataio.read_image(os.path.join(image_dir, img_name))
-    # img_crop_resize, resce = dataops.crop_resize(
-    #     img, pose_raw, caminfo)
-    # # pose2d = dataops.raw_to_2d(pose_raw, caminfo, resce)
-    # batchallot.batch_index[bi, :] = dataio.imagename2index(img_name)
-    # batchallot.batch_frame[bi, ...] = np.expand_dims(img_crop_resize, axis=2)
-    # batchallot.batch_poses[bi, :] = pose_raw.flatten().T
-    # batchallot.batch_resce[bi, :] = resce
+            pose_local.flatten().T, resce)
+
+
+def yank_cropped(pose_local, resce):
+    resce3 = resce[3:7]
+    return dataops.local_to_raw(pose_local, resce3)
 
 
 def put_worker(args, worker, image_dir, caminfo, batchallot):
@@ -134,9 +116,11 @@ def puttensor_mt(fanno, worker, image_dir, caminfo, batchallot):
     return num_line
 
 
-def write2d(fanno, batch_index, batch_poses):
+def write2d(fanno, yanker, batch_index, batch_resce, batch_poses):
     for ii in range(batch_index.shape[0]):
         img_name = dataio.index2imagename(batch_index[ii, 0])
-        pose_raw = batch_poses[ii, :].flatten()
-        crimg_line = ''.join("%12.4f" % x for x in pose_raw)
+        pose_local = batch_poses[ii, :].reshape(-1, 3)
+        resce = batch_resce[ii, :]
+        pose_raw = yanker(pose_local, resce)
+        crimg_line = ''.join("%12.4f" % x for x in pose_raw.flatten())
         fanno.write(img_name + crimg_line + '\n')

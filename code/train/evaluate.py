@@ -2,7 +2,6 @@ import os
 import sys
 from importlib import import_module
 import numpy as np
-import matplotlib.pyplot as mpplot
 import re
 from train_abc import train_abc
 
@@ -16,6 +15,10 @@ args_holder = getattr(
 
 
 def run_one(args):
+    import matplotlib as mpl
+    mpl.use('Agg')
+    mpplot = import_module('matplotlib.pyplot')
+
     argsholder.create_instance()
     data_inst = args.data_inst
     predict_file = os.path.join(
@@ -34,7 +37,8 @@ def run_one(args):
 
     datadraw = import_module(
         'data.' + args.data_name + '.draw')
-    mpplot.gcf().clear()
+    # mpplot.gcf().clear()
+    mpplot.figure()
     datadraw.draw_pred_random(
         data_inst,
         data_inst.training_images,
@@ -85,6 +89,10 @@ def run_one(args):
 
 
 def draw_compare(args, predict_dir=None):
+    import matplotlib as mpl
+    mpl.use('Agg')
+    mpplot = import_module('matplotlib.pyplot')
+
     argsholder.create_instance()
     dataeval = import_module(
         'data.' + args.data_name + '.eval')
@@ -109,10 +117,12 @@ def draw_compare(args, predict_dir=None):
             error_l = errors
         else:
             error_l = np.concatenate((error_l, errors), axis=0)
+    mpplot.gcf().clear()
     dataeval.draw_error_percentage_curve(
         error_l, methods, mpplot.gca())
     mpplot.savefig(os.path.join(args.data_inst.predict_dir, 'error_rate.png'))
     # mpplot.show()
+    mpplot.gcf().clear()
     dataeval.draw_error_per_joint(
         error_l, methods, mpplot.gca(), args.data_inst.join_name)
     mpplot.savefig(os.path.join(args.data_inst.predict_dir, 'error_bar.png'))
@@ -156,28 +166,28 @@ def test_dataops(args):
 
 
 if __name__ == "__main__":
-    # python evaluate.py --max_epoch=1 --batch_size=16 --store_level=6 --model_name=base_conv3
+    # python evaluate.py --max_epoch=1 --batch_size=16 --store_level=6 --model_name=base_clean
     argsholder = args_holder()
     argsholder.parse_args()
     args = argsholder.args
 
-    test_dataops(args)
-    sys.exit()
+    # test_dataops(args)
+    # sys.exit()
 
     # run_one(args)
     # sys.exit()
 
-    # methlist = [
-    #     'base_regre',
-    #     'base_clean',
-    #     'ortho3view',
-    #     'base_conv3',
-    #     # 'trunc_dist'
-    # ]
-    # for meth in methlist:
-    #     args.model_name = meth
-    #     run_one(args)
-    #
-    # draw_compare(args)
-    scp_t = os.path.join(args.out_dir, 'predict_remote')
-    draw_compare(args, scp_t)
+    methlist = [
+        'base_regre',
+        'base_clean',
+        # 'ortho3view',
+        # 'base_conv3',
+        # 'trunc_dist'
+    ]
+    for meth in methlist:
+        args.model_name = meth
+        run_one(args)
+
+    draw_compare(args)
+    # scp_t = os.path.join(args.out_dir, 'predict_remote')
+    # draw_compare(args, scp_t)
