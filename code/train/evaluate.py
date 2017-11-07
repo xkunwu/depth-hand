@@ -178,11 +178,11 @@ if __name__ == "__main__":
     # sys.exit()
 
     methlist = [
-        'base_regre',
-        'base_clean',
-        'ortho3view',
-        # 'base_conv3',
         # 'trunc_dist'
+        # 'base_conv3',
+        'ortho3view',
+        'base_clean',
+        'base_regre',
     ]
     for meth in methlist:
         args.model_name = meth

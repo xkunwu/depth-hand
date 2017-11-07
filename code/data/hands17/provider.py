@@ -8,18 +8,32 @@ import io as dataio
 def prow_truncdf(line, image_dir, caminfo):
     img_name, pose_raw = dataio.parse_line_annot(line)
     img = dataio.read_image(os.path.join(image_dir, img_name))
-    pcnt, resce = dataops.fill_grid(img, pose_raw, batchallot.image_size, caminfo)
+    pcnt, resce = dataops.fill_grid(img, pose_raw, caminfo.crop_size, caminfo)
     bef = dataops.trunc_belief(pcnt)
-    return (img_name, np.expand_dims(img_crop_resize, axis=2),
-            poses.flatten().T, resce)
+    resce3 = resce[0:8]
+    pose_pca = dataops.raw_to_pca(pose_raw, resce3)
+    return (img_name, bef,
+            pose_pca.flatten().T, resce)
+
+
+def yank_truncdf(pose_local, resce):
+    resce3 = resce[0:8]
+    return dataops.pca_to_raw(pose_local, resce3)
 
 
 def prow_conv3d(line, image_dir, caminfo):
     img_name, pose_raw = dataio.parse_line_annot(line)
     img = dataio.read_image(os.path.join(image_dir, img_name))
-    pcnt, resce = dataops.fill_grid(img, pose_raw, batchallot.image_size, caminfo)
-    return (img_name, np.expand_dims(img_crop_resize, axis=2),
-            poses.flatten().T, resce)
+    pcnt, resce = dataops.fill_grid(img, pose_raw, caminfo.crop_size, caminfo)
+    resce3 = resce[0:8]
+    pose_pca = dataops.raw_to_pca(pose_raw, resce3)
+    return (img_name, pcnt,
+            pose_pca.flatten().T, resce)
+
+
+def yank_conv3d(pose_local, resce):
+    resce3 = resce[0:8]
+    return dataops.pca_to_raw(pose_local, resce3)
 
 
 def prow_ortho3v(line, image_dir, caminfo):

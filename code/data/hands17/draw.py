@@ -108,7 +108,7 @@ def draw_pose_raw(thedata, img, pose_raw, show_margin=False):
     # points3 = dataops.d2z_to_raw(indz, thedata)
     # print(pose_raw - points3)
 
-    # draw bounding box
+    # draw bounding cube
     rect = dataops.get_rect3(pose_raw, thedata)
     rect.draw()
 
@@ -235,8 +235,8 @@ def draw_raw3d_pose(thedata, pose_raw, zdir='z'):
 
 
 def draw_raw3d(thedata, img, pose_raw):
-    box = iso_cube()
-    box.build(pose_raw)
+    cube = iso_cube()
+    cube.build(pose_raw)
     # draw full image
     fig_size = (2 * 6, 6)
     fig = mpplot.figure(figsize=fig_size)
@@ -254,38 +254,36 @@ def draw_raw3d(thedata, img, pose_raw):
     ax.view_init(azim=-90, elev=-60)
     ax.set_zlabel('depth (mm)', labelpad=15)
     draw_raw3d_pose(thedata, pose_raw)
-    corners = box.get_corners()
-    corners = box.transform_inv(corners)
-    box.draw_wire(corners)
+    corners = cube.get_corners()
+    corners = cube.transform_inv(corners)
+    cube.draw_wire(corners)
     # draw cropped region
     ax = fig.add_subplot(1, 2, 2, projection='3d')
-    points3 = box.pick(points3)
-    numpts = points3.shape[0]
+    _, points3_trans = cube.pick(points3)
+    numpts = points3_trans.shape[0]
     if 1000 < numpts:
-        samid = randsample(range(numpts), 1000)
-        points3_sam = points3[samid, :]
+        points3_sam = points3_trans[randsample(range(numpts), 1000), :]
     else:
-        points3_sam = points3
-    points3_sam = box.transform(points3_sam)
-    pose_trans = box.transform(pose_raw)
+        points3_sam = points3_trans
+    points3_sam = cube.transform(points3_sam)
+    pose_trans = cube.transform(pose_raw)
     ax.scatter(
         points3_sam[:, 0], points3_sam[:, 1], points3_sam[:, 2],
         color=Color('lightsteelblue').rgb)
     draw_raw3d_pose(thedata, pose_trans)
-    corners = box.get_corners()
-    box.draw_wire(corners)
+    corners = cube.get_corners()
+    cube.draw_wire(corners)
     ax.view_init(azim=-120, elev=-150)
     mpplot.tight_layout()
     mpplot.show()
     # draw projected image
-    points3_trans = box.transform(points3)
     fig_size = (3 * 5, 5)
     mpplot.subplots(nrows=1, ncols=3, figsize=fig_size)
     for spi in range(3):
         mpplot.subplot(1, 3, spi + 1)
-        coord, depth = box.project_pca(points3_trans, roll=spi)
-        img = box.print_image(coord, depth)
-        pose2d, _ = box.project_pca(pose_trans, roll=spi, sort=False)
+        coord, depth = cube.project_pca(points3_trans, roll=spi)
+        img = cube.print_image(coord, depth)
+        pose2d, _ = cube.project_pca(pose_trans, roll=spi, sort=False)
         draw_pose2d(thedata, img, pose2d)
         mpplot.imshow(img, cmap='bone')
     mpplot.gcf().gca().axis('off')

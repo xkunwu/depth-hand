@@ -8,19 +8,29 @@ from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 from colour import Color
 
-# BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-# BASE_DIR = os.path.abspath(os.path.join(BASE_DIR, os.pardir))
-# sys.path.append(os.path.join(BASE_DIR, 'utils'))
-# iso_cube = getattr(
-#     import_module('iso_boxes'),
-#     'iso_cube'
-# )
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.abspath(os.path.join(BASE_DIR, os.pardir))
+sys.path.append(os.path.join(BASE_DIR, 'utils'))
+iso_cube = getattr(
+    import_module('iso_boxes'),
+    'iso_cube'
+)
 
 
 class grid_cell():
     def __init__(self, cll=np.zeros(3), len=0.):
         self.cll = cll
         self.len = len
+
+    def dump(self):
+        return np.append(self.len, self.cll)
+
+    def load(self, args):
+        self.cll = args[1:4]
+        self.len = args[0]
+
+    def show_dims(self):
+        print(self.cll, self.len)
 
     def pick(self, points3):
         cmin = self.cll
@@ -63,20 +73,44 @@ class regu_grid:
         self.len = len  # cell side length
         self.step = step
         self.pcnt = np.zeros(
-            shape=(self.step, self.step, self.step), dtype=int)
+            shape=(self.step, self.step, self.step), dtype=float)
 
-    def build(self, cell, step):
-        self.cll = cell.cll
+    def dump(self):
+        return np.concatenate((
+            np.array([self.len]), self.cen,
+            np.array([self.step])
+        ))
+
+    def load(self, args):
+        self.len = args[0]
+        self.cen = args[1:4]
+        self.step = args[4]
+
+    def show_dims(self):
+        print(self.cll, self.len, self.step)
+
+    def from_cube(self, cube, step, m=0.1):
+        if 1 > m and -1 < m:
+            m = cube.len * m
+        cubelen = cube.len + m
+        self.cll = np.zeros(3) - cubelen
         self.step = step
-        self.len = cell.len / self.step
-        self.pcnt = np.zeros(shape=(self.step, self.step, self.step), dtype=int)
+        self.len = cubelen * 2 / step
+        self.pcnt = np.zeros(shape=(self.step, self.step, self.step), dtype=float)
 
     def putit(self, points3):
         return np.floor((points3 - self.cll) / self.len).astype(int)
 
     def fill(self, points3):
-        index = self.putit(points3)
-        self.pcnt[index] += 1
+        indices = self.putit(points3)
+        # print(np.max(points3, axis=0))
+        # print(np.min(points3, axis=0))
+        # print(np.ptp(points3, axis=0))
+        # print(self.cll + self.len * self.step)
+        # self.show_dims()
+        for index in indices:
+            self.pcnt[index] += 1
+        self.pcnt /= np.max(self.pcnt)
 
     def voxen(self, index):
         return self.cll + self.len * (float(index) + 0.5)

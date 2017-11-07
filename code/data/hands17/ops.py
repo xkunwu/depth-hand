@@ -32,15 +32,15 @@ grid_cell = getattr(
 
 
 def raw_to_pca(points3, resce=np.array([1, 0, 0, 0, 1, 0, 0, 0])):
-    box = iso_cube()
-    box.load(resce)
-    return box.transform(points3) / resce[0]
+    cube = iso_cube()
+    cube.load(resce)
+    return cube.transform(points3) / resce[0]
 
 
 def pca_to_raw(points3, resce=np.array([1, 0, 0, 0, 1, 0, 0, 0])):
-    box = iso_cube()
-    box.load(resce)
-    return box.transform_inv(points3 * resce[0])
+    cube = iso_cube()
+    cube.load(resce)
+    return cube.transform_inv(points3 * resce[0])
 
 
 def raw_to_local(points3, resce=np.array([1, 0, 0, 0])):
@@ -121,18 +121,15 @@ def clip_image_border(rect, caminfo):
 
 
 def fill_grid(img, pose_raw, step, caminfo):
-    box = iso_cube()
-    box.build(pose_raw)
-    points3 = box.pick(img_to_raw(img, caminfo))
-    points3_trans = box.transform(points3) + box.len  # 0-based
-    cell = grid_cell()
-    cell.build(points3_trans)
+    cube = iso_cube()
+    cube.build(pose_raw)
+    _, points3_trans = cube.pick(img_to_raw(img, caminfo))
     grid = regu_grid()
-    grid.build(cell, step)
+    grid.from_cube(cube, step)
     grid.fill(points3_trans)
     resce = np.append(
-        grid.cll.flatten(),
-        grid.len
+        cube.dump(),
+        step
     )
     return grid.pcnt, resce
 
@@ -161,37 +158,36 @@ def trunc_belief(pcnt):
 
 
 def proj_ortho3(img, pose_raw, caminfo):
-    box = iso_cube()
-    box.build(pose_raw)
-    points3 = box.pick(img_to_raw(img, caminfo))
-    points3_trans = box.transform(points3)
+    cube = iso_cube()
+    cube.build(pose_raw)
+    _, points3_trans = cube.pick(img_to_raw(img, caminfo))
     img_crop_resize = []
     for spi in range(3):
-        coord, depth = box.project_pca(points3_trans, roll=spi)
-        img_crop = box.print_image(coord, depth)
+        coord, depth = cube.project_pca(points3_trans, roll=spi)
+        img_crop = cube.print_image(coord, depth)
         img_crop_resize.append(
             cv2resize(img_crop, (caminfo.crop_size, caminfo.crop_size))
         )
-        # pose2d, _ = box.project_pca(pose_trans, roll=spi, sort=False)
+        # pose2d, _ = cube.project_pca(pose_trans, roll=spi, sort=False)
     resce = np.concatenate((
-        np.array([float(caminfo.crop_size) / box.get_sidelen()]),
-        np.ones(2) * box.get_sidelen(),
-        box.dump()
+        np.array([float(caminfo.crop_size) / cube.get_sidelen()]),
+        np.ones(2) * cube.get_sidelen(),
+        cube.dump()
     ))
     # resce = np.append(
-    #     float(caminfo.crop_size) / box.get_sidelen(),
-    #     box.cen
+    #     float(caminfo.crop_size) / cube.get_sidelen(),
+    #     cube.cen
     # )
     # resce = np.concatenate((
     #     resce,
-    #     box.evecs.flatten()))
+    #     cube.evecs.flatten()))
     return np.stack(img_crop_resize, axis=2), resce
 
 
 def crop_resize_pca(img, pose_raw, caminfo):
-    box = iso_cube()
-    box.build(pose_raw)
-    points3 = box.pick(img_to_raw(img, caminfo))
+    cube = iso_cube()
+    cube.build(pose_raw)
+    points3, _ = cube.pick(img_to_raw(img, caminfo))
     points2, pose_z = raw_to_2dz(points3, caminfo)
     rect = iso_rect()
     rect.build(points2, 0.5)
@@ -202,7 +198,7 @@ def crop_resize_pca(img, pose_raw, caminfo):
     resce = np.concatenate((
         np.array([float(caminfo.crop_size) / rect.len]),
         rect.cll,
-        box.dump()
+        cube.dump()
     ))
     return img_crop_resize, resce
 
@@ -268,12 +264,12 @@ def get_rect3(points3, caminfo, m=0.6):
     """ return a rectangle with margin that 3d points
         NOTE: there is still a perspective problem
     """
-    box = iso_cube()
-    box.build(points3, m)
-    cen = raw_to_2d(box.cen.reshape(1, -1), caminfo).flatten()
+    cube = iso_cube()
+    cube.build(points3, m)
+    cen = raw_to_2d(cube.cen.reshape(1, -1), caminfo).flatten()
     rect = iso_rect(
-        cen - box.len,
-        box.get_sidelen()
+        cen - cube.len,
+        cube.get_sidelen()
     )
     rect = clip_image_border(rect, caminfo)
     return rect

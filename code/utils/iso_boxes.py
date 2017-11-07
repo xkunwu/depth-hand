@@ -127,7 +127,7 @@ class iso_cube:
             np.all(cmin < points3_trans, axis=1),
             np.all(cmax > points3_trans, axis=1)
         )
-        return points3[conds, :]
+        return points3[conds, :], points3_trans[conds, :]
 
     def build(self, points3, m=0.6):
         # from sklearn.decomposition import PCA
@@ -213,7 +213,8 @@ class iso_cube:
         ])
         return corners
 
-    def draw(self, corners, alpha='0.25'):
+    @staticmethod
+    def draw_cube_face(corners, alpha='0.25'):
         faces = [
             [corners[0], corners[3], corners[2], corners[1]],
             [corners[0], corners[1], corners[5], corners[4]],
@@ -231,7 +232,8 @@ class iso_cube:
             corners[:, 0], corners[:, 1], corners[:, 2],
             color=Color('cyan').rgb, alpha=0.5, marker='o')
 
-    def draw_wire(self, corners):
+    @staticmethod
+    def draw_cube_wire(corners):
         ring_b = np.array([
             corners[0], corners[1], corners[2], corners[3], corners[0]
         ])
@@ -285,14 +287,14 @@ class iso_cube:
 
 
 if __name__ == "__main__":
-    box = iso_cube()
+    cube = iso_cube()
     # points3 = np.random.randn(1000, 3)
     points3 = np.random.rand(1000, 3) * 6
-    box.build(points3)
+    cube.build(points3)
     fig = mpplot.figure()
     ax = Axes3D(fig)
-    box.draw()
+    cube.draw()
     ax.scatter(points3[:, 0], points3[:, 1], points3[:, 2])
-    # points3_trans = box.transform(points3)
+    # points3_trans = cube.transform(points3)
     # ax.scatter(points3_trans[:, 0], points3_trans[:, 1], points3_trans[:, 2])
     mpplot.show()

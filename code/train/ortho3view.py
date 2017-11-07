@@ -82,14 +82,14 @@ class ortho3view(base_regre):
         mpplot.subplots(nrows=3, ncols=3, figsize=fig_size)
         resce2 = resce_h5[0:3]
         resce3 = resce_h5[3:11]
-        box = iso_cube()
-        box.load(resce3)
-        pose_pca = poses_h5 * resce3[0]
+        cube = iso_cube()
+        cube.load(resce3)
+        pose_pca = poses_h5 * resce3[0]  # still in the transformed coordinates
         for spi in range(3):
             mpplot.subplot(3, 3, spi + 7)
             img = frame_h5[..., spi]
             mpplot.imshow(img, cmap='bone')
-            pose2d, _ = box.project_pca(pose_pca, roll=spi, sort=False)
+            pose2d, _ = cube.project_pca(pose_pca, roll=spi, sort=False)
             pose2d = pose2d * resce2[0]
             args.data_draw.draw_pose2d(
                 thedata, img,
@@ -120,17 +120,17 @@ class ortho3view(base_regre):
 
         img_name, frame, poses, resce = self.provider_worker(
             annot_line, self.image_dir, thedata)
+        poses = poses.reshape(-1, 3)
         resce2 = resce[0:3]
         resce3 = resce[3:11]
-        poses = poses.reshape(-1, 3)
-        box = iso_cube()
-        box.load(resce3)
-        pose_pca = poses * resce3[0]
+        cube = iso_cube()
+        cube.load(resce3)
+        pose_pca = poses * resce3[0]  # still in the transformed coordinates
         for spi in range(3):
             mpplot.subplot(3, 3, spi + 4)
             img = frame[..., spi]
             mpplot.imshow(img, cmap='bone')
-            pose2d, _ = box.project_pca(pose_pca, roll=spi, sort=False)
+            pose2d, _ = cube.project_pca(pose_pca, roll=spi, sort=False)
             pose2d = pose2d * resce2[0]
             args.data_draw.draw_pose2d(
                 thedata, img,

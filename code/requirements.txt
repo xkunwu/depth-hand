@@ -12,3 +12,8 @@ notebook
 imageio
 opencv
 progressbar
+vtk
+traits
+pyside
+configobj
+envisage

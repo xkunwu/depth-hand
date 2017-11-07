@@ -15,6 +15,10 @@ file_pack = getattr(
     import_module('coder'),
     'file_pack'
 )
+iso_cube = getattr(
+    import_module('iso_boxes'),
+    'iso_cube'
+)
 
 
 class base_conv3(base_regre):
@@ -34,12 +38,12 @@ class base_conv3(base_regre):
             self.batch_beg = 0
             self.batch_end = self.batch_beg + self.batch_size
 
-        def allot(self, num_channel, num_appen):
+        def allot(self, num_appen):
             self.batch_index = np.empty(
                 shape=(self.batch_size, 1), dtype=np.uint32)
             self.batch_frame = np.empty(
-                shape=(self.batch_size, self.image_size, self.image_size, self.image_size, num_channel),
-                dtype=int)
+                shape=(self.batch_size, self.image_size, self.image_size, self.image_size),
+                dtype=np.float32)
             self.batch_poses = np.empty(
                 shape=(self.batch_size, self.pose_dim), dtype=np.float32)
             self.batch_resce = np.empty(
@@ -81,7 +85,7 @@ class base_conv3(base_regre):
             return
         batchallot = self.batch_allot(
             args.store_level, self.crop_size, self.pose_dim, args.store_level)
-        batchallot.allot(1, 4)
+        batchallot.allot(9)
         with file_pack() as filepack:
             file_annot = filepack.push_file(thedata.training_annot_train)
             self.prepare_data(thedata, batchallot, file_annot, self.appen_train)
@@ -94,8 +98,10 @@ class base_conv3(base_regre):
         """ Receive parameters specific to the data """
         self.pose_dim = thedata.join_num * 3
         self.image_dir = thedata.training_images
+        self.caminfo = thedata
         self.provider = args.data_provider
         self.provider_worker = args.data_provider.prow_conv3d
+        self.yanker = self.provider.yank_conv3d
         self.check_dir(thedata, args)
 
     def draw_random(self, thedata, args):
@@ -115,22 +121,96 @@ class base_conv3(base_regre):
             )
             frame_id = random.randrange(store_size)
             img_id = batchallot.batch_index[frame_id, 0]
-            img_crop_resize = batchallot.batch_frame[frame_id, ...]
-            pose_raw = batchallot.batch_poses[frame_id, ...].reshape(-1, 3)
-            resce = batchallot.batch_resce[frame_id, ...]
+            frame_h5 = batchallot.batch_frame[frame_id, ...]
+            poses_h5 = batchallot.batch_poses[frame_id, ...].reshape(-1, 3)
+            resce_h5 = batchallot.batch_resce[frame_id, ...]
 
         import matplotlib.pyplot as mpplot
+        from colour import Color
+        from mayavi import mlab
+        from random import sample as randsample
         print('[{}] drawing pose #{:d}'.format(self.__class__.__name__, img_id))
         fig_size = (2 * 5, 2 * 5)
+        resce3 = resce_h5[0:8]
+        cube = iso_cube()
+        cube.load(resce3)
         mpplot.subplots(nrows=2, ncols=2, figsize=fig_size)
-        mpplot.subplot(1, 4, 1)
+        mpplot.subplot(2, 2, 1)
+        annot_line = args.data_io.get_line(
+            thedata.training_annot_cleaned, img_id)
+        img_name, pose_raw = args.data_io.parse_line_annot(annot_line)
+        img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
+        mpplot.imshow(img, cmap='bone')
+        args.data_draw.draw_pose2d(
+            thedata, img,
+            args.data_ops.raw_to_2d(pose_raw, thedata))
+
+        ax = mpplot.subplot(2, 2, 2, projection='3d')
+        annot_line = args.data_io.get_line(
+            thedata.training_annot_cleaned, img_id)
+        img_name, pose_raw = args.data_io.parse_line_annot(annot_line)
+        img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
+        points3 = args.data_ops.img_to_raw(img, thedata)
+        numpts = points3.shape[0]
+        if 1000 < numpts:
+            samid = randsample(range(numpts), 1000)
+            points3_sam = points3[samid, :]
+        else:
+            points3_sam = points3
+        ax.scatter(
+            points3_sam[:, 0], points3_sam[:, 1], points3_sam[:, 2],
+            color=Color('lightsteelblue').rgb)
+        # mlab.points3d(
+        #     points3_sam[:, 0], points3_sam[:, 1], points3_sam[:, 2],
+        #     color=Color('lightsteelblue').rgb)
+        # mlabimg = mlab.screenshot()
+        # mlab.close()
+        # ax.imshow(mlabimg)
+        ax.view_init(azim=-90, elev=-60)
+        ax.set_zlabel('depth (mm)', labelpad=15)
+        args.data_draw.draw_raw3d_pose(thedata, pose_raw)
+        corners = cube.get_corners()
+        corners = cube.transform_inv(corners)
+        iso_cube.draw_cube_wire(corners)
+
+        ax = mpplot.subplot(2, 2, 3, projection='3d')
+        _, points3_trans = cube.pick(points3)
+        numpts = points3_trans.shape[0]
+        if 1000 < numpts:
+            points3_trans = points3_trans[randsample(range(numpts), 1000), :]
+        pose_trans = cube.transform(pose_raw)
+        ax.scatter(
+            points3_trans[:, 0], points3_trans[:, 1], points3_trans[:, 2],
+            color=Color('lightsteelblue').rgb)
+        args.data_draw.draw_raw3d_pose(thedata, pose_trans)
+        corners = cube.get_corners()
+        cube.draw_cube_wire(corners)
+        ax.view_init(azim=-120, elev=-150)
+
+        ax = mpplot.subplot(2, 2, 4, projection='3d')
+        img_name, frame, poses, resce = self.provider_worker(
+            annot_line, self.image_dir, thedata)
+        poses = poses.reshape(-1, 3)
+        resce3 = resce_h5[0:8]
+        cube = iso_cube()
+        cube.load(resce3)
+        # mlab.contour3d(frame)
+        mlab.pipeline.volume(mlab.pipeline.scalar_field(frame))
+        mlab.pipeline.image_plane_widget(
+            mlab.pipeline.scalar_field(frame),
+            plane_orientation='x_axes',
+            slice_index=15)
+        mlab.outline()
+        print(np.max(frame))
+        print(np.min(frame))
+        print(frame[:, 15, 15])
         mpplot.show()
 
     @staticmethod
     def placeholder_inputs(batch_size, image_size, pose_dim):
         frames_tf = tf.placeholder(
             tf.float32,
-            shape=(batch_size, image_size, image_size, image_size, 1))
+            shape=(batch_size, image_size, image_size, image_size))
         poses_tf = tf.placeholder(
             tf.float32, shape=(batch_size, pose_dim))
         return frames_tf, poses_tf

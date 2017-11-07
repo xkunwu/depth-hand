@@ -25,7 +25,7 @@ iso_cube = getattr(
 
 
 class base_clean(base_regre):
-    """ This class use cleaned data from 3D PCA bounding box.
+    """ This class use cleaned data from 3D PCA bounding cube.
     """
     def __init__(self, out_dir):
         super(base_clean, self).__init__(out_dir)
