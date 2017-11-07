@@ -98,6 +98,16 @@ class ortho3view(base_regre):
             mpplot.gcf().gca().axis('off')
             # mpplot.tight_layout()
 
+        mpplot.subplot(3, 3, 3)
+        img_name = args.data_io.index2imagename(img_id)
+        img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
+        mpplot.imshow(img, cmap='bone')
+        pose_raw = self.yanker(poses_h5, resce_h5)
+        args.data_draw.draw_pose2d(
+            thedata, img,
+            args.data_ops.raw_to_2d(pose_raw, thedata)
+        )
+
         mpplot.subplot(3, 3, 1)
         annot_line = args.data_io.get_line(
             thedata.training_annot_cleaned, img_id)
