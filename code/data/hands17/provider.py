@@ -27,7 +27,8 @@ def prow_ortho3v(line, image_dir, caminfo):
     img = dataio.read_image(os.path.join(image_dir, img_name))
     img_crop_resize, resce = dataops.proj_ortho3(
         img, pose_raw, caminfo)
-    pose_pca = dataops.raw_to_pca(pose_raw, resce[3:11])
+    resce3 = resce[3:11]
+    pose_pca = dataops.raw_to_pca(pose_raw, resce3)
     return (img_name, img_crop_resize,
             pose_pca.flatten().T, resce)
 
@@ -42,7 +43,8 @@ def prow_cleaned(line, image_dir, caminfo):
     img = dataio.read_image(os.path.join(image_dir, img_name))
     img_crop_resize, resce = dataops.crop_resize_pca(
         img, pose_raw, caminfo)
-    pose_pca = dataops.raw_to_pca(pose_raw, resce[3:11])
+    resce3 = resce[3:11]
+    pose_pca = dataops.raw_to_pca(pose_raw, resce3)
     return (img_name, np.expand_dims(img_crop_resize, axis=2),
             pose_pca.flatten().T, resce)
 
@@ -57,7 +59,8 @@ def prow_cropped(line, image_dir, caminfo):
     img = dataio.read_image(os.path.join(image_dir, img_name))
     img_crop_resize, resce = dataops.crop_resize(
         img, pose_raw, caminfo)
-    pose_local = dataops.raw_to_local(pose_raw, resce[3:7])
+    resce3 = resce[3:7]
+    pose_local = dataops.raw_to_local(pose_raw, resce3)
     return (img_name, np.expand_dims(img_crop_resize, axis=2),
             pose_local.flatten().T, resce)
 

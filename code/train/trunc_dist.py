@@ -74,23 +74,23 @@ class trunc_dist(base_conv3):
             # pose_raw = batchallot.batch_poses[frame_id, ...].reshape(-1, 3)
             # resce = batchallot.batch_resce[frame_id, ...]
 
-        # import matplotlib.pyplot as mpplot
-        # print('drawing pose #{:d}'.format(img_id))
-        # fig_size = (4 * 5, 5)
-        # mpplot.subplots(nrows=1, ncols=4, figsize=fig_size)
-        # for spi in range(3):
-        #     mpplot.subplot(1, 4, spi + 2)
-        #     mpplot.imshow(img_crop_resize[..., spi], cmap='bone')
-        #     mpplot.gcf().gca().axis('off')
-        #     mpplot.tight_layout()
-        # mpplot.subplot(1, 4, 1)
-        # args.data_draw.draw_pose_raw_random(
-        #     thedata,
-        #     thedata.training_images,
-        #     thedata.training_annot_cleaned,
-        #     img_id
-        # )
-        # mpplot.show()
+        import matplotlib.pyplot as mpplot
+        print('[{}] drawing pose #{:d}'.format(self.__class__.__name__, img_id))
+        fig_size = (4 * 5, 5)
+        mpplot.subplots(nrows=1, ncols=4, figsize=fig_size)
+        for spi in range(3):
+            mpplot.subplot(1, 4, spi + 2)
+            mpplot.imshow(img_crop_resize[..., spi], cmap='bone')
+            mpplot.gcf().gca().axis('off')
+            mpplot.tight_layout()
+        mpplot.subplot(1, 4, 1)
+        args.data_draw.draw_pose_raw_random(
+            thedata,
+            thedata.training_images,
+            thedata.training_annot_cleaned,
+            img_id
+        )
+        mpplot.show()
 
     @staticmethod
     def placeholder_inputs(batch_size, image_size, pose_dim):

@@ -77,7 +77,7 @@ class ortho3view(base_regre):
             resce_h5 = batchallot.batch_resce[frame_id, ...]
 
         import matplotlib.pyplot as mpplot
-        print('drawing pose #{:d}'.format(img_id))
+        print('[{}] drawing pose #{:d}'.format(self.__class__.__name__, img_id))
         fig_size = (3 * 5, 3 * 5)
         mpplot.subplots(nrows=3, ncols=3, figsize=fig_size)
         resce2 = resce_h5[0:3]

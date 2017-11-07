@@ -44,10 +44,14 @@ def pca_to_raw(points3, resce=np.array([1, 0, 0, 0, 1, 0, 0, 0])):
 
 
 def raw_to_local(points3, resce=np.array([1, 0, 0, 0])):
+    # aabb = iso_aabb()
+    # aabb.load(resce)
     return (points3 - resce[1:4]) / resce[0]
 
 
 def local_to_raw(points3, resce=np.array([1, 0, 0, 0])):
+    # aabb = iso_aabb()
+    # aabb.load(resce)
     return points3 * resce[0] + resce[1:4]
 
 
@@ -255,7 +259,7 @@ def crop_resize(img, pose_raw, caminfo):
     resce = np.concatenate((
         np.array([float(caminfo.crop_size) / rect.len]),
         rect.cll,
-        np.append(aabb.len, aabb.cll)
+        aabb.dump()
     ))
     return img_crop_resize, resce
 

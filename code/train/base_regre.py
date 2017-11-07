@@ -255,12 +255,12 @@ class base_regre(object):
         # aabb = iso_aabb(resce_h5[2:5], resce_h5[1])
         # rect = args.data_ops.get_rect2(aabb, thedata)
         # resce2 = np.append(resce_h5[0], rect.cll)
-        rect = iso_rect(resce_h5[1:3], self.crop_size / resce_h5[0])
         resce2 = resce_h5[0:3]
         resce3 = resce_h5[3:7]
-        fig_size = (3 * 5, 5)
-        mpplot.subplots(nrows=1, ncols=2, figsize=fig_size)
-        mpplot.subplot(1, 3, 3)
+        fig_size = (2 * 5, 2 * 5)
+        mpplot.subplots(nrows=2, ncols=2, figsize=fig_size)
+
+        mpplot.subplot(2, 2, 3)
         mpplot.imshow(frame_h5, cmap='bone')
         pose_raw = args.data_ops.local_to_raw(poses_h5, resce3)
         args.data_draw.draw_pose2d(
@@ -268,18 +268,29 @@ class base_regre(object):
             args.data_ops.raw_to_2d(pose_raw, thedata, resce2)
         )
 
-        mpplot.subplot(1, 3, 1)
+        mpplot.subplot(2, 2, 4)
+        img_name = args.data_io.index2imagename(img_id)
+        img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
+        mpplot.imshow(img, cmap='bone')
+        pose_raw = self.yanker(poses_h5, resce_h5)
+        args.data_draw.draw_pose2d(
+            thedata, img,
+            args.data_ops.raw_to_2d(pose_raw, thedata)
+        )
+
+        mpplot.subplot(2, 2, 1)
         annot_line = args.data_io.get_line(
             thedata.training_annot_cleaned, img_id)
         img_name, pose_raw = args.data_io.parse_line_annot(annot_line)
         img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
         mpplot.imshow(img, cmap='bone')
+        rect = iso_rect(resce_h5[1:3], self.crop_size / resce_h5[0])
         rect.draw()
         args.data_draw.draw_pose2d(
             thedata, img,
             args.data_ops.raw_to_2d(pose_raw, thedata))
 
-        mpplot.subplot(1, 3, 2)
+        mpplot.subplot(2, 2, 2)
         img_name, frame, poses, resce = self.provider_worker(
             annot_line, self.image_dir, thedata)
         poses = poses.reshape(-1, 3)
