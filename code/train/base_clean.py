@@ -78,24 +78,25 @@ class base_clean(base_regre):
             )
             frame_id = random.randrange(store_size)
             img_id = batchallot.batch_index[frame_id, 0]
-            img_crop_resize = np.squeeze(batchallot.batch_frame[frame_id, ...], -1)
-            pose_local = batchallot.batch_poses[frame_id, ...].reshape(-1, 3)
-            resce = batchallot.batch_resce[frame_id, ...]
+            frame_h5 = np.squeeze(batchallot.batch_frame[frame_id, ...], -1)
+            poses_h5 = batchallot.batch_poses[frame_id, ...].reshape(-1, 3)
+            resce_h5 = batchallot.batch_resce[frame_id, ...]
 
         import matplotlib.pyplot as mpplot
         print('[{}] drawing pose #{:d}'.format(self.__class__.__name__, img_id))
-        rect = iso_rect(resce[1:3], self.crop_size / resce[0])
-        resce2 = resce[0:3]
-        resce3 = resce[3:11]
+        rect = iso_rect(resce_h5[1:3], self.crop_size / resce_h5[0])
+        resce2 = resce_h5[0:3]
+        resce3 = resce_h5[3:11]
         fig_size = (3 * 5, 5)
         mpplot.subplots(nrows=1, ncols=2, figsize=fig_size)
         mpplot.subplot(1, 3, 3)
-        mpplot.imshow(img_crop_resize, cmap='bone')
-        pose_raw = args.data_ops.pca_to_raw(pose_local, resce3)
+        mpplot.imshow(frame_h5, cmap='bone')
+        pose_raw = args.data_ops.pca_to_raw(poses_h5, resce3)
         args.data_draw.draw_pose2d(
-            thedata, img_crop_resize,
+            thedata, frame_h5,
             args.data_ops.raw_to_2d(pose_raw, thedata, resce2)
         )
+
         mpplot.subplot(1, 3, 1)
         annot_line = args.data_io.get_line(
             thedata.training_annot_cleaned, img_id)
@@ -106,13 +107,17 @@ class base_clean(base_regre):
         args.data_draw.draw_pose2d(
             thedata, img,
             args.data_ops.raw_to_2d(pose_raw, thedata))
+
         mpplot.subplot(1, 3, 2)
         img_name, frame, poses, resce = self.provider_worker(
             annot_line, self.image_dir, thedata)
+        poses = poses.reshape(-1, 3)
+        resce2 = resce[0:3]
+        resce3 = resce[3:11]
         mpplot.imshow(np.squeeze(frame, axis=2), cmap='bone')
-        pose_raw = args.data_ops.pca_to_raw(pose_local, resce3)
+        pose_raw = args.data_ops.pca_to_raw(poses, resce3)
         args.data_draw.draw_pose2d(
-            thedata, img_crop_resize,
+            thedata, frame,
             args.data_ops.raw_to_2d(pose_raw, thedata, resce2)
         )
         mpplot.show()

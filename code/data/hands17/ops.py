@@ -34,13 +34,13 @@ grid_cell = getattr(
 def raw_to_pca(points3, resce=np.array([1, 0, 0, 0, 1, 0, 0, 0])):
     box = iso_cube()
     box.load(resce)
-    return box.transform(points3)
+    return box.transform(points3) / resce[0]
 
 
 def pca_to_raw(points3, resce=np.array([1, 0, 0, 0, 1, 0, 0, 0])):
     box = iso_cube()
     box.load(resce)
-    return box.transform_inv(points3)
+    return box.transform_inv(points3 * resce[0])
 
 
 def raw_to_local(points3, resce=np.array([1, 0, 0, 0])):
@@ -169,13 +169,18 @@ def proj_ortho3(img, pose_raw, caminfo):
             cv2resize(img_crop, (caminfo.crop_size, caminfo.crop_size))
         )
         # pose2d, _ = box.project_pca(pose_trans, roll=spi, sort=False)
-    resce = np.append(
-        float(caminfo.crop_size) / box.get_sidelen(),
-        box.cen
-    )
     resce = np.concatenate((
-        resce,
-        box.evecs.flatten()))
+        np.array([float(caminfo.crop_size) / box.get_sidelen()]),
+        np.ones(2) * box.get_sidelen(),
+        box.dump()
+    ))
+    # resce = np.append(
+    #     float(caminfo.crop_size) / box.get_sidelen(),
+    #     box.cen
+    # )
+    # resce = np.concatenate((
+    #     resce,
+    #     box.evecs.flatten()))
     return np.stack(img_crop_resize, axis=2), resce
 
 

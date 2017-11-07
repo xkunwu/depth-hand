@@ -14,6 +14,10 @@ file_pack = getattr(
     import_module('coder'),
     'file_pack'
 )
+iso_cube = getattr(
+    import_module('iso_boxes'),
+    'iso_cube'
+)
 
 
 class ortho3view(base_regre):
@@ -32,7 +36,7 @@ class ortho3view(base_regre):
             return
         batchallot = self.batch_allot(
             args.store_level, self.crop_size, self.pose_dim, args.store_level)
-        batchallot.allot(3, 13)
+        batchallot.allot(3, 11)
         with file_pack() as filepack:
             file_annot = filepack.push_file(thedata.training_annot_train)
             self.prepare_data(thedata, batchallot, file_annot, self.appen_train)
@@ -68,26 +72,62 @@ class ortho3view(base_regre):
             )
             frame_id = random.randrange(store_size)
             img_id = batchallot.batch_index[frame_id, 0]
-            img_crop_resize = batchallot.batch_frame[frame_id, ...]
-            pose_raw = batchallot.batch_poses[frame_id, ...].reshape(-1, 3)
-            resce = batchallot.batch_resce[frame_id, ...]
+            frame_h5 = batchallot.batch_frame[frame_id, ...]
+            poses_h5 = batchallot.batch_poses[frame_id, ...].reshape(-1, 3)
+            resce_h5 = batchallot.batch_resce[frame_id, ...]
 
         import matplotlib.pyplot as mpplot
         print('drawing pose #{:d}'.format(img_id))
-        fig_size = (4 * 5, 5)
-        mpplot.subplots(nrows=1, ncols=4, figsize=fig_size)
+        fig_size = (3 * 5, 3 * 5)
+        mpplot.subplots(nrows=3, ncols=3, figsize=fig_size)
+        resce2 = resce_h5[0:3]
+        resce3 = resce_h5[3:11]
+        box = iso_cube()
+        box.load(resce3)
+        pose_pca = poses_h5 * resce3[0]
         for spi in range(3):
-            mpplot.subplot(1, 4, spi + 2)
-            mpplot.imshow(img_crop_resize[..., spi], cmap='bone')
+            mpplot.subplot(3, 3, spi + 7)
+            img = frame_h5[..., spi]
+            mpplot.imshow(img, cmap='bone')
+            pose2d, _ = box.project_pca(pose_pca, roll=spi, sort=False)
+            pose2d = pose2d * resce2[0]
+            args.data_draw.draw_pose2d(
+                thedata, img,
+                pose2d,
+            )
             mpplot.gcf().gca().axis('off')
-            mpplot.tight_layout()
-        mpplot.subplot(1, 4, 1)
-        args.data_draw.draw_pose_raw_random(
-            thedata,
-            thedata.training_images,
-            thedata.training_annot_cleaned,
-            img_id
-        )
+            # mpplot.tight_layout()
+
+        mpplot.subplot(3, 3, 1)
+        annot_line = args.data_io.get_line(
+            thedata.training_annot_cleaned, img_id)
+        img_name, pose_raw = args.data_io.parse_line_annot(annot_line)
+        img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
+        mpplot.imshow(img, cmap='bone')
+        args.data_draw.draw_pose2d(
+            thedata, img,
+            args.data_ops.raw_to_2d(pose_raw, thedata))
+
+        img_name, frame, poses, resce = self.provider_worker(
+            annot_line, self.image_dir, thedata)
+        resce2 = resce[0:3]
+        resce3 = resce[3:11]
+        poses = poses.reshape(-1, 3)
+        box = iso_cube()
+        box.load(resce3)
+        pose_pca = poses * resce3[0]
+        for spi in range(3):
+            mpplot.subplot(3, 3, spi + 4)
+            img = frame[..., spi]
+            mpplot.imshow(img, cmap='bone')
+            pose2d, _ = box.project_pca(pose_pca, roll=spi, sort=False)
+            pose2d = pose2d * resce2[0]
+            args.data_draw.draw_pose2d(
+                thedata, img,
+                pose2d,
+            )
+            mpplot.gcf().gca().axis('off')
+            # mpplot.tight_layout()
         mpplot.show()
 
     @staticmethod

@@ -27,9 +27,14 @@ def prow_ortho3v(line, image_dir, caminfo):
     img = dataio.read_image(os.path.join(image_dir, img_name))
     img_crop_resize, resce = dataops.proj_ortho3(
         img, pose_raw, caminfo)
-    # pose2d = dataops.raw_to_2d(pose_raw, caminfo, resce)
-    return (img_name, np.expand_dims(img_crop_resize, axis=2),
-            poses.flatten().T, resce)
+    pose_pca = dataops.raw_to_pca(pose_raw, resce[3:11])
+    return (img_name, img_crop_resize,
+            pose_pca.flatten().T, resce)
+
+
+def yank_ortho3v(pose_local, resce):
+    resce3 = resce[3:11]
+    return dataops.pca_to_raw(pose_local, resce3)
 
 
 def prow_cleaned(line, image_dir, caminfo):

@@ -134,16 +134,16 @@ def test_dataops(args):
     argsholder.create_instance()
     data_inst = args.data_inst
 
-    datadraw = import_module(
-        'data.' + args.data_name + '.draw')
+    args.model_inst.draw_random(data_inst, args)
+
+    # datadraw = import_module(
+    #     'data.' + args.data_name + '.draw')
     # datadraw.draw_raw3d_random(
     #     data_inst,
     #     data_inst.training_images,
     #     data_inst.training_annot_cleaned
     # )
     # sys.exit()
-
-    args.model_inst.draw_random(data_inst, args)
 
     # mpplot.gcf().clear()
     # fig_size = (2 * 5, 5)
@@ -180,7 +180,7 @@ if __name__ == "__main__":
     methlist = [
         'base_regre',
         'base_clean',
-        # 'ortho3view',
+        'ortho3view',
         # 'base_conv3',
         # 'trunc_dist'
     ]
