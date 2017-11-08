@@ -3,8 +3,8 @@ import tensorflow as tf
 import os
 import sys
 from importlib import import_module
-import numpy as np
-import h5py
+# import numpy as np
+# import h5py
 from base_conv3 import base_conv3
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -15,6 +15,10 @@ tf_util = import_module('tf_util')
 file_pack = getattr(
     import_module('coder'),
     'file_pack'
+)
+iso_cube = getattr(
+    import_module('iso_boxes'),
+    'iso_cube'
 )
 
 
@@ -36,7 +40,7 @@ class trunc_dist(base_conv3):
             return
         batchallot = self.batch_allot(
             args.store_level, self.crop_size, self.pose_dim, args.store_level)
-        batchallot.allot(1, 4)
+        batchallot.allot(1, 9)
         with file_pack() as filepack:
             file_annot = filepack.push_file(thedata.training_annot_train)
             self.prepare_data(thedata, batchallot, file_annot, self.appen_train)
@@ -49,48 +53,11 @@ class trunc_dist(base_conv3):
         """ Receive parameters specific to the data """
         self.pose_dim = thedata.join_num * 3
         self.image_dir = thedata.training_images
+        self.caminfo = thedata
         self.provider = args.data_provider
         self.provider_worker = args.data_provider.prow_truncdf
+        self.yanker = self.provider.yank_truncdf
         self.check_dir(thedata, args)
-
-    def draw_random(self, thedata, args):
-        import random
-        filelist = [f for f in os.listdir(self.train_dir)
-                    if os.path.isfile(os.path.join(self.train_dir, f))]
-        filename = os.path.join(self.train_dir, random.choice(filelist))
-        with h5py.File(filename, 'r') as h5file:
-            store_size = h5file['index'][:].shape[0]
-            batchallot = self.batch_allot(
-                store_size, self.crop_size, self.pose_dim, self.batch_size)
-            batchallot.assign(
-                h5file['index'][:],
-                h5file['frame'][:],
-                h5file['poses'][:],
-                h5file['resce'][:]
-            )
-            frame_id = random.randrange(store_size)
-            img_id = batchallot.batch_index[frame_id, 0]
-            img_crop_resize = batchallot.batch_frame[frame_id, ...]
-            # pose_raw = batchallot.batch_poses[frame_id, ...].reshape(-1, 3)
-            # resce = batchallot.batch_resce[frame_id, ...]
-
-        import matplotlib.pyplot as mpplot
-        print('[{}] drawing pose #{:d}'.format(self.__class__.__name__, img_id))
-        fig_size = (4 * 5, 5)
-        mpplot.subplots(nrows=1, ncols=4, figsize=fig_size)
-        for spi in range(3):
-            mpplot.subplot(1, 4, spi + 2)
-            mpplot.imshow(img_crop_resize[..., spi], cmap='bone')
-            mpplot.gcf().gca().axis('off')
-            mpplot.tight_layout()
-        mpplot.subplot(1, 4, 1)
-        args.data_draw.draw_pose_raw_random(
-            thedata,
-            thedata.training_images,
-            thedata.training_annot_cleaned,
-            img_id
-        )
-        mpplot.show()
 
     @staticmethod
     def placeholder_inputs(batch_size, image_size, pose_dim):

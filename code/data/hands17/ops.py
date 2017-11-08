@@ -124,11 +124,6 @@ def fill_grid(img, pose_raw, step, caminfo):
     cube = iso_cube()
     cube.build(pose_raw)
     _, points3_trans = cube.pick(img_to_raw(img, caminfo))
-
-    # cube = iso_cube()
-    # points3_trans = np.hstack(
-    #     (np.zeros((10, 2)), np.arange(-1, 1, 0.2).reshape(10, 1)))
-
     grid = regu_grid()
     grid.from_cube(cube, step)
     grid.fill(points3_trans)
@@ -141,24 +136,22 @@ def fill_grid(img, pose_raw, step, caminfo):
 
 def trunc_belief(pcnt):
     size = pcnt.shape[0]
-    # print(pcnt.shape, np.max(pcnt))
     phi = np.ones_like(pcnt)
     z0front = np.ones((size, size)) * (size - 1)
+    for index in np.transpose(np.where(0 < pcnt)):
+        if z0front[index[0], index[1]] > index[2]:
+            z0front[index[0], index[1]] = index[2]
     # print(z0front)
-    # print(pcnt[..., 15])
-    # print(np.where(0 < pcnt))
-    for index in zip(*np.where(0 < pcnt)):
-        if z0front[index[0:2]] > index[2]:
-            z0front[index[0:2]] = index[2]
-    zrange = np.repeat(np.arange(size), size * size).reshape(size, size, size)
-    phi[(z0front == zrange)] = 0
-    phi[(z0front < zrange)] = -1
+    zrange = np.ones((size, size, size))
+    zrange[:, :, np.arange(size)] *= np.arange(size)
+    # print(zrange[..., 2])
+    for z in range(size):
+        phi[zrange[..., z] == z0front, z] = 0
+        phi[zrange[..., z] > z0front, z] = -1
+    # print(phi[..., 2])
+    # print(phi[..., 3])
+    # print(phi[..., 4])
     bef = skfmm.distance(phi, dx=1e-2, narrow=0.3)
-    # plt.title('Distance calculation limited to narrow band')
-    # plt.contour(X, Y, phi, [0], linewidths=(3), colors='black')
-    # plt.contour(X, Y, d, 15)
-    # plt.colorbar()
-    # plt.show()
     return bef
 
 

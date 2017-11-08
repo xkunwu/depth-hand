@@ -231,6 +231,8 @@ class base_regre(object):
 
     def draw_random(self, thedata, args):
         import random
+        import matplotlib.pyplot as mpplot
+
         filelist = [f for f in os.listdir(self.train_dir)
                     if os.path.isfile(os.path.join(self.train_dir, f))]
         filename = os.path.join(self.train_dir, random.choice(filelist))
@@ -250,7 +252,6 @@ class base_regre(object):
             poses_h5 = batchallot.batch_poses[frame_id, ...].reshape(-1, 3)
             resce_h5 = batchallot.batch_resce[frame_id, ...]
 
-        import matplotlib.pyplot as mpplot
         print('[{}] drawing pose #{:d}'.format(self.__class__.__name__, img_id))
         # aabb = iso_aabb(resce_h5[2:5], resce_h5[1])
         # rect = args.data_ops.get_rect2(aabb, thedata)
@@ -293,6 +294,7 @@ class base_regre(object):
         mpplot.subplot(2, 2, 2)
         img_name, frame, poses, resce = self.provider_worker(
             annot_line, self.image_dir, thedata)
+        print(np.linalg.norm(frame_h5 - frame))
         poses = poses.reshape(-1, 3)
         resce2 = resce[0:3]
         resce3 = resce[3:7]
@@ -302,6 +304,9 @@ class base_regre(object):
             thedata, frame,
             args.data_ops.raw_to_2d(pose_raw, thedata, resce2)
         )
+        mpplot.savefig(os.path.join(
+            args.data_inst.predict_dir,
+            'draw_{}.png'.format(self.__class__.__name__)))
         mpplot.show()
 
     @staticmethod
