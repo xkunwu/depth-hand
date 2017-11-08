@@ -5,14 +5,30 @@ import ops as dataops
 import io as dataio
 
 
+def prow_dirtsdf(line, image_dir, caminfo):
+    img_name, pose_raw = dataio.parse_line_annot(line)
+    img = dataio.read_image(os.path.join(image_dir, img_name))
+    pcnt, resce = dataops.fill_grid(img, pose_raw, caminfo.crop_size, caminfo)
+    befs = dataops.trunc_belief(pcnt)
+    resce3 = resce[0:8]
+    pose_pca = dataops.raw_to_pca(pose_raw, resce3)
+    return (img_name, befs,
+            pose_pca.flatten().T, resce)
+
+
+def yank_dirtsdf(pose_local, resce):
+    resce3 = resce[0:8]
+    return dataops.pca_to_raw(pose_local, resce3)
+
+
 def prow_truncdf(line, image_dir, caminfo):
     img_name, pose_raw = dataio.parse_line_annot(line)
     img = dataio.read_image(os.path.join(image_dir, img_name))
     pcnt, resce = dataops.fill_grid(img, pose_raw, caminfo.crop_size, caminfo)
-    bef = dataops.prop_dist(pcnt)
+    tdf = dataops.prop_dist(pcnt)
     resce3 = resce[0:8]
     pose_pca = dataops.raw_to_pca(pose_raw, resce3)
-    return (img_name, np.expand_dims(bef, axis=3),
+    return (img_name, np.expand_dims(tdf, axis=3),
             pose_pca.flatten().T, resce)
 
 

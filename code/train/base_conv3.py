@@ -299,17 +299,17 @@ class base_conv3(base_regre):
 
         net = tf.reshape(net, [batch_size, -1])
         net = tf_util.fully_connected(
-            net, 4096, bn=True, is_training=is_training,
+            net, 2048, bn=True, is_training=is_training,
             scope='fc1', bn_decay=bn_decay)
         net = tf_util.dropout(
             net, keep_prob=0.5, is_training=is_training,
             scope='dp1')
-        net = tf_util.fully_connected(
-            net, 1024, bn=True, is_training=is_training,
-            scope='fc2', bn_decay=bn_decay)
-        net = tf_util.dropout(
-            net, keep_prob=0.5, is_training=is_training,
-            scope='dp2')
+        # net = tf_util.fully_connected(
+        #     net, 1024, bn=True, is_training=is_training,
+        #     scope='fc2', bn_decay=bn_decay)
+        # net = tf_util.dropout(
+        #     net, keep_prob=0.5, is_training=is_training,
+        #     scope='dp2')
         net = tf_util.fully_connected(
             net, pose_dim, activation_fn=None, scope='fc3')
 

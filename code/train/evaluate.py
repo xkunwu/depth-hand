@@ -178,6 +178,7 @@ if __name__ == "__main__":
     # sys.exit()
 
     methlist = [
+        'direc_tsdf',
         'trunc_dist',
         'base_conv3',
         'ortho3view',

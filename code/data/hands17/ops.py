@@ -134,10 +134,10 @@ def fill_grid(img, pose_raw, step, caminfo):
     return grid.pcnt, resce
 
 
-def trunc_belief(pcnt):
+def direc_belief(pcnt):
     size = pcnt.shape[0]
     phi = np.ones_like(pcnt)
-    z0front = np.ones((size, size)) * (size - 1)
+    z0front = np.ones((size, size)) * size
     for index in np.transpose(np.where(0 < pcnt)):
         if z0front[index[0], index[1]] > index[2]:
             z0front[index[0], index[1]] = index[2]
@@ -147,12 +147,24 @@ def trunc_belief(pcnt):
     # print(zrange[..., 2])
     for z in range(size):
         phi[zrange[..., z] == z0front, z] = 0
-        # phi[zrange[..., z] > z0front, z] = -1
+        phi[zrange[..., z] > z0front, z] = -1
+    # print(phi[..., 0])
+    # print(phi[..., 1])
     # print(phi[..., 2])
     # print(phi[..., 3])
     # print(phi[..., 4])
+    # print(phi[..., 5])
     bef = skfmm.distance(phi, dx=1e-1, narrow=0.3)
     return bef
+
+
+def trunc_belief(pcnt):
+    pcnt_r = np.copy(pcnt)
+    befs = []
+    for spi in range(3):
+        pcnt_r = np.rollaxis(pcnt_r, -1)
+        befs.append(direc_belief(pcnt_r))
+    return np.stack(befs, axis=3)
 
 
 def prop_dist(pcnt):
