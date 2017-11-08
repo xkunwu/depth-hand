@@ -96,11 +96,7 @@ def draw_error_per_joint(errors, methods, ax, join_name=None, draw_std=False):
         np.expand_dims(err_mean - err_min, -1),
         np.expand_dims(err_max - err_mean, -1)
     ), axis=-1)
-    # err_m2m = [
-    #     (err_mean - err_min).tolist(),
-    #     (err_max - err_mean).tolist()
-    # ]
-    # err_mean = err_mean.tolist()
+
     jid = np.arange(num_v + 1)
     jtick = join_name
     if join_name is None:
@@ -110,27 +106,24 @@ def draw_error_per_joint(errors, methods, ax, join_name=None, draw_std=False):
         jtick.append('Mean')
     wb = 0.2
     wsl = float(num_m - 1) * wb / 2
+    jloc = jid * (num_m + 2) * wb
     for ei, err in enumerate(err_mean):
         if draw_std:
             mpplot.bar(
-                jid + wb * ei - wsl, err, width=wb, align='center',
+                jloc + wb * ei - wsl, err, width=wb, align='center',
                 yerr=err_m2m,
                 error_kw=dict(ecolor='gray', lw=1, capsize=3, capthick=2)
             )
         else:
             mpplot.bar(
-                jid + wb * ei - wsl, err, width=wb, align='center'
+                jloc + wb * ei - wsl, err, width=wb, align='center'
             )
-    # mpplot.bar(
-    #     jid, err_mean, yerr=err_m2m, align='center',
-    #     error_kw=dict(ecolor='gray', lw=1, capsize=3, capthick=2)
-    # )
     ylim_top = min(np.max(err_mean[:, 0:7]), np.max(err_mean))
     ax.set_ylabel('Mean error (mm)')
     ax.set_ylim(bottom=0)
     ax.set_ylim(top=ylim_top + float(num_m) * ylim_top * 0.1)
-    ax.set_xlim([-1, 22])
-    mpplot.xticks(jid, jtick, rotation='vertical')
+    ax.set_xlim([-2 * wsl, jloc[-1] + 2 * wsl])
+    mpplot.xticks(jloc, jtick, rotation='vertical')
     mpplot.margins(0.1)
     mpplot.legend(methods, loc='upper left')
     # mpplot.show()

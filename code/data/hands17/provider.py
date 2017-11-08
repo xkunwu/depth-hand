@@ -9,7 +9,7 @@ def prow_truncdf(line, image_dir, caminfo):
     img_name, pose_raw = dataio.parse_line_annot(line)
     img = dataio.read_image(os.path.join(image_dir, img_name))
     pcnt, resce = dataops.fill_grid(img, pose_raw, caminfo.crop_size, caminfo)
-    bef = dataops.trunc_belief(pcnt)
+    bef = dataops.prop_dist(pcnt)
     resce3 = resce[0:8]
     pose_pca = dataops.raw_to_pca(pose_raw, resce3)
     return (img_name, np.expand_dims(bef, axis=3),

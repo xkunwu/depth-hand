@@ -1,6 +1,7 @@
 import tensorflow as tf
 import os
 import sys
+import numpy as np
 from importlib import import_module
 import h5py
 from base_regre import base_regre
@@ -121,7 +122,8 @@ class ortho3view(base_regre):
 
         img_name, frame, poses, resce = self.provider_worker(
             annot_line, self.image_dir, thedata)
-        print(np.linalg.norm(frame_h5 - frame))
+        if (1e-4 < np.linalg.norm(frame_h5 - frame)):
+            print('ERROR - h5 storage corrupted!')
         poses = poses.reshape(-1, 3)
         resce2 = resce[0:3]
         resce3 = resce[3:11]

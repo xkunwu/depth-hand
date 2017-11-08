@@ -147,12 +147,19 @@ def trunc_belief(pcnt):
     # print(zrange[..., 2])
     for z in range(size):
         phi[zrange[..., z] == z0front, z] = 0
-        phi[zrange[..., z] > z0front, z] = -1
+        # phi[zrange[..., z] > z0front, z] = -1
     # print(phi[..., 2])
     # print(phi[..., 3])
     # print(phi[..., 4])
-    bef = skfmm.distance(phi, dx=1e-2, narrow=0.3)
+    bef = skfmm.distance(phi, dx=1e-1, narrow=0.3)
     return bef
+
+
+def prop_dist(pcnt):
+    phi = np.ones_like(pcnt)
+    phi[1e-4 < pcnt] = 0
+    tdf = skfmm.distance(phi, dx=1e-1, narrow=0.2)
+    return tdf
 
 
 def proj_ortho3(img, pose_raw, caminfo):

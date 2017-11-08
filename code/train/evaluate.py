@@ -171,8 +171,8 @@ if __name__ == "__main__":
     argsholder.parse_args()
     args = argsholder.args
 
-    test_dataops(args)
-    sys.exit()
+    # test_dataops(args)
+    # sys.exit()
 
     # run_one(args)
     # sys.exit()

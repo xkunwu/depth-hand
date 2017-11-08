@@ -1,5 +1,5 @@
 
-import tensorflow as tf
+# import tensorflow as tf
 import os
 import sys
 from importlib import import_module
@@ -29,26 +29,6 @@ class trunc_dist(base_conv3):
         super(trunc_dist, self).__init__(out_dir)
         self.train_dir = os.path.join(out_dir, 'truncdf')
 
-    def check_dir(self, thedata, args):
-        first_run = False
-        if not os.path.exists(self.train_dir):
-            first_run = True
-            os.makedirs(self.train_dir)
-        if args.rebuild_data:
-            first_run = True
-        if not first_run:
-            return
-        batchallot = self.batch_allot(
-            args.store_level, self.crop_size, self.pose_dim, args.store_level)
-        batchallot.allot(1, 9)
-        with file_pack() as filepack:
-            file_annot = filepack.push_file(thedata.training_annot_train)
-            self.prepare_data(thedata, batchallot, file_annot, self.appen_train)
-        with file_pack() as filepack:
-            file_annot = filepack.push_file(thedata.training_annot_test)
-            self.prepare_data(thedata, batchallot, file_annot, self.appen_test)
-        print('data prepared: {}'.format(self.train_dir))
-
     def receive_data(self, thedata, args):
         """ Receive parameters specific to the data """
         self.pose_dim = thedata.join_num * 3
@@ -58,66 +38,3 @@ class trunc_dist(base_conv3):
         self.provider_worker = args.data_provider.prow_truncdf
         self.yanker = self.provider.yank_truncdf
         self.check_dir(thedata, args)
-
-    @staticmethod
-    def placeholder_inputs(batch_size, image_size, pose_dim):
-        frames_tf = tf.placeholder(
-            tf.float32,
-            shape=(batch_size, image_size, image_size, image_size, 1))
-        poses_tf = tf.placeholder(
-            tf.float32, shape=(batch_size, pose_dim))
-        return frames_tf, poses_tf
-
-    @staticmethod
-    def get_model(frames_tf, pose_dim, is_training, bn_decay=None):
-        """ directly predict all joints' location using regression
-            frames_tf: BxHxWxDx1
-            pose_dim: BxJ, where J is flattened 3D locations
-        """
-        batch_size = frames_tf.get_shape()[0].value
-        end_points = {}
-        input_image = frames_tf
-
-        net = tf_util.conv3d(
-            input_image, 32, [5, 5, 5],
-            padding='VALID', stride=[1, 1, 1],
-            bn=True, is_training=is_training,
-            scope='conv1', bn_decay=bn_decay)
-        net = tf_util.max_pool3d(
-            net, [2, 2, 2],
-            padding='VALID', scope='maxpool1')
-        net = tf_util.conv3d(
-            net, 64, [3, 3, 3],
-            padding='VALID', stride=[1, 1, 1],
-            bn=True, is_training=is_training,
-            scope='conv2', bn_decay=bn_decay)
-        net = tf_util.max_pool3d(
-            net, [2, 2, 2],
-            padding='VALID', scope='maxpool2')
-        net = tf_util.conv3d(
-            net, 128, [3, 3, 3],
-            padding='VALID', stride=[1, 1, 1],
-            bn=True, is_training=is_training,
-            scope='conv3', bn_decay=bn_decay)
-        # net = tf_util.max_pool3d(
-        #     net, [2, 2, 2],
-        #     padding='VALID', scope='maxpool3')
-        # print(net.shape)
-
-        net = tf.reshape(net, [batch_size, -1])
-        net = tf_util.fully_connected(
-            net, 4096, bn=True, is_training=is_training,
-            scope='fc1', bn_decay=bn_decay)
-        net = tf_util.dropout(
-            net, keep_prob=0.5, is_training=is_training,
-            scope='dp1')
-        net = tf_util.fully_connected(
-            net, 1024, bn=True, is_training=is_training,
-            scope='fc2', bn_decay=bn_decay)
-        net = tf_util.dropout(
-            net, keep_prob=0.5, is_training=is_training,
-            scope='dp2')
-        net = tf_util.fully_connected(
-            net, pose_dim, activation_fn=None, scope='fc3')
-
-        return net, end_points

@@ -116,17 +116,17 @@ class base_conv3(base_regre):
         from random import sample as randsample
 
         # mlab.figure(size=(800, 800))
-        # cube = iso_cube()
-        # points3_trans = np.hstack(
-        #     (np.zeros((10, 2)), np.arange(-1, 1, 0.2).reshape(10, 1)))
-        # grid = regu_grid()
-        # grid.from_cube(cube, 6)
-        # grid.fill(points3_trans)
-        # pcnt = grid.pcnt
+        # # cube = iso_cube()
+        # # points3_trans = np.hstack(
+        # #     (np.zeros((10, 2)), np.arange(-1, 1, 0.2).reshape(10, 1)))
+        # # grid = regu_grid()
+        # # grid.from_cube(cube, 6)
+        # # grid.fill(points3_trans)
+        # # pcnt = grid.pcnt
         #
-        # # pcnt = np.zeros((6, 6, 6))
-        # # pcnt[2:4, 2:4, 3] = 1
-        # volume3 = args.data_ops.trunc_belief(pcnt)
+        # pcnt = np.zeros((6, 6, 6))
+        # pcnt[2:4, 2:4, 3] = 1
+        # volume3 = args.data_ops.prop_dist(pcnt)
         # mlab.pipeline.volume(mlab.pipeline.scalar_field(volume3))
         # mlab.pipeline.image_plane_widget(
         #     mlab.pipeline.scalar_field(volume3),
@@ -134,6 +134,7 @@ class base_conv3(base_regre):
         #     slice_index=self.crop_size / 2)
         # print(pcnt[..., 3])
         # print(volume3[..., 3])
+        # print(volume3[0, 0, 3], type(volume3[0, 0, 3]))
         # mlab.outline()
         # mlab.show()
         # sys.exit()
@@ -195,13 +196,13 @@ class base_conv3(base_regre):
         corners = cube.transform_inv(corners)
         iso_cube.draw_cube_wire(corners)
 
-        mlab.figure(size=(800, 800))
-        points3_trans = cube.transform(points3_sam)
-        mlab.points3d(
-            points3_trans[:, 0], points3_trans[:, 1], points3_trans[:, 2],
-            scale_factor=8,
-            color=Color('lightsteelblue').rgb)
-        mlab.outline()
+        # mlab.figure(size=(800, 800))
+        # points3_trans = cube.transform(points3_sam)
+        # mlab.points3d(
+        #     points3_trans[:, 0], points3_trans[:, 1], points3_trans[:, 2],
+        #     scale_factor=8,
+        #     color=Color('lightsteelblue').rgb)
+        # mlab.outline()
 
         ax = mpplot.subplot(2, 2, 3, projection='3d')
         _, points3_trans = cube.pick(points3)
@@ -230,7 +231,8 @@ class base_conv3(base_regre):
         mlab.figure(size=(800, 800))
         img_name, frame, poses, resce = self.provider_worker(
             annot_line, self.image_dir, thedata)
-        print(np.linalg.norm(frame_h5 - frame))
+        if (1e-4 < np.linalg.norm(frame_h5 - frame)):
+            print('ERROR - h5 storage corrupted!')
         poses = poses.reshape(-1, 3)
         resce3 = resce_h5[0:8]
         cube = iso_cube()
@@ -242,7 +244,8 @@ class base_conv3(base_regre):
             mlab.pipeline.scalar_field(volume3),
             plane_orientation='z_axes',
             slice_index=self.crop_size / 2)
-        # print(volume3[..., 4])
+        np.set_printoptions(precision=4)
+        # print(volume3[12:20, 12:20, 16])
         mlab.outline()
         mpplot.savefig(os.path.join(
             args.data_inst.predict_dir,
