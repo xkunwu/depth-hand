@@ -124,6 +124,11 @@ def fill_grid(img, pose_raw, step, caminfo):
     cube = iso_cube()
     cube.build(pose_raw)
     _, points3_trans = cube.pick(img_to_raw(img, caminfo))
+
+    # cube = iso_cube()
+    # points3_trans = np.hstack(
+    #     (np.zeros((10, 2)), np.arange(-1, 1, 0.2).reshape(10, 1)))
+
     grid = regu_grid()
     grid.from_cube(cube, step)
     grid.fill(points3_trans)

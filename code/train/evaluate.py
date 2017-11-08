@@ -179,7 +179,7 @@ if __name__ == "__main__":
 
     methlist = [
         # 'trunc_dist'
-        # 'base_conv3',
+        'base_conv3',
         'ortho3view',
         'base_clean',
         'base_regre',

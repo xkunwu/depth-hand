@@ -38,11 +38,11 @@ class base_conv3(base_regre):
             self.batch_beg = 0
             self.batch_end = self.batch_beg + self.batch_size
 
-        def allot(self, num_appen):
+        def allot(self, num_channel, num_appen):
             self.batch_index = np.empty(
                 shape=(self.batch_size, 1), dtype=np.uint32)
             self.batch_frame = np.empty(
-                shape=(self.batch_size, self.image_size, self.image_size, self.image_size),
+                shape=(self.batch_size, self.image_size, self.image_size, self.image_size, num_channel),
                 dtype=np.float32)
             self.batch_poses = np.empty(
                 shape=(self.batch_size, self.pose_dim), dtype=np.float32)
@@ -85,7 +85,7 @@ class base_conv3(base_regre):
             return
         batchallot = self.batch_allot(
             args.store_level, self.crop_size, self.pose_dim, args.store_level)
-        batchallot.allot(9)
+        batchallot.allot(1, 9)
         with file_pack() as filepack:
             file_annot = filepack.push_file(thedata.training_annot_train)
             self.prepare_data(thedata, batchallot, file_annot, self.appen_train)
@@ -194,23 +194,22 @@ class base_conv3(base_regre):
         resce3 = resce_h5[0:8]
         cube = iso_cube()
         cube.load(resce3)
-        # mlab.contour3d(frame)
-        mlab.pipeline.volume(mlab.pipeline.scalar_field(frame))
+        pcnt = np.squeeze(frame, axis=3)
+        # mlab.contour3d(pcnt)
+        mlab.pipeline.volume(mlab.pipeline.scalar_field(pcnt))
         mlab.pipeline.image_plane_widget(
-            mlab.pipeline.scalar_field(frame),
+            mlab.pipeline.scalar_field(pcnt),
             plane_orientation='x_axes',
             slice_index=15)
+        # print(pcnt[..., 4])
         mlab.outline()
-        print(np.max(frame))
-        print(np.min(frame))
-        print(frame[:, 15, 15])
         mpplot.show()
 
     @staticmethod
     def placeholder_inputs(batch_size, image_size, pose_dim):
         frames_tf = tf.placeholder(
             tf.float32,
-            shape=(batch_size, image_size, image_size, image_size))
+            shape=(batch_size, image_size, image_size, image_size, 1))
         poses_tf = tf.placeholder(
             tf.float32, shape=(batch_size, pose_dim))
         return frames_tf, poses_tf

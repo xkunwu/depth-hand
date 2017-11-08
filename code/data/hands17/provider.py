@@ -12,7 +12,7 @@ def prow_truncdf(line, image_dir, caminfo):
     bef = dataops.trunc_belief(pcnt)
     resce3 = resce[0:8]
     pose_pca = dataops.raw_to_pca(pose_raw, resce3)
-    return (img_name, bef,
+    return (img_name, np.expand_dims(bef, axis=3),
             pose_pca.flatten().T, resce)
 
 
@@ -27,7 +27,7 @@ def prow_conv3d(line, image_dir, caminfo):
     pcnt, resce = dataops.fill_grid(img, pose_raw, caminfo.crop_size, caminfo)
     resce3 = resce[0:8]
     pose_pca = dataops.raw_to_pca(pose_raw, resce3)
-    return (img_name, pcnt,
+    return (img_name, np.expand_dims(pcnt, axis=3),
             pose_pca.flatten().T, resce)
 
 

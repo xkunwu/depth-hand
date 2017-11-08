@@ -18,7 +18,7 @@ iso_cube = getattr(
 
 
 class grid_cell():
-    def __init__(self, cll=np.zeros(3), len=0.):
+    def __init__(self, cll=np.zeros(3), len=1.):
         self.cll = cll
         self.len = len
 
@@ -68,7 +68,7 @@ class grid_cell():
 
 
 class regu_grid:
-    def __init__(self, cll=np.zeros(3), step=0, len=0.):
+    def __init__(self, cll=np.zeros(3), step=2, len=1.):
         self.cll = cll
         self.len = len  # cell side length
         self.step = step
@@ -89,7 +89,7 @@ class regu_grid:
     def show_dims(self):
         print(self.cll, self.len, self.step)
 
-    def from_cube(self, cube, step, m=0.1):
+    def from_cube(self, cube, step, m=0.01):
         if 1 > m and -1 < m:
             m = cube.len * m
         cubelen = cube.len + m
@@ -103,13 +103,8 @@ class regu_grid:
 
     def fill(self, points3):
         indices = self.putit(points3)
-        # print(np.max(points3, axis=0))
-        # print(np.min(points3, axis=0))
-        # print(np.ptp(points3, axis=0))
-        # print(self.cll + self.len * self.step)
-        # self.show_dims()
         for index in indices:
-            self.pcnt[index] += 1
+            self.pcnt[index[0], index[1], index[2]] += 1
         self.pcnt /= np.max(self.pcnt)
 
     def voxen(self, index):

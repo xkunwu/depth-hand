@@ -8,7 +8,7 @@ from colour import Color
 
 
 class iso_rect:
-    def __init__(self, cll=np.zeros(2), len=0., m=0.):
+    def __init__(self, cll=np.zeros(2), len=1., m=0.1):
         self.cll = cll
         self.len = len
         self.add_margan(m)
@@ -64,7 +64,7 @@ class iso_rect:
 
 
 class iso_aabb:
-    def __init__(self, cll=np.zeros(3), len=0., m=0.):
+    def __init__(self, cll=np.zeros(3), len=1., m=0.1):
         self.cll = cll
         self.len = len
         self.add_margan(m)
@@ -94,7 +94,7 @@ class iso_aabb:
 
 
 class iso_cube:
-    def __init__(self, cen=np.zeros(3), len=0., m=0.):
+    def __init__(self, cen=np.zeros(3), len=1., m=0.1):
         self.cen = cen
         self.len = len  # half side length
         self.evecs = np.eye(3)
