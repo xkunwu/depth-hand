@@ -112,7 +112,7 @@ class hands17holder:
         with open(self.training_annot_cleaned, 'r') as source:
             lines = source.readlines()
         # import random
-        # random.shuffle(lines)
+        # np.random.shuffle(lines)
         with open(self.training_annot_train, 'w') as f:
             for line in lines[self.range_train[0]:self.range_train[1]]:
                 f.write(line)

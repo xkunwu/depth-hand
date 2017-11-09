@@ -45,7 +45,7 @@ def run_one(args):
         data_inst.training_annot_test,
         predict_file
     )
-    fname = '{}_prediction.png'.format(args.model_name)
+    fname = 'prediction_{}.png'.format(args.model_name)
     mpplot.savefig(os.path.join(args.data_inst.predict_dir, fname))
 
     dataeval = import_module(

@@ -58,14 +58,14 @@ class base_regre(object):
 
         def allot(self, num_channel, num_appen):
             self.batch_index = np.empty(
-                shape=(self.batch_size, 1), dtype=int)
+                shape=(self.batch_size, 1), dtype=np.int32)
             self.batch_frame = np.empty(
                 shape=(self.batch_size, self.image_size, self.image_size, num_channel),
-                dtype=float)
+                dtype=np.float32)
             self.batch_poses = np.empty(
-                shape=(self.batch_size, self.pose_dim), dtype=float)
+                shape=(self.batch_size, self.pose_dim), dtype=np.float32)
             self.batch_resce = np.empty(
-                shape=(self.batch_size, num_appen), dtype=float)
+                shape=(self.batch_size, num_appen), dtype=np.float32)
             self.batch_bytes = \
                 self.batch_index.nbytes + self.batch_frame.nbytes + \
                 self.batch_poses.nbytes + self.batch_resce.nbytes
@@ -184,16 +184,16 @@ class base_regre(object):
             filen_bi = '{}_{:d}'.format(name_appen, bi)
             with h5py.File(os.path.join(self.train_dir, filen_bi), 'w') as h5file:
                 h5file.create_dataset(
-                    'index', data=batchallot.batch_index[0:resline, ...], dtype=int
+                    'index', data=batchallot.batch_index[0:resline, ...], dtype=np.int32
                 )
                 h5file.create_dataset(
-                    'frame', data=batchallot.batch_frame[0:resline, ...], dtype=float
+                    'frame', data=batchallot.batch_frame[0:resline, ...], dtype=np.float32
                 )
                 h5file.create_dataset(
-                    'poses', data=batchallot.batch_poses[0:resline, ...], dtype=float
+                    'poses', data=batchallot.batch_poses[0:resline, ...], dtype=np.float32
                 )
                 h5file.create_dataset(
-                    'resce', data=batchallot.batch_resce[0:resline, ...], dtype=float
+                    'resce', data=batchallot.batch_resce[0:resline, ...], dtype=np.float32
                 )
             timerbar.update(bi)
             bi += 1
@@ -230,12 +230,11 @@ class base_regre(object):
         self.check_dir(thedata, args)
 
     def draw_random(self, thedata, args):
-        import random
         import matplotlib.pyplot as mpplot
 
         filelist = [f for f in os.listdir(self.train_dir)
                     if os.path.isfile(os.path.join(self.train_dir, f))]
-        filename = os.path.join(self.train_dir, random.choice(filelist))
+        filename = os.path.join(self.train_dir, np.random.choice(filelist))
         with h5py.File(filename, 'r') as h5file:
             store_size = h5file['index'][:].shape[0]
             batchallot = self.batch_allot(
@@ -246,7 +245,7 @@ class base_regre(object):
                 h5file['poses'][:],
                 h5file['resce'][:]
             )
-            frame_id = random.randrange(store_size)
+            frame_id = np.random.choice(store_size)
             img_id = batchallot.batch_index[frame_id, 0]
             frame_h5 = np.squeeze(batchallot.batch_frame[frame_id, ...], -1)
             poses_h5 = batchallot.batch_poses[frame_id, ...].reshape(-1, 3)
@@ -294,10 +293,12 @@ class base_regre(object):
         mpplot.subplot(2, 2, 2)
         img_name, frame, poses, resce = self.provider_worker(
             annot_line, self.image_dir, thedata)
-        frame = np.squeeze(frame, axis=2)
+        frame = np.squeeze(frame, axis=-1)
         poses = poses.reshape(-1, 3)
-        if ((1e-4 < np.linalg.norm(frame_h5 - frame)) or
-                (1e-4 < np.linalg.norm(poses_h5 - poses))):
+        if (
+                # (1e-4 < np.linalg.norm(frame_h5 - frame)) or
+                (1e-4 < np.linalg.norm(poses_h5 - poses))
+        ):
             print(np.linalg.norm(frame_h5 - frame))
             print(np.linalg.norm(poses_h5 - poses))
             print('ERROR - h5 storage corrupted!')

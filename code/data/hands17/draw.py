@@ -7,8 +7,6 @@ import matplotlib.patches as mppatches
 # from mpl_toolkits.mplot3d import Axes3D
 import imageio
 from colour import Color
-from random import randint
-from random import sample as randsample
 import linecache
 import csv
 import ops as dataops
@@ -120,7 +118,7 @@ def draw_pose_raw(thedata, img, pose_raw, show_margin=False):
 
 
 def draw_pred_random(thedata, image_dir, annot_echt, annot_pred):
-    img_id = randint(1, sum(1 for _ in open(annot_pred, 'r')))
+    img_id = np.random.randint(1, high=sum(1 for _ in open(annot_pred, 'r')))
     line_echt = linecache.getline(annot_echt, img_id)
     line_pred = linecache.getline(annot_pred, img_id)
     img_name, pose_echt = dataio.parse_line_annot(line_echt)
@@ -161,7 +159,7 @@ def draw_pose_raw_random(thedata, image_dir, annot_txt, img_id=-1):
     """
     if 1 > img_id:
         # img_id = randint(1, thedata.num_training)
-        img_id = randint(1, thedata.num_training)
+        img_id = np.random.randint(1, high=thedata.num_training)
     # Notice that linecache counts from 1
     annot_line = linecache.getline(annot_txt, img_id)
     # annot_line = linecache.getline(annot_txt, 219)  # palm
@@ -243,7 +241,7 @@ def draw_raw3d(thedata, img, pose_raw):
     points3 = dataops.img_to_raw(img, thedata)
     numpts = points3.shape[0]
     if 1000 < numpts:
-        samid = randsample(range(numpts), 1000)
+        samid = np.random.choice(numpts, 1000, replace=False)
         points3_sam = points3[samid, :]
     else:
         points3_sam = points3
@@ -262,7 +260,7 @@ def draw_raw3d(thedata, img, pose_raw):
     _, points3_trans = cube.pick(points3)
     numpts = points3_trans.shape[0]
     if 1000 < numpts:
-        points3_sam = points3_trans[randsample(range(numpts), 1000), :]
+        points3_sam = points3_trans[np.random.choice(numpts, 1000, replace=False), :]
     else:
         points3_sam = points3_trans
     points3_sam = cube.transform(points3_sam)
@@ -295,8 +293,8 @@ def draw_raw3d_random(thedata, image_dir, annot_txt, img_id=-1):
     """ Draw 3D pose of a randomly picked image.
     """
     if 0 > img_id:
-        # img_id = randint(1, thedata.num_training)
-        img_id = randint(1, thedata.num_training)
+        # img_id = np.random.randint(1, high=thedata.num_training)
+        img_id = np.random.np.random.randint(1, high=thedata.num_training)
     # Notice that linecache counts from 1
     annot_line = linecache.getline(annot_txt, img_id)
     # annot_line = linecache.getline(annot_txt, 219)  # palm
@@ -339,8 +337,8 @@ def draw_raw3d_random(thedata, image_dir, annot_txt, img_id=-1):
 def draw_bbox_random(thedata):
     """ Draw 3D pose of a randomly picked image.
     """
-    # img_id = randint(1, thedata.num_training)
-    img_id = randint(1, thedata.num_training)
+    # img_id = np.random.randint(1, high=thedata.num_training)
+    img_id = np.random.randint(1, high=thedata.num_training)
     # Notice that linecache counts from 1
     annot_line = linecache.getline(thedata.frame_bbox, img_id)
     # annot_line = linecache.getline(thedata.frame_bbox, 652)
@@ -364,7 +362,7 @@ def draw_bbox_random(thedata):
 
 def draw_hist_random(thedata, image_dir, img_id=-1):
     if 0 > img_id:
-        img_id = randint(1, thedata.num_training)
+        img_id = np.random.randint(1, high=thedata.num_training)
     img_name = dataio.index2imagename(img_id)
     img_path = os.path.join(image_dir, img_name)
     print('drawing hist: {}'.format(img_path))

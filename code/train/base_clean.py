@@ -62,12 +62,27 @@ class base_clean(base_regre):
         self.check_dir(thedata, args)
 
     def draw_random(self, thedata, args):
-        import random
         import matplotlib.pyplot as mpplot
+
+        # from colour import Color
+        # points3 = np.random.rand(1000, 3)
+        # points3[:, 1] *= 2
+        # points3[:, 2] *= 4
+        # cube = iso_cube()
+        # cube.build(points3, 0)
+        # corners = cube.get_corners()
+        # ax = mpplot.subplot(projection='3d')
+        # cube.draw_cube_wire(corners)
+        # pose_trans = cube.transform(points3)
+        # ax.scatter(
+        #     pose_trans[:, 0], pose_trans[:, 1], pose_trans[:, 2],
+        #     color=Color('lightsteelblue').rgb)
+        # mpplot.show()
+        # sys.exit()
 
         filelist = [f for f in os.listdir(self.train_dir)
                     if os.path.isfile(os.path.join(self.train_dir, f))]
-        filename = os.path.join(self.train_dir, random.choice(filelist))
+        filename = os.path.join(self.train_dir, np.random.choice(filelist))
         with h5py.File(filename, 'r') as h5file:
             store_size = h5file['index'][:].shape[0]
             batchallot = self.batch_allot(
@@ -78,7 +93,7 @@ class base_clean(base_regre):
                 h5file['poses'][:],
                 h5file['resce'][:]
             )
-            frame_id = random.randrange(store_size)
+            frame_id = np.random.choice(store_size)
             img_id = batchallot.batch_index[frame_id, 0]
             frame_h5 = np.squeeze(batchallot.batch_frame[frame_id, ...], -1)
             poses_h5 = batchallot.batch_poses[frame_id, ...].reshape(-1, 3)
@@ -123,10 +138,12 @@ class base_clean(base_regre):
         mpplot.subplot(2, 2, 2)
         img_name, frame, poses, resce = self.provider_worker(
             annot_line, self.image_dir, thedata)
-        frame = np.squeeze(frame, axis=2)
+        frame = np.squeeze(frame, axis=-1)
         poses = poses.reshape(-1, 3)
-        if ((1e-4 < np.linalg.norm(frame_h5 - frame)) or
-                (1e-4 < np.linalg.norm(poses_h5 - poses))):
+        if (
+                # (1e-4 < np.linalg.norm(frame_h5 - frame)) or
+                (1e-4 < np.linalg.norm(poses_h5 - poses))
+        ):
             print(np.linalg.norm(frame_h5 - frame))
             print(np.linalg.norm(poses_h5 - poses))
             print('ERROR - h5 storage corrupted!')

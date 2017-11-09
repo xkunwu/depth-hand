@@ -59,7 +59,6 @@ class direc_tsdf(base_conv3):
         print('data prepared: {}'.format(self.train_dir))
 
     def draw_random(self, thedata, args):
-        import random
         from mayavi import mlab
 
         # pcnt = np.zeros((6, 6, 6))
@@ -82,7 +81,7 @@ class direc_tsdf(base_conv3):
 
         filelist = [f for f in os.listdir(self.train_dir)
                     if os.path.isfile(os.path.join(self.train_dir, f))]
-        filename = os.path.join(self.train_dir, random.choice(filelist))
+        filename = os.path.join(self.train_dir, np.random.choice(filelist))
         with h5py.File(filename, 'r') as h5file:
             store_size = h5file['index'][:].shape[0]
             batchallot = self.batch_allot(
@@ -93,12 +92,24 @@ class direc_tsdf(base_conv3):
                 h5file['poses'][:],
                 h5file['resce'][:]
             )
-            frame_id = random.randrange(store_size)
+            frame_id = np.random.choice(store_size)
             img_id = batchallot.batch_index[frame_id, 0]
             frame_h5 = batchallot.batch_frame[frame_id, ...]
-            # poses_h5 = batchallot.batch_poses[frame_id, ...].reshape(-1, 3)
+            poses_h5 = batchallot.batch_poses[frame_id, ...].reshape(-1, 3)
             # resce_h5 = batchallot.batch_resce[frame_id, ...]
 
+        annot_line = args.data_io.get_line(
+            thedata.training_annot_cleaned, img_id)
+        img_name, frame, poses, resce = self.provider_worker(
+            annot_line, self.image_dir, thedata)
+        poses = poses.reshape(-1, 3)
+        if (
+                # (1e-4 < np.linalg.norm(frame_h5 - frame)) or
+                (1e-4 < np.linalg.norm(poses_h5 - poses))
+        ):
+            print(np.linalg.norm(frame_h5 - frame))
+            print(np.linalg.norm(poses_h5 - poses))
+            print('ERROR - h5 storage corrupted!')
         print('[{}] drawing pose #{:d}'.format(self.__class__.__name__, img_id))
         for spi in range(3):
             mlab.figure(size=(800, 800))

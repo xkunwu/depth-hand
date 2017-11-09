@@ -73,7 +73,7 @@ class regu_grid:
         self.len = len  # cell side length
         self.step = step
         self.pcnt = np.zeros(
-            shape=(self.step, self.step, self.step), dtype=float)
+            shape=(self.step, self.step, self.step))
 
     def dump(self):
         return np.concatenate((
@@ -96,7 +96,7 @@ class regu_grid:
         self.cll = np.zeros(3) - cubelen
         self.step = step
         self.len = cubelen * 2 / step
-        self.pcnt = np.zeros(shape=(self.step, self.step, self.step), dtype=float)
+        self.pcnt = np.zeros(shape=(self.step, self.step, self.step))
 
     def putit(self, points3):
         return np.floor((points3 - self.cll) / self.len).astype(int)

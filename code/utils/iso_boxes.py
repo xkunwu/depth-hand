@@ -94,7 +94,7 @@ class iso_aabb:
 
 
 class iso_cube:
-    def __init__(self, cen=np.zeros(3), len=1., m=0.1):
+    def __init__(self, cen=np.zeros(3), len=1., m=0.):
         self.cen = cen
         self.len = len  # half side length
         self.evecs = np.eye(3)
@@ -130,34 +130,29 @@ class iso_cube:
         return points3[conds, :], points3_trans[conds, :]
 
     def build(self, points3, m=0.6):
-        # from sklearn.decomposition import PCA
-        # pca = PCA(n_components=3)
-        # points3_trans_skl = pca.fit_transform(points3)  # bias might be wrong
-        # print(pca.explained_variance_)
-        # print(np.ptp(points3_trans_skl, axis=0))
         pmin = np.min(points3, axis=0)
         pmax = np.max(points3, axis=0)
         self.cen = (pmin + pmax) / 2
-        # self.cen = np.mean(points3, axis=0)
-        C = np.cov((points3 - self.cen), rowvar=False)
-        # evals, evecs = np.linalg.eigh(C)
-        _, evecs = np.linalg.eigh(C)
-        # idx = np.argsort(evals)[::-1]
-        # evecs = evecs[idx, :]
+        self.len = np.max(pmax - pmin) / 2
+        self.evecs = np.eye(3)
+        self.add_margan(m)
+        return self.transform(points3)
+
+    def build_bak(self, points3, m=0.6):
+        self.cen = np.mean(points3, axis=0)
+        evals, evecs = np.linalg.eig(np.cov(points3.T))
+        # _, evecs = np.linalg.eig(np.cov(points3.T))
+        idx = np.argsort(evals)[::-1]
+        evecs = evecs[idx, :]
         # evals = evals[idx]
         # print(evals)
         points3_trans = np.dot(points3 - self.cen, evecs)
-        # ptp = np.ptp(points3_trans, axis=0)
-        ptp = pmax - pmin
-        idx = np.argsort(ptp)[::-1]
-        evecs = evecs[idx, :]
-        ptp = ptp[idx]
-        # print(ptp)
-        self.len = np.max(ptp) / 2
-        # print(self.len)
-        self.evecs = evecs
+        pmin = np.min(points3_trans, axis=0)
+        pmax = np.max(points3_trans, axis=0)
+        self.len = np.max(pmax - pmin) / 2
         if 0 > np.linalg.det(evecs):
             evecs[2, :] *= -1
+        self.evecs = evecs
         # self.qrot = Quaternion(matrix=evecs)
         self.add_margan(m)
         return points3_trans
