@@ -44,14 +44,14 @@ class base_conv3(base_regre):
 
         def allot(self, num_channel, num_appen):
             self.batch_index = np.empty(
-                shape=(self.batch_size, 1), dtype=np.uint32)
+                shape=(self.batch_size, 1), dtype=int)
             self.batch_frame = np.empty(
                 shape=(self.batch_size, self.image_size, self.image_size, self.image_size, num_channel),
-                dtype=np.float32)
+                dtype=float)
             self.batch_poses = np.empty(
-                shape=(self.batch_size, self.pose_dim), dtype=np.float32)
+                shape=(self.batch_size, self.pose_dim), dtype=float)
             self.batch_resce = np.empty(
-                shape=(self.batch_size, num_appen), dtype=np.float32)
+                shape=(self.batch_size, num_appen), dtype=float)
             self.batch_bytes = \
                 self.batch_index.nbytes + self.batch_frame.nbytes + \
                 self.batch_poses.nbytes + self.batch_resce.nbytes
@@ -126,15 +126,15 @@ class base_conv3(base_regre):
         #
         # pcnt = np.zeros((6, 6, 6))
         # pcnt[2:4, 2:4, 3] = 1
-        # volume3 = args.data_ops.prop_dist(pcnt)
-        # mlab.pipeline.volume(mlab.pipeline.scalar_field(volume3))
+        # frame = args.data_ops.prop_dist(pcnt)
+        # mlab.pipeline.volume(mlab.pipeline.scalar_field(frame))
         # mlab.pipeline.image_plane_widget(
-        #     mlab.pipeline.scalar_field(volume3),
+        #     mlab.pipeline.scalar_field(frame),
         #     plane_orientation='z_axes',
         #     slice_index=self.crop_size / 2)
         # print(pcnt[..., 3])
-        # print(volume3[..., 3])
-        # print(volume3[0, 0, 3], type(volume3[0, 0, 3]))
+        # print(frame[..., 3])
+        # print(frame[0, 0, 3], type(frame[0, 0, 3]))
         # mlab.outline()
         # mlab.show()
         # sys.exit()
@@ -231,21 +231,24 @@ class base_conv3(base_regre):
         mlab.figure(size=(800, 800))
         img_name, frame, poses, resce = self.provider_worker(
             annot_line, self.image_dir, thedata)
-        if (1e-4 < np.linalg.norm(frame_h5 - frame)):
-            print('ERROR - h5 storage corrupted!')
+        frame = np.squeeze(frame, axis=3)
         poses = poses.reshape(-1, 3)
+        if ((1e-4 < np.linalg.norm(frame_h5 - frame)) or
+                (1e-4 < np.linalg.norm(poses_h5 - poses))):
+            print(np.linalg.norm(frame_h5 - frame))
+            print(np.linalg.norm(poses_h5 - poses))
+            print('ERROR - h5 storage corrupted!')
         resce3 = resce_h5[0:8]
         cube = iso_cube()
         cube.load(resce3)
-        volume3 = np.squeeze(frame, axis=3)
-        # mlab.contour3d(volume3)
-        mlab.pipeline.volume(mlab.pipeline.scalar_field(volume3))
+        # mlab.contour3d(frame)
+        mlab.pipeline.volume(mlab.pipeline.scalar_field(frame))
         mlab.pipeline.image_plane_widget(
-            mlab.pipeline.scalar_field(volume3),
+            mlab.pipeline.scalar_field(frame),
             plane_orientation='z_axes',
             slice_index=self.crop_size / 2)
         np.set_printoptions(precision=4)
-        # print(volume3[12:20, 12:20, 16])
+        # print(frame[12:20, 12:20, 16])
         mlab.outline()
         mpplot.savefig(os.path.join(
             args.data_inst.predict_dir,

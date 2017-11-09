@@ -122,7 +122,21 @@ class ortho3view(base_regre):
 
         img_name, frame, poses, resce = self.provider_worker(
             annot_line, self.image_dir, thedata)
-        if (1e-4 < np.linalg.norm(frame_h5 - frame)):
+        poses = poses.reshape(-1, 3)
+        if ((1e-4 < np.linalg.norm(frame_h5 - frame)) or
+                (1e-4 < np.linalg.norm(poses_h5 - poses))):
+            print(np.linalg.norm(frame_h5 - frame))
+            print(np.linalg.norm(poses_h5 - poses))
+            _, frame_1, _, _ = self.provider_worker(
+                annot_line, self.image_dir, thedata)
+            print(np.linalg.norm(frame_1 - frame))
+            with h5py.File('/tmp/111', 'w') as h5file:
+                h5file.create_dataset(
+                    'frame', data=frame_1, dtype=float
+                )
+            with h5py.File('/tmp/111', 'r') as h5file:
+                frame_2 = h5file['frame'][:]
+                print(np.linalg.norm(frame_1 - frame_2))
             print('ERROR - h5 storage corrupted!')
         poses = poses.reshape(-1, 3)
         resce2 = resce[0:3]

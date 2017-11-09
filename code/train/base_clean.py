@@ -123,12 +123,16 @@ class base_clean(base_regre):
         mpplot.subplot(2, 2, 2)
         img_name, frame, poses, resce = self.provider_worker(
             annot_line, self.image_dir, thedata)
-        if (1e-4 < np.linalg.norm(frame_h5 - frame)):
-            print('ERROR - h5 storage corrupted!')
+        frame = np.squeeze(frame, axis=2)
         poses = poses.reshape(-1, 3)
+        if ((1e-4 < np.linalg.norm(frame_h5 - frame)) or
+                (1e-4 < np.linalg.norm(poses_h5 - poses))):
+            print(np.linalg.norm(frame_h5 - frame))
+            print(np.linalg.norm(poses_h5 - poses))
+            print('ERROR - h5 storage corrupted!')
         resce2 = resce[0:3]
         resce3 = resce[3:11]
-        mpplot.imshow(np.squeeze(frame, axis=2), cmap='bone')
+        mpplot.imshow(frame, cmap='bone')
         pose_raw = args.data_ops.pca_to_raw(poses, resce3)
         args.data_draw.draw_pose2d(
             thedata, frame,
