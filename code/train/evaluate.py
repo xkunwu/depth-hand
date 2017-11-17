@@ -166,16 +166,20 @@ def test_dataops(args):
 
 
 if __name__ == "__main__":
-    # python evaluate.py --max_epoch=1 --batch_size=16 --store_level=6 --model_name=base_clean
+    # python evaluate.py --max_epoch=1 --batch_size=16 --model_name=base_clean
     argsholder = args_holder()
     argsholder.parse_args()
     args = argsholder.args
 
-    test_dataops(args)
-    sys.exit()
-
-    # run_one(args)
+    # test_dataops(args)
     # sys.exit()
+
+    # scp_t = os.path.join(args.out_dir, 'predict_sipadan')
+    # draw_compare(args, scp_t)
+    # sys.exit()
+
+    run_one(args)
+    sys.exit()
 
     methlist = [
         'direc_tsdf',
@@ -190,5 +194,3 @@ if __name__ == "__main__":
         run_one(args)
 
     draw_compare(args)
-    # scp_t = os.path.join(args.out_dir, 'predict_remote')
-    # draw_compare(args, scp_t)

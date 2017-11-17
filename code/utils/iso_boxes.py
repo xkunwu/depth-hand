@@ -138,7 +138,7 @@ class iso_cube:
         self.add_margan(m)
         return self.transform(points3)
 
-    def build_bak(self, points3, m=0.6):
+    def build_pca(self, points3, m=0.6):
         self.cen = np.mean(points3, axis=0)
         evals, evecs = np.linalg.eig(np.cov(points3.T))
         # _, evecs = np.linalg.eig(np.cov(points3.T))

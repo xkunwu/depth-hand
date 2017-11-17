@@ -29,10 +29,7 @@ class train_abc():
         tf.reset_default_graph()
         with tf.Graph().as_default():
             with tf.device('/gpu:' + str(self.args.gpu_id)):
-                frames_tf, poses_tf = self.args.model_inst.placeholder_inputs(
-                    self.args.batch_size,
-                    self.args.crop_size,
-                    self.args.model_inst.pose_dim)
+                frames_tf, poses_tf = self.args.model_inst.placeholder_inputs()
                 is_training_tf = tf.placeholder(tf.bool, shape=())
 
                 # Note the global_step=batch parameter to minimize.
@@ -42,7 +39,7 @@ class train_abc():
 
                 # Get model and loss
                 pred, end_points = self.args.model_inst.get_model(
-                    frames_tf, self.args.model_inst.pose_dim, is_training_tf, bn_decay=bn_decay)
+                    frames_tf, is_training_tf, bn_decay=bn_decay)
                 loss = self.args.model_inst.get_loss(pred, poses_tf, end_points)
                 regre_error = tf.sqrt(loss * 2)
                 tf.summary.scalar('regression_error', regre_error)
@@ -86,27 +83,29 @@ class train_abc():
                     'pred': pred
                 }
 
-                self.args.model_inst.start_train(self.args.batch_size)
-                for epoch in range(self.args.max_epoch):
-                    self.logger.info('**** Epoch #{:03d} ****'.format(epoch))
-                    sys.stdout.flush()
+                with file_pack() as filepack:
+                    self.args.model_inst.start_train()
+                    for epoch in range(self.args.max_epoch):
+                        self.logger.info('**** Epoch #{:03d} ****'.format(epoch))
+                        sys.stdout.flush()
 
-                    time_s = timer()
-                    self.args.model_inst.start_epoch_train()
-                    self.logger.info('** Training **')
-                    self.train_one_epoch(sess, ops, train_writer)
-                    self.args.model_inst.start_epoch_test()
-                    self.logger.info('** Testing **')
-                    self.test_one_epoch(sess, ops, test_writer)
-                    self.logger.info('Epoch #{:03d} processing time: {}'.format(
-                        epoch,
-                        timer() - time_s))
+                        time_s = timer()
+                        self.logger.info('** Training **')
+                        self.args.model_inst.start_epoch_train(filepack)
+                        self.train_one_epoch(sess, ops, train_writer)
+                        self.logger.info('** Testing **')
+                        self.args.model_inst.start_epoch_test(filepack)
+                        self.test_one_epoch(sess, ops, test_writer)
+                        self.logger.info('Epoch #{:03d} processing time: {}'.format(
+                            epoch,
+                            timer() - time_s))
 
-                    # Save the variables to disk.
-                    if epoch % 10 == 0:
-                        save_path = saver.save(
-                            sess, os.path.join(self.log_dir_t, self.args.model_ckpt))
-                        self.logger.info("Model saved in file: {}".format(save_path))
+                        # Save the variables to disk.
+                        if epoch % 10 == 0:
+                            save_path = saver.save(
+                                sess, os.path.join(self.log_dir_t, self.args.model_ckpt))
+                            self.logger.info("Model saved in file: {}".format(save_path))
+                    self.args.model_inst.end_train()
 
     def train_one_epoch(self, sess, ops, train_writer):
         """ ops: dict mapping from string to tf ops """
@@ -159,15 +158,12 @@ class train_abc():
     def evaluate(self):
         tf.reset_default_graph()
         with tf.device('/gpu:' + str(self.args.gpu_id)):
-            frames_tf, poses_tf = self.args.model_inst.placeholder_inputs(
-                self.args.batch_size,
-                self.args.crop_size,
-                self.args.model_inst.pose_dim)
+            frames_tf, poses_tf = self.args.model_inst.placeholder_inputs()
             is_training_tf = tf.placeholder(tf.bool, shape=())
 
             # Get model and loss
             pred, end_points = self.args.model_inst.get_model(
-                frames_tf, self.args.model_inst.pose_dim, is_training_tf)
+                frames_tf, is_training_tf)
             loss = self.args.model_inst.get_loss(pred, poses_tf, end_points)
 
             # Add ops to save and restore all the variables.
@@ -192,50 +188,48 @@ class train_abc():
                 'pred': pred
             }
 
-            self.args.model_inst.start_train(self.args.batch_size)
-            self.args.model_inst.start_epoch_test()
-            self.eval_one_epoch_write(sess, ops)
+            with file_pack() as filepack:
+                writer = self.args.model_inst.start_evaluate(filepack)
+                self.args.model_inst.start_epoch_test(filepack)
+                self.eval_one_epoch_write(sess, ops, writer)
+                self.args.model_inst.end_evaluate()
 
-    def eval_one_epoch_write(self, sess, ops):
+    def eval_one_epoch_write(self, sess, ops, writer):
         is_training = False
         batch_count = 0
         loss_sum = 0
-        with file_pack() as filepack:
-            predict_file = os.path.join(
-                self.args.data_inst.predict_dir, self.args.model_inst.predict_file)
-            writer = filepack.push_file(predict_file, 'w')
-            while True:
-                batch_data = self.args.model_inst.fetch_batch_test()
-                if batch_data is None:
-                    break
-                feed_dict = {
-                    ops['batch_frame']: batch_data['batch_frame'],
-                    ops['batch_poses']: batch_data['batch_poses'],
-                    ops['is_training']: is_training
-                }
-                loss_val, pred_val = sess.run(
-                    [ops['loss'], ops['pred']],
-                    feed_dict=feed_dict)
-                self.args.data_provider.write2d(
-                    writer,
-                    self.args.model_inst.yanker,
-                    batch_data['batch_index'],
-                    batch_data['batch_resce'],
-                    pred_val
-                )
-                # for bi, _ in enumerate(next_n_lines):
-                #     out_list = np.append(
-                #         pred_val[bi, :].flatten(),
-                #         batch_resce[bi, :].flatten()).flatten()
-                #     crimg_line = ''.join("%12.4f" % x for x in out_list)
-                #     writer.write(image_names[bi] + crimg_line + '\n')
-                batch_count += 1
-                loss_sum += loss_val
-                sys.stdout.write('.')
-                sys.stdout.flush()
-            print('\n')
-            self.logger.info('epoch evaluate mean loss (half-squared): {}'.format(
-                loss_sum / batch_count))
+        while True:
+            batch_data = self.args.model_inst.fetch_batch_test()
+            if batch_data is None:
+                break
+            feed_dict = {
+                ops['batch_frame']: batch_data['batch_frame'],
+                ops['batch_poses']: batch_data['batch_poses'],
+                ops['is_training']: is_training
+            }
+            loss_val, pred_val = sess.run(
+                [ops['loss'], ops['pred']],
+                feed_dict=feed_dict)
+            self.args.data_provider.write2d(
+                writer,
+                self.args.model_inst.yanker,
+                batch_data['batch_index'],
+                batch_data['batch_resce'],
+                pred_val
+            )
+            # for bi, _ in enumerate(next_n_lines):
+            #     out_list = np.append(
+            #         pred_val[bi, :].flatten(),
+            #         batch_resce[bi, :].flatten()).flatten()
+            #     crimg_line = ''.join("%12.4f" % x for x in out_list)
+            #     writer.write(image_names[bi] + crimg_line + '\n')
+            batch_count += 1
+            loss_sum += loss_val
+            sys.stdout.write('.')
+            sys.stdout.flush()
+        print('\n')
+        self.logger.info('epoch evaluate mean loss (half-squared): {}'.format(
+            loss_sum / batch_count))
 
     def get_learning_rate(self, batch):
         learning_rate = tf.train.exponential_decay(
@@ -322,7 +316,7 @@ class train_abc():
 
 
 if __name__ == "__main__":
-    # python train_abc.py --max_epoch=1 --batch_size=16 --store_level=6 --model_name=base_regre
+    # python train_abc.py --max_epoch=1 --batch_size=16 --model_name=base_regre
     argsholder = args_holder()
     argsholder.parse_args()
     argsholder.create_instance()

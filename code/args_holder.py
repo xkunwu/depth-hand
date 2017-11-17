@@ -57,9 +57,6 @@ class args_holder:
         self.parser.add_argument(
             '--batch_size', type=int, default=128,
             help='Batch size during training [default: 64]')
-        self.parser.add_argument(
-            '--store_level', type=int, default=16,
-            help='Batch size for storage [default: 16, means 2<<16 frames]')
         # self.parser.add_argument(
         #     '--optimizer', default='adam',
         #     help='Only using adam currently [default: adam]')
@@ -91,14 +88,13 @@ class args_holder:
             os.makedirs(self.args.out_dir)
         self.args.log_dir = os.path.join(self.args.out_dir, 'log')
         self.args.cpu_count = multiprocessing.cpu_count()
-        self.args.store_level = (2 << self.args.store_level)
 
     def create_instance(self):
         self.args.model_class = getattr(
             import_module('train.' + self.args.model_name),
             self.args.model_name
         )
-        self.args.model_inst = self.args.model_class(self.args.out_dir)
+        self.args.model_inst = self.args.model_class()
         self.args.model_inst.tweak_args(self.args)
         self.args.data_module = import_module(
             'data.' + self.args.data_name)
@@ -119,6 +115,7 @@ class args_holder:
             self.args.rebuild_data
         )
         self.args.model_inst.receive_data(self.args.data_inst, self.args)
+        self.args.model_inst.check_dir(self.args.data_inst, self.args)
 
     def write_args(self, log_dir):
         with open(os.path.join(log_dir, 'args.txt'), 'w') as writer:
@@ -128,7 +125,7 @@ class args_holder:
 
 
 if __name__ == "__main__":
-    # python args_holder.py --batch_size=16 --store_level=6
+    # python args_holder.py --batch_size=16
     argsholder = args_holder()
     argsholder.parse_args()
     ARGS = argsholder.args

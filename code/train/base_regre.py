@@ -2,10 +2,10 @@ import tensorflow as tf
 import os
 import sys
 from importlib import import_module
+from psutil import virtual_memory
 import numpy as np
 import progressbar
 import h5py
-import re
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 BASE_DIR = os.path.abspath(os.path.join(BASE_DIR, os.pardir))
@@ -29,142 +29,168 @@ iso_aabb = getattr(
 class base_regre(object):
     """ This class holds baseline training approach using plain regression.
     """
-    def __init__(self, out_dir):
-        self.train_dir = os.path.join(out_dir, 'cropped')
-        self.appen_train = 'appen_train'
-        self.appen_test = 'appen_test'
-        self.predict_file = 'predict_{}'.format(self.__class__.__name__)
+    def __init__(self):
         self.crop_size = 96
-        self.batch_size = -1
+        self.num_channel = 1
+        self.num_appen = 7
         self.batchallot = None
-        self.batch_bytes = 0
-        self.train_list = []
-        self.train_id = -1
-        self.test_list = []
-        self.test_id = -1
+        self.batch_size = 0
         self.pose_dim = 0
         self.image_dir = ''
         self.provider = None
         self.provider_worker = None
 
     class batch_allot:
-        def __init__(self, store_size, image_size, pose_dim, batch_size=1):
-            self.store_size = store_size
+        def __init__(self, batch_size, image_size, pose_dim, num_channel, num_appen):
             self.batch_size = batch_size
             self.image_size = image_size
             self.pose_dim = pose_dim
+            self.num_channel = num_channel
+            self.num_appen = num_appen
+            batch_data = {
+                'batch_index': np.empty(
+                    shape=(batch_size, 1), dtype=np.int32),
+                'batch_frame': np.empty(
+                    shape=(
+                        batch_size,
+                        image_size, image_size,
+                        num_channel),
+                    dtype=np.float32),
+                'batch_poses': np.empty(
+                    shape=(batch_size, pose_dim),
+                    dtype=np.float32),
+                'batch_resce': np.empty(
+                    shape=(batch_size, num_appen),
+                    dtype=np.float32)
+            }
+            self.batch_bytes = \
+                batch_data['batch_index'].nbytes + batch_data['batch_frame'].nbytes + \
+                batch_data['batch_poses'].nbytes + batch_data['batch_resce'].nbytes
             self.batch_beg = 0
-            self.batch_end = self.batch_beg + self.batch_size
 
-        def allot(self, num_channel, num_appen):
+        def allot(self, store_size=-1):
+            store_cap_mult = (virtual_memory().total >> 2) // self.batch_bytes
+            store_cap = store_cap_mult * self.batch_size
+            if 0 > store_size:
+                self.store_size = store_cap
+            else:
+                self.store_size = min(store_cap, store_size)
+            self.store_bytes = self.store_size * self.batch_bytes / self.batch_size
+            self.store_beg = 0
             self.batch_index = np.empty(
-                shape=(self.batch_size, 1), dtype=np.int32)
+                shape=(self.store_size, 1), dtype=np.int32)
             self.batch_frame = np.empty(
-                shape=(self.batch_size, self.image_size, self.image_size, num_channel),
+                shape=(
+                    self.store_size,
+                    self.image_size, self.image_size,
+                    self.num_channel),
                 dtype=np.float32)
             self.batch_poses = np.empty(
-                shape=(self.batch_size, self.pose_dim), dtype=np.float32)
+                shape=(self.store_size, self.pose_dim), dtype=np.float32)
             self.batch_resce = np.empty(
-                shape=(self.batch_size, num_appen), dtype=np.float32)
-            self.batch_bytes = \
-                self.batch_index.nbytes + self.batch_frame.nbytes + \
-                self.batch_poses.nbytes + self.batch_resce.nbytes
+                shape=(self.store_size, self.num_appen), dtype=np.float32)
 
-        def assign(self, batch_index, batch_frame, batch_poses, batch_resce):
-            self.batch_index = batch_index
-            self.batch_frame = batch_frame
-            self.batch_poses = batch_poses
-            self.batch_resce = batch_resce
-            self.batch_bytes = \
-                self.batch_index.nbytes + self.batch_frame.nbytes + \
-                self.batch_poses.nbytes + self.batch_resce.nbytes
+        def fetch_store(self):
+            if self.store_beg >= self.file_size:
+                return False
+            store_end = min(
+                self.store_beg + self.store_size,
+                self.file_size
+            )
+            self.store_size = store_end - self.store_beg
+            self.batch_index = self.store_file['index'][self.store_beg:store_end, ...]
+            self.batch_frame = self.store_file['frame'][self.store_beg:store_end, ...]
+            self.batch_poses = self.store_file['poses'][self.store_beg:store_end, ...]
+            self.batch_resce = self.store_file['resce'][self.store_beg:store_end, ...]
+            self.store_beg = store_end
+            self.batch_beg = 0
+            return True
+
+        def assign(self, store_file):
+            self.store_file = store_file
+            self.file_size = self.store_file['index'].shape[0]
+            self.store_size = min(
+                self.file_size,
+                ((virtual_memory().total >> 1) // self.batch_bytes) * self.batch_size
+            )
+            self.store_beg = 0
+            self.fetch_store()
 
         def fetch_batch(self):
-            if self.batch_end >= self.store_size:
-                return None
+            # if self.batch_beg >= self.store_size:
+            #     if not self.fetch_store():
+            #         return None
+            # batch_end = min(
+            #     self.batch_beg + self.batch_size,
+            #     self.store_size
+            # )
+            batch_end = self.batch_beg + self.batch_size
+            if batch_end >= self.store_size:
+                if not self.fetch_store():
+                    return None
+                batch_end = self.batch_beg + self.batch_size
+                if batch_end >= self.store_size:
+                    return None
             batch_data = {
-                'batch_index': self.batch_index[self.batch_beg:self.batch_end, ...],
-                'batch_frame': self.batch_frame[self.batch_beg:self.batch_end, ...],
-                'batch_poses': self.batch_poses[self.batch_beg:self.batch_end, ...],
-                'batch_resce': self.batch_resce[self.batch_beg:self.batch_end, ...]
+                'batch_index': self.batch_index[self.batch_beg:batch_end, ...],
+                'batch_frame': self.batch_frame[self.batch_beg:batch_end, ...],
+                'batch_poses': self.batch_poses[self.batch_beg:batch_end, ...],
+                'batch_resce': self.batch_resce[self.batch_beg:batch_end, ...]
             }
-            self.batch_beg = self.batch_end
-            self.batch_end = self.batch_beg + self.batch_size
+            self.batch_beg = batch_end
             return batch_data
 
-    def read_next_file(self, filename):
-        with h5py.File(filename, 'r') as h5file:
-            store_size = h5file['index'][:].shape[0]
-            # print(h5file['index'][:])
-            # batch_index = h5file['index'][:]
-            self.batchallot = self.batch_allot(
-                store_size, self.crop_size, self.pose_dim, self.batch_size)
-            self.batchallot.assign(
-                h5file['index'][:],
-                h5file['frame'][:],
-                h5file['poses'][:],
-                h5file['resce'][:]
+    def start_train(self):
+        self.batchallot = self.batch_allot(
+            self.batch_size, self.crop_size, self.pose_dim,
+            self.num_channel, self.num_appen)
+
+    def start_epoch_train(self, filepack):
+        self.batchallot.assign(
+            filepack.push_h5(
+                os.path.join(self.prep_dir, self.appen_train)
             )
+        )
 
-    def start_train(self, batch_size):
-        self.batch_size = batch_size
-        filelist = [f for f in os.listdir(self.train_dir)
-                    if os.path.isfile(os.path.join(self.train_dir, f))]
-        self.train_list = []
-        for f in filelist:
-            m = re.match(r'^(' + re.escape(self.appen_train) + r'_\d+)$', f)
-            if m:
-                self.train_list.append(os.path.join(self.train_dir, m.group(1)))
-        self.test_list = []
-        for f in filelist:
-            m = re.match(r'^(' + re.escape(self.appen_test) + r'_\d+)$', f)
-            if m:
-                self.test_list.append(os.path.join(self.train_dir, m.group(1)))
-        print('[{}] prepared for training'.format(
-            self.__class__.__name__
-        ))
-
-    def start_epoch_train(self):
-        self.read_next_file(self.train_list[0])
-        self.train_id = 1
-
-    def start_epoch_test(self):
-        self.read_next_file(self.test_list[0])
-        self.test_id = 1
+    def start_epoch_test(self, filepack):
+        self.batchallot.assign(
+            filepack.push_h5(
+                os.path.join(self.prep_dir, self.appen_test)
+            )
+        )
 
     def fetch_batch_train(self):
-        batch_data = self.batchallot.fetch_batch()
-        if batch_data is None:
-            if len(self.train_list) <= self.train_id:
-                return None
-            self.read_next_file(self.train_list[self.train_id])
-            self.train_id += 1
-            batch_data = self.batchallot.fetch_batch()
-        return batch_data
+        return self.batchallot.fetch_batch()
 
     def fetch_batch_test(self):
-        batch_data = self.batchallot.fetch_batch()
-        if batch_data is None:
-            if len(self.test_list) <= self.test_id:
-                return None
-            self.read_next_file(self.test_list[self.test_id])
-            self.test_id += 1
-            batch_data = self.batchallot.fetch_batch()
-        return batch_data
+        return self.batchallot.fetch_batch()
+
+    def end_train(self):
+        self.batchallot = None
+
+    def start_evaluate(self, filepack):
+        self.batchallot = self.batch_allot(
+            self.batch_size, self.crop_size, self.pose_dim,
+            self.num_channel, self.num_appen)
+        return filepack.write_file(self.predict_file)
+
+    def end_evaluate(self):
+        self.batchallot = None
 
     def tweak_args(self, args):
         """ Tweak algorithm specific parameters """
         args.crop_size = self.crop_size
 
     def prepare_data(self, thedata, batchallot, file_annot, name_appen):
-        store_size = batchallot.store_size
         num_line = int(sum(1 for line in file_annot))
         file_annot.seek(0)
+        batchallot.allot(num_line)
+        store_size = batchallot.store_size
         num_stores = int(np.ceil(float(num_line) / store_size))
-        print('[{}] preparing data: {:d} lines, subdivided into {:d} files \n\
+        print('[{}] preparing data: {:d} lines \n\
               (producing {:.4f} GB for store size {:d}) ...'.format(
-            self.__class__.__name__, num_line, num_stores,
-            float(batchallot.batch_bytes) / (2 << 30), store_size
+            self.__class__.__name__, num_line,
+            float(batchallot.store_bytes) / (2 << 30), store_size
         ))
         timerbar = progressbar.ProgressBar(
             maxval=num_stores,
@@ -173,83 +199,111 @@ class base_regre(object):
                 ' ', progressbar.Bar('=', '[', ']'),
                 ' ', progressbar.ETA()]
         ).start()
-        bi = 0
-        while True:
-            resline = self.provider.puttensor_mt(
-                file_annot, self.provider_worker,
-                self.image_dir, thedata, batchallot
+        image_size = self.crop_size
+        pose_dim = batchallot.pose_dim
+        num_channel = batchallot.num_channel
+        num_appen = batchallot.num_appen
+        with h5py.File(os.path.join(self.prep_dir, name_appen), 'w') as h5file:
+            h5file.create_dataset(
+                'index',
+                (num_line, 1),
+                compression='lzf',
+                dtype=np.int32
             )
-            if 0 > resline:
-                break
-            filen_bi = '{}_{:d}'.format(name_appen, bi)
-            with h5py.File(os.path.join(self.train_dir, filen_bi), 'w') as h5file:
-                h5file.create_dataset(
-                    'index', data=batchallot.batch_index[0:resline, ...], dtype=np.int32
+            h5file.create_dataset(
+                'frame',
+                (num_line,
+                    image_size, image_size,
+                    num_channel),
+                chunks=(1,
+                        image_size, image_size,
+                        num_channel),
+                compression='lzf',
+                dtype=np.float32
+            )
+            h5file.create_dataset(
+                'poses',
+                (num_line, pose_dim),
+                compression='lzf',
+                dtype=np.float32
+            )
+            h5file.create_dataset(
+                'resce',
+                (num_line, num_appen),
+                compression='lzf',
+                dtype=np.float32
+            )
+            bi = 0
+            store_beg = 0
+            while True:
+                resline = self.provider.puttensor_mt(
+                    file_annot, self.provider_worker,
+                    self.image_dir, thedata, batchallot
                 )
-                h5file.create_dataset(
-                    'frame', data=batchallot.batch_frame[0:resline, ...], dtype=np.float32
-                )
-                h5file.create_dataset(
-                    'poses', data=batchallot.batch_poses[0:resline, ...], dtype=np.float32
-                )
-                h5file.create_dataset(
-                    'resce', data=batchallot.batch_resce[0:resline, ...], dtype=np.float32
-                )
-            timerbar.update(bi)
-            bi += 1
+                if 0 > resline:
+                    break
+                h5file['index'][store_beg:store_beg + resline, ...] = \
+                    batchallot.batch_index[0:resline, ...]
+                h5file['frame'][store_beg:store_beg + resline, ...] = \
+                    batchallot.batch_frame[0:resline, ...]
+                h5file['poses'][store_beg:store_beg + resline, ...] = \
+                    batchallot.batch_poses[0:resline, ...]
+                h5file['resce'][store_beg:store_beg + resline, ...] = \
+                    batchallot.batch_resce[0:resline, ...]
+                timerbar.update(bi)
+                bi += 1
+                store_beg += resline
         timerbar.finish()
 
     def check_dir(self, thedata, args):
         first_run = False
-        if not os.path.exists(self.train_dir):
-            first_run = True
-            os.makedirs(self.train_dir)
-        if args.rebuild_data:
+        if (
+                args.rebuild_data or
+                (not os.path.exists(self.appen_train)) or
+                (not os.path.exists(self.appen_test))
+        ):
             first_run = True
         if not first_run:
             return
         batchallot = self.batch_allot(
-            args.store_level, self.crop_size, self.pose_dim, args.store_level)
-        batchallot.allot(1, 7)
+            self.batch_size, self.crop_size, self.pose_dim,
+            self.num_channel, self.num_appen)
         with file_pack() as filepack:
             file_annot = filepack.push_file(thedata.training_annot_train)
             self.prepare_data(thedata, batchallot, file_annot, self.appen_train)
         with file_pack() as filepack:
             file_annot = filepack.push_file(thedata.training_annot_test)
             self.prepare_data(thedata, batchallot, file_annot, self.appen_test)
-        print('data prepared: {}'.format(self.train_dir))
+        print('data prepared: {}'.format(self.prep_dir))
 
     def receive_data(self, thedata, args):
         """ Receive parameters specific to the data """
+        self.prep_dir = thedata.prep_dir
+        self.appen_train = os.path.join(
+            self.prep_dir, 'train_{}'.format(self.__class__.__name__))
+        self.appen_test = os.path.join(
+            self.prep_dir, 'test_{}'.format(self.__class__.__name__))
+        self.predict_dir = thedata.predict_dir
+        self.predict_file = os.path.join(
+            self.predict_dir, 'predict_{}'.format(self.__class__.__name__))
+        self.batch_size = args.batch_size
         self.pose_dim = thedata.join_num * 3
         self.image_dir = thedata.training_images
         self.caminfo = thedata
         self.provider = args.data_provider
         self.provider_worker = self.provider.prow_cropped
         self.yanker = self.provider.yank_cropped
-        self.check_dir(thedata, args)
 
     def draw_random(self, thedata, args):
         import matplotlib.pyplot as mpplot
 
-        filelist = [f for f in os.listdir(self.train_dir)
-                    if os.path.isfile(os.path.join(self.train_dir, f))]
-        filename = os.path.join(self.train_dir, np.random.choice(filelist))
-        with h5py.File(filename, 'r') as h5file:
-            store_size = h5file['index'][:].shape[0]
-            batchallot = self.batch_allot(
-                store_size, self.crop_size, self.pose_dim, self.batch_size)
-            batchallot.assign(
-                h5file['index'][:],
-                h5file['frame'][:],
-                h5file['poses'][:],
-                h5file['resce'][:]
-            )
+        with h5py.File(os.path.join(self.prep_dir, self.appen_train), 'r') as h5file:
+            store_size = h5file['index'].shape[0]
             frame_id = np.random.choice(store_size)
-            img_id = batchallot.batch_index[frame_id, 0]
-            frame_h5 = np.squeeze(batchallot.batch_frame[frame_id, ...], -1)
-            poses_h5 = batchallot.batch_poses[frame_id, ...].reshape(-1, 3)
-            resce_h5 = batchallot.batch_resce[frame_id, ...]
+            img_id = h5file['index'][frame_id, 0]
+            frame_h5 = np.squeeze(h5file['frame'][frame_id, ...], -1)
+            poses_h5 = h5file['poses'][frame_id, ...].reshape(-1, 3)
+            resce_h5 = h5file['resce'][frame_id, ...]
 
         print('[{}] drawing pose #{:d}'.format(self.__class__.__name__, img_id))
         # aabb = iso_aabb(resce_h5[2:5], resce_h5[1])
@@ -315,16 +369,17 @@ class base_regre(object):
             'draw_{}.png'.format(self.__class__.__name__)))
         mpplot.show()
 
-    @staticmethod
-    def placeholder_inputs(batch_size, image_size, pose_dim):
+    def placeholder_inputs(self):
         frames_tf = tf.placeholder(
-            tf.float32, shape=(batch_size, image_size, image_size, 1))
+            tf.float32, shape=(
+                self.batch_size,
+                self.crop_size, self.crop_size,
+                1))
         poses_tf = tf.placeholder(
-            tf.float32, shape=(batch_size, pose_dim))
+            tf.float32, shape=(self.batch_size, self.pose_dim))
         return frames_tf, poses_tf
 
-    @staticmethod
-    def get_model(frames_tf, pose_dim, is_training, bn_decay=None):
+    def get_model(self, frames_tf, is_training, bn_decay=None):
         """ directly predict all joints' location using regression
             frames_tf: BxHxWx1
             pose_dim: BxJ, where J is flattened 3D locations
@@ -368,7 +423,7 @@ class base_regre(object):
             net, keep_prob=0.5, is_training=is_training,
             scope='dp1')
         net = tf_util.fully_connected(
-            net, pose_dim, activation_fn=None, scope='fc3')
+            net, self.pose_dim, activation_fn=None, scope='fc3')
 
         return net, end_points
 

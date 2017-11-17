@@ -22,15 +22,31 @@ class file_pack:
     def __init__(self):
         self.files = {}
 
-    def push_h5(self, name, rw='r'):
-        file = h5py.File(name, rw)
+    def write_h5(self, name):
+        if name in self.files:
+            self.files[name].close()
+        file = h5py.File(name, 'w')
         self.files[name] = file
         return file
 
-    def push_file(self, name, rw='r'):
-        file = open(name, rw)
+    def write_file(self, name):
+        if name in self.files:
+            self.files[name].close()
+        file = open(name, 'w')
         self.files[name] = file
         return file
+
+    def push_h5(self, name):
+        if name not in self.files:
+            file = h5py.File(name, 'r')
+            self.files[name] = file
+        return self.files[name]
+
+    def push_file(self, name):
+        if name not in self.files:
+            file = open(name, 'r')
+            self.files[name] = file
+        return self.files[name]
 
     def __enter__(self):
         return self

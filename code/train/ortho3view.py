@@ -22,61 +22,27 @@ iso_cube = getattr(
 
 
 class ortho3view(base_regre):
-    def __init__(self, out_dir):
-        super(ortho3view, self).__init__(out_dir)
-        self.train_dir = os.path.join(out_dir, 'ortho3v')
-
-    def check_dir(self, thedata, args):
-        first_run = False
-        if not os.path.exists(self.train_dir):
-            first_run = True
-            os.makedirs(self.train_dir)
-        if args.rebuild_data:
-            first_run = True
-        if not first_run:
-            return
-        batchallot = self.batch_allot(
-            args.store_level, self.crop_size, self.pose_dim, args.store_level)
-        batchallot.allot(3, 11)
-        with file_pack() as filepack:
-            file_annot = filepack.push_file(thedata.training_annot_train)
-            self.prepare_data(thedata, batchallot, file_annot, self.appen_train)
-        with file_pack() as filepack:
-            file_annot = filepack.push_file(thedata.training_annot_test)
-            self.prepare_data(thedata, batchallot, file_annot, self.appen_test)
-        print('data prepared: {}'.format(self.train_dir))
+    def __init__(self):
+        super(ortho3view, self).__init__()
+        self.num_channel = 3
+        self.num_appen = 11
 
     def receive_data(self, thedata, args):
         """ Receive parameters specific to the data """
-        self.pose_dim = thedata.join_num * 3
-        self.image_dir = thedata.training_images
-        self.caminfo = thedata
-        self.provider = args.data_provider
-        self.provider_worker = args.data_provider.prow_ortho3v
-        self.yanker = self.provider.yank_ortho3v
-        self.check_dir(thedata, args)
+        super(ortho3view, self).receive_data(thedata, args)
+        self.provider_worker = args.data_provider.prow_cleaned
+        self.yanker = self.provider.yank_cleaned
 
     def draw_random(self, thedata, args):
         import matplotlib.pyplot as mpplot
 
-        filelist = [f for f in os.listdir(self.train_dir)
-                    if os.path.isfile(os.path.join(self.train_dir, f))]
-        filename = os.path.join(self.train_dir, np.random.choice(filelist))
-        with h5py.File(filename, 'r') as h5file:
-            store_size = h5file['index'][:].shape[0]
-            batchallot = self.batch_allot(
-                store_size, self.crop_size, self.pose_dim, self.batch_size)
-            batchallot.assign(
-                h5file['index'][:],
-                h5file['frame'][:],
-                h5file['poses'][:],
-                h5file['resce'][:]
-            )
+        with h5py.File(os.path.join(self.prep_dir, self.appen_train), 'r') as h5file:
+            store_size = h5file['index'].shape[0]
             frame_id = np.random.choice(store_size)
-            img_id = batchallot.batch_index[frame_id, 0]
-            frame_h5 = batchallot.batch_frame[frame_id, ...]
-            poses_h5 = batchallot.batch_poses[frame_id, ...].reshape(-1, 3)
-            resce_h5 = batchallot.batch_resce[frame_id, ...]
+            img_id = h5file['index'][frame_id, 0]
+            frame_h5 = np.squeeze(h5file['frame'][frame_id, ...], -1)
+            poses_h5 = h5file['poses'][frame_id, ...].reshape(-1, 3)
+            resce_h5 = h5file['resce'][frame_id, ...]
 
         print('[{}] drawing pose #{:d}'.format(self.__class__.__name__, img_id))
         fig_size = (3 * 5, 3 * 5)
@@ -162,16 +128,17 @@ class ortho3view(base_regre):
             'draw_{}.png'.format(self.__class__.__name__)))
         mpplot.show()
 
-    @staticmethod
-    def placeholder_inputs(batch_size, image_size, pose_dim):
+    def placeholder_inputs(self):
         frames_tf = tf.placeholder(
-            tf.float32, shape=(batch_size, image_size, image_size, 3))
+            tf.float32, shape=(
+                self.batch_size,
+                self.crop_size, self.crop_size,
+                3))
         poses_tf = tf.placeholder(
-            tf.float32, shape=(batch_size, pose_dim))
+            tf.float32, shape=(self.batch_size, self.pose_dim))
         return frames_tf, poses_tf
 
-    @staticmethod
-    def get_model(frames_tf, pose_dim, is_training, bn_decay=None):
+    def get_model(self, frames_tf, is_training, bn_decay=None):
         """ directly predict all joints' location using regression
             frames_tf: BxHxWx3
             pose_dim: BxJ, where J is flattened 3D locations
@@ -214,6 +181,6 @@ class ortho3view(base_regre):
             net, keep_prob=0.5, is_training=is_training,
             scope='dp1')
         net = tf_util.fully_connected(
-            net, pose_dim, activation_fn=None, scope='fc2')
+            net, self.pose_dim, activation_fn=None, scope='fc2')
 
         return net, end_points

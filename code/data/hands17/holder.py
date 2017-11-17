@@ -14,10 +14,10 @@ class hands17holder:
     # dataset info
     data_dir = ''
     out_dir = ''
+    prep_dir = ''
     predict_dir = ''
     training_images = ''
     frame_images = ''
-    training_cropped = ''
     training_annot_origin = ''
     training_annot_cleaned = ''
     training_annot_train = ''
@@ -178,12 +178,14 @@ class hands17holder:
         self.data_dir = args.data_dir
         self.out_dir = args.out_dir
         self.crop_size = args.crop_size
+        self.prep_dir = os.path.join(self.out_dir, 'prepared')
+        if not os.path.exists(self.prep_dir):
+            os.mkdir(self.prep_dir)
         self.predict_dir = os.path.join(self.out_dir, 'predict')
         if not os.path.exists(self.predict_dir):
             os.mkdir(self.predict_dir)
         self.training_images = os.path.join(self.data_dir, 'training/images')
         self.frame_images = os.path.join(self.data_dir, 'frame/images')
-        self.training_cropped = os.path.join(self.out_dir, 'cropped')
         self.training_annot_origin = os.path.join(
             self.data_dir, 'training/Training_Annotation.txt')
         self.training_annot_cleaned = os.path.join(

@@ -70,6 +70,7 @@ def draw_error_percentage_curve(errors, methods, ax):
     ax.set_xlim(left=0)
     ax.set_xlim(right=100)
     mpplot.legend(methods, loc='lower right')
+    mpplot.tight_layout()
     # ax.set_xlim(right=50)
     # mpplot.show()
 
@@ -118,12 +119,13 @@ def draw_error_per_joint(errors, methods, ax, join_name=None, draw_std=False):
             mpplot.bar(
                 jloc + wb * ei - wsl, err, width=wb, align='center'
             )
-    ylim_top = min(np.max(err_mean[:, 0:7]), np.max(err_mean))
+    ylim_top = max(np.max(err_mean[:, 0:7]), np.max(err_mean))
     ax.set_ylabel('Mean error (mm)')
-    ax.set_ylim(bottom=0)
-    ax.set_ylim(top=ylim_top + float(num_m) * ylim_top * 0.1)
+    ax.set_ylim(0, ylim_top + float(num_m) * ylim_top * 0.1)
+    # ax.set_xlim([-2 * wsl - 1, jloc[-1] + 1 + 2 * wsl])
     ax.set_xlim([-2 * wsl, jloc[-1] + 2 * wsl])
     mpplot.xticks(jloc, jtick, rotation='vertical')
     mpplot.margins(0.1)
+    mpplot.tight_layout()
     mpplot.legend(methods, loc='upper left')
     # mpplot.show()
