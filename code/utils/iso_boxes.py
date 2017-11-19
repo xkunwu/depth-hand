@@ -24,7 +24,6 @@ class iso_rect:
         print(self.cll, self.len)
 
     def pick(self, points2):
-        """ only meaningful when picked in the local coordinates """
         cmin = self.cll
         cmax = self.cll + self.len
         conds = np.logical_and(
@@ -73,7 +72,7 @@ class iso_aabb:
         return np.append(self.len, self.cll)
 
     def load(self, args):
-        self.cll = args[1:3]
+        self.cll = args[1:4]
         self.len = args[0]
 
     def show_dims(self):
@@ -91,6 +90,14 @@ class iso_aabb:
         if 1 > m and -1 < m:
             m = self.len * m
         self.len += m
+
+    def transform(self, points3):
+        """ to local coordinates """
+        return points3 - (self.cll + self.len / 2)
+
+    def transform_inv(self, points3):
+        """ to world coordinates """
+        return points3 + (self.cll + self.len / 2)
 
 
 class iso_cube:
@@ -182,7 +189,7 @@ class iso_cube:
         coord = ps3_pca[:, cid]
         cll = np.array([-self.len, -self.len])
         coord = np.floor(coord - cll + 0.5).astype(int)
-        depth = ps3_pca[:, did] + self.len
+        depth = (ps3_pca[:, did] + self.len) / (2 * self.len)
         return coord, depth
 
     def print_image(self, coord, depth):

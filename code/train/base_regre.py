@@ -55,13 +55,16 @@ class base_regre(object):
                         batch_size,
                         image_size, image_size,
                         num_channel),
-                    dtype=np.float32),
+                    # dtype=np.float32),
+                    dtype=float),
                 'batch_poses': np.empty(
                     shape=(batch_size, pose_dim),
-                    dtype=np.float32),
+                    # dtype=np.float32),
+                    dtype=float),
                 'batch_resce': np.empty(
                     shape=(batch_size, num_appen),
-                    dtype=np.float32)
+                    # dtype=np.float32),
+                    dtype=float),
             }
             self.batch_bytes = \
                 batch_data['batch_index'].nbytes + batch_data['batch_frame'].nbytes + \
@@ -84,11 +87,16 @@ class base_regre(object):
                     self.store_size,
                     self.image_size, self.image_size,
                     self.num_channel),
-                dtype=np.float32)
+                # dtype=np.float32)
+                dtype=float)
             self.batch_poses = np.empty(
-                shape=(self.store_size, self.pose_dim), dtype=np.float32)
+                shape=(self.store_size, self.pose_dim),
+                # dtype=np.float32)
+                dtype=float)
             self.batch_resce = np.empty(
-                shape=(self.store_size, self.num_appen), dtype=np.float32)
+                shape=(self.store_size, self.num_appen),
+                # dtype=np.float32)
+                dtype=float)
 
         def fetch_store(self):
             if self.store_beg >= self.file_size:
@@ -219,20 +227,20 @@ class base_regre(object):
                         image_size, image_size,
                         num_channel),
                 compression='lzf',
-                dtype=np.float32
-            )
+                # dtype=np.float32)
+                dtype=float)
             h5file.create_dataset(
                 'poses',
                 (num_line, pose_dim),
                 compression='lzf',
-                dtype=np.float32
-            )
+                # dtype=np.float32)
+                dtype=float)
             h5file.create_dataset(
                 'resce',
                 (num_line, num_appen),
                 compression='lzf',
-                dtype=np.float32
-            )
+                # dtype=np.float32)
+                dtype=float)
             bi = 0
             store_beg = 0
             while True:
@@ -304,6 +312,8 @@ class base_regre(object):
             frame_h5 = np.squeeze(h5file['frame'][frame_id, ...], -1)
             poses_h5 = h5file['poses'][frame_id, ...].reshape(-1, 3)
             resce_h5 = h5file['resce'][frame_id, ...]
+            # print(np.histogram(frame_h5))
+            # print(poses_h5)
 
         print('[{}] drawing pose #{:d}'.format(self.__class__.__name__, img_id))
         # aabb = iso_aabb(resce_h5[2:5], resce_h5[1])
@@ -318,7 +328,7 @@ class base_regre(object):
         mpplot.imshow(frame_h5, cmap='bone')
         pose_raw = args.data_ops.local_to_raw(poses_h5, resce3)
         args.data_draw.draw_pose2d(
-            thedata, frame_h5,
+            thedata,
             args.data_ops.raw_to_2d(pose_raw, thedata, resce2)
         )
 
@@ -328,7 +338,7 @@ class base_regre(object):
         mpplot.imshow(img, cmap='bone')
         pose_raw = self.yanker(poses_h5, resce_h5)
         args.data_draw.draw_pose2d(
-            thedata, img,
+            thedata,
             args.data_ops.raw_to_2d(pose_raw, thedata)
         )
 
@@ -341,7 +351,7 @@ class base_regre(object):
         rect = iso_rect(resce_h5[1:3], self.crop_size / resce_h5[0])
         rect.draw()
         args.data_draw.draw_pose2d(
-            thedata, img,
+            thedata,
             args.data_ops.raw_to_2d(pose_raw, thedata))
 
         mpplot.subplot(2, 2, 2)
@@ -350,7 +360,7 @@ class base_regre(object):
         frame = np.squeeze(frame, axis=-1)
         poses = poses.reshape(-1, 3)
         if (
-                # (1e-4 < np.linalg.norm(frame_h5 - frame)) or
+                (1e-4 < np.linalg.norm(frame_h5 - frame)) or
                 (1e-4 < np.linalg.norm(poses_h5 - poses))
         ):
             print(np.linalg.norm(frame_h5 - frame))
@@ -361,7 +371,7 @@ class base_regre(object):
         mpplot.imshow(frame, cmap='bone')
         pose_raw = args.data_ops.local_to_raw(poses, resce3)
         args.data_draw.draw_pose2d(
-            thedata, frame,
+            thedata,
             args.data_ops.raw_to_2d(pose_raw, thedata, resce2)
         )
         mpplot.savefig(os.path.join(

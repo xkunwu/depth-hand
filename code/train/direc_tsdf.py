@@ -60,7 +60,7 @@ class direc_tsdf(base_conv3):
             store_size = h5file['index'].shape[0]
             frame_id = np.random.choice(store_size)
             img_id = h5file['index'][frame_id, 0]
-            frame_h5 = np.squeeze(h5file['frame'][frame_id, ...], -1)
+            frame_h5 = h5file['frame'][frame_id, ...]
             poses_h5 = h5file['poses'][frame_id, ...].reshape(-1, 3)
             # resce_h5 = h5file['resce'][frame_id, ...]
 
@@ -70,7 +70,7 @@ class direc_tsdf(base_conv3):
             annot_line, self.image_dir, thedata)
         poses = poses.reshape(-1, 3)
         if (
-                # (1e-4 < np.linalg.norm(frame_h5 - frame)) or
+                (1e-4 < np.linalg.norm(frame_h5 - frame)) or
                 (1e-4 < np.linalg.norm(poses_h5 - poses))
         ):
             print(np.linalg.norm(frame_h5 - frame))

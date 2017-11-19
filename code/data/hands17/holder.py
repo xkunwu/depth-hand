@@ -34,9 +34,9 @@ class hands17holder:
     # cropped & resized training images
     image_size = [640, 480]
     crop_size = 96
-    z_near = 1
-    z_far = 3333
-    z_max = 9999  # max distance set to 10m
+    z_near = 1.
+    z_far = 3333.
+    z_max = 9999.  # max distance set to 10m
     # camera info
     focal = (475.065948, 475.065857)
     centre = (315.944855, 245.287079)

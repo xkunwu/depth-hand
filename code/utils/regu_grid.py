@@ -1,20 +1,4 @@
-import os
-import sys
-from importlib import import_module
 import numpy as np
-import matplotlib.pyplot as mpplot
-import matplotlib.patches as mppatches
-from mpl_toolkits.mplot3d import Axes3D
-from mpl_toolkits.mplot3d.art3d import Poly3DCollection
-from colour import Color
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-BASE_DIR = os.path.abspath(os.path.join(BASE_DIR, os.pardir))
-sys.path.append(os.path.join(BASE_DIR, 'utils'))
-iso_cube = getattr(
-    import_module('iso_boxes'),
-    'iso_cube'
-)
 
 
 class grid_cell():
@@ -104,7 +88,7 @@ class regu_grid:
     def fill(self, points3):
         indices = self.putit(points3)
         for index in indices:
-            self.pcnt[index[0], index[1], index[2]] += 1
+            self.pcnt[index[0], index[1], index[2]] += 1.
         self.pcnt /= np.max(self.pcnt)
 
     def voxen(self, index):

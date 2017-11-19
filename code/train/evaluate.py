@@ -171,15 +171,15 @@ if __name__ == "__main__":
     argsholder.parse_args()
     args = argsholder.args
 
-    # test_dataops(args)
-    # sys.exit()
+    test_dataops(args)
+    sys.exit()
 
     # scp_t = os.path.join(args.out_dir, 'predict_sipadan')
     # draw_compare(args, scp_t)
     # sys.exit()
 
-    run_one(args)
-    sys.exit()
+    # run_one(args)
+    # sys.exit()
 
     methlist = [
         'direc_tsdf',

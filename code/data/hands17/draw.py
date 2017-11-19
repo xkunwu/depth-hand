@@ -30,7 +30,7 @@ iso_cube = getattr(
 )
 
 
-def draw_pose2d(thedata, img, pose2d, show_margin=False):
+def draw_pose2d(thedata, pose2d, show_margin=False):
     """ Draw 2D pose on the image domain.
         Args:
             pose2d: nx2 array, image domain coordinates
@@ -111,7 +111,7 @@ def draw_pose_raw(thedata, img, pose_raw, show_margin=False):
     rect.draw()
 
     img_posed = draw_pose2d(
-        thedata, img,
+        thedata,
         pose2d,
         show_margin)
     return img_posed
@@ -179,7 +179,7 @@ def draw_pose_raw_random(thedata, image_dir, annot_txt, img_id=-1):
     # if resce is None:
     draw_pose_raw(thedata, img, pose_raw)
     # else:
-    #     draw_pose2d(thedata, img, pose_raw[:, 0:2])
+    #     draw_pose2d(thedata, pose_raw[:, 0:2])
     # mpplot.show()
     return img_id
 
@@ -282,7 +282,7 @@ def draw_raw3d(thedata, img, pose_raw):
         coord, depth = cube.project_pca(points3_trans, roll=spi)
         img = cube.print_image(coord, depth)
         pose2d, _ = cube.project_pca(pose_trans, roll=spi, sort=False)
-        draw_pose2d(thedata, img, pose2d)
+        draw_pose2d(thedata, pose2d)
         mpplot.imshow(img, cmap='bone')
     mpplot.gcf().gca().axis('off')
     mpplot.tight_layout()
@@ -317,7 +317,7 @@ def draw_raw3d_random(thedata, image_dir, annot_txt, img_id=-1):
         img, pose_raw, thedata)
     mpplot.imshow(img_crop_resize, cmap='bone')
     draw_pose2d(
-        thedata, img_crop_resize,
+        thedata,
         dataops.raw_to_2d(pose_raw, thedata, resce))
     mpplot.gca().set_title('Cropped')
     mpplot.subplot(1, 3, 3)
@@ -325,7 +325,7 @@ def draw_raw3d_random(thedata, image_dir, annot_txt, img_id=-1):
         img, pose_raw, thedata)
     mpplot.imshow(img_crop_resize, cmap='bone')
     draw_pose2d(
-        thedata, img_crop_resize,
+        thedata,
         dataops.raw_to_2d(pose_raw, thedata, resce))
     mpplot.gca().set_title('Cleaned')
     mpplot.gcf().gca().axis('off')

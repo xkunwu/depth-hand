@@ -44,15 +44,15 @@ def pca_to_raw(points3, resce=np.array([1, 0, 0, 0, 1, 0, 0, 0])):
 
 
 def raw_to_local(points3, resce=np.array([1, 0, 0, 0])):
-    # aabb = iso_aabb()
-    # aabb.load(resce)
-    return (points3 - resce[1:4]) / resce[0]
+    aabb = iso_aabb()
+    aabb.load(resce)
+    return aabb.transform(points3) / resce[0]
 
 
 def local_to_raw(points3, resce=np.array([1, 0, 0, 0])):
-    # aabb = iso_aabb()
-    # aabb.load(resce)
-    return points3 * resce[0] + resce[1:4]
+    aabb = iso_aabb()
+    aabb.load(resce)
+    return aabb.transform_inv(points3 * resce[0])
 
 
 def d2z_to_raw(p2z, caminfo, resce=np.array([1, 0, 0])):
@@ -94,6 +94,13 @@ def raw_to_2dz(points3, caminfo, resce=np.array([1, 0, 0])):
 def raw_to_2d(points3, caminfo, resce=np.array([1, 0, 0])):
     pose2d, _ = raw_to_2dz(points3, caminfo, resce)
     return pose2d
+
+
+def normalize_depth(img, caminfo):
+    return np.clip(
+        (img.astype(float) - caminfo.z_near) / (caminfo.z_far - caminfo.z_near),
+        0., 1.
+    )
 
 
 def getbm(base_z, caminfo, base_margin=20):
@@ -178,11 +185,11 @@ def proj_ortho3(img, pose_raw, caminfo):
     cube = iso_cube()
     cube.build(pose_raw)
     _, points3_trans = cube.pick(img_to_raw(img, caminfo))
-    img_crop_resize = []
+    img_l = []
     for spi in range(3):
         coord, depth = cube.project_pca(points3_trans, roll=spi)
         img_crop = cube.print_image(coord, depth)
-        img_crop_resize.append(
+        img_l.append(
             cv2resize(img_crop, (caminfo.crop_size, caminfo.crop_size))
         )
         # pose2d, _ = cube.project_pca(pose_trans, roll=spi, sort=False)
@@ -198,7 +205,8 @@ def proj_ortho3(img, pose_raw, caminfo):
     # resce = np.concatenate((
     #     resce,
     #     cube.evecs.flatten()))
-    return np.stack(img_crop_resize, axis=2), resce
+    img_crop_resize = np.stack(img_l, axis=2)
+    return img_crop_resize, resce
 
 
 def crop_resize_pca(img, pose_raw, caminfo):
@@ -212,6 +220,8 @@ def crop_resize_pca(img, pose_raw, caminfo):
     conds = rect.pick(points2)
     img_crop = rect.print_image(points2[conds, :], pose_z[conds])
     img_crop_resize = cv2resize(img_crop, (caminfo.crop_size, caminfo.crop_size))
+    img_crop_resize = (img_crop_resize.astype(float) - np.min(img_crop_resize)) /\
+        (np.max(img_crop_resize) - np.min(img_crop_resize))
     resce = np.concatenate((
         np.array([float(caminfo.crop_size) / rect.len]),
         rect.cll,
@@ -266,6 +276,7 @@ def crop_resize(img, pose_raw, caminfo):
     # img_crop = rect.print_image(points2[conds, :], pose_z[conds])
 
     img_crop_resize = cv2resize(img_crop, (caminfo.crop_size, caminfo.crop_size))
+    img_crop_resize = normalize_depth(img_crop_resize, caminfo)
     # cen = (np.min(pose_raw, axis=0) + np.max(pose_raw, axis=0)) / 2
     # cen2, cenz = raw_to_2dz(np.expand_dims(cen, axis=0), caminfo)
     # cen2 = (cll + ctr) / 2

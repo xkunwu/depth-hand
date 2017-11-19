@@ -30,8 +30,8 @@ class ortho3view(base_regre):
     def receive_data(self, thedata, args):
         """ Receive parameters specific to the data """
         super(ortho3view, self).receive_data(thedata, args)
-        self.provider_worker = args.data_provider.prow_cleaned
-        self.yanker = self.provider.yank_cleaned
+        self.provider_worker = args.data_provider.prow_ortho3v
+        self.yanker = self.provider.yank_ortho3v
 
     def draw_random(self, thedata, args):
         import matplotlib.pyplot as mpplot
@@ -40,7 +40,7 @@ class ortho3view(base_regre):
             store_size = h5file['index'].shape[0]
             frame_id = np.random.choice(store_size)
             img_id = h5file['index'][frame_id, 0]
-            frame_h5 = np.squeeze(h5file['frame'][frame_id, ...], -1)
+            frame_h5 = h5file['frame'][frame_id, ...]
             poses_h5 = h5file['poses'][frame_id, ...].reshape(-1, 3)
             resce_h5 = h5file['resce'][frame_id, ...]
 
@@ -59,7 +59,7 @@ class ortho3view(base_regre):
             pose2d, _ = cube.project_pca(pose_pca, roll=spi, sort=False)
             pose2d = pose2d * resce2[0]
             args.data_draw.draw_pose2d(
-                thedata, img,
+                thedata,
                 pose2d,
             )
             mpplot.gcf().gca().axis('off')
@@ -71,7 +71,7 @@ class ortho3view(base_regre):
         mpplot.imshow(img, cmap='bone')
         pose_raw = self.yanker(poses_h5, resce_h5)
         args.data_draw.draw_pose2d(
-            thedata, img,
+            thedata,
             args.data_ops.raw_to_2d(pose_raw, thedata)
         )
 
@@ -82,14 +82,14 @@ class ortho3view(base_regre):
         img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
         mpplot.imshow(img, cmap='bone')
         args.data_draw.draw_pose2d(
-            thedata, img,
+            thedata,
             args.data_ops.raw_to_2d(pose_raw, thedata))
 
         img_name, frame, poses, resce = self.provider_worker(
             annot_line, self.image_dir, thedata)
         poses = poses.reshape(-1, 3)
         if (
-                # (1e-4 < np.linalg.norm(frame_h5 - frame)) or
+                (1e-4 < np.linalg.norm(frame_h5 - frame)) or
                 (1e-4 < np.linalg.norm(poses_h5 - poses))
         ):
             print(np.linalg.norm(frame_h5 - frame))
@@ -118,7 +118,7 @@ class ortho3view(base_regre):
             pose2d, _ = cube.project_pca(pose_pca, roll=spi, sort=False)
             pose2d = pose2d * resce2[0]
             args.data_draw.draw_pose2d(
-                thedata, img,
+                thedata,
                 pose2d,
             )
             mpplot.gcf().gca().axis('off')
