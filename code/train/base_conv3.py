@@ -136,17 +136,16 @@ class base_conv3(base_regre):
             self.batch_beg = batch_end
             return batch_data
 
-    def prepare_data(self, thedata, batchallot, file_annot, name_appen):
+    def prepare_data(self, thedata, args, batchallot, file_annot, name_appen):
         num_line = int(sum(1 for line in file_annot))
         file_annot.seek(0)
         batchallot.allot(num_line)
         store_size = batchallot.store_size
         num_stores = int(np.ceil(float(num_line) / store_size))
-        print('[{}] preparing data: {:d} lines \n\
-              (producing {:.4f} GB for store size {:d}) ...'.format(
-            self.__class__.__name__, num_line,
-            float(batchallot.store_bytes) / (2 << 30), store_size
-        ))
+        args.logger.debug(
+            'preparing data [{}]: {:d} lines (producing {:.4f} GB for store size {:d}) ...'.format(
+                self.__class__.__name__, num_line,
+                float(batchallot.store_bytes) / (2 << 30), store_size))
         timerbar = progressbar.ProgressBar(
             maxval=num_stores,
             widgets=[

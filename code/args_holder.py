@@ -1,7 +1,8 @@
 import os
+import sys
 from importlib import import_module
 import argparse
-import multiprocessing
+import logging
 
 
 class args_holder:
@@ -11,6 +12,8 @@ class args_holder:
 
         # directories
         home_dir = os.path.expanduser('~')
+        this_dir = os.path.dirname(os.path.abspath(__file__))
+        proj_root = os.path.abspath(os.path.join(this_dir, os.pardir))
         self.parser.add_argument(
             '--data_root', default=os.path.join(home_dir, 'data'),
             help='root dir of all data sets [default: data]')
@@ -18,17 +21,17 @@ class args_holder:
             '--data_name', default='hands17',
             help='name of data set and its dir [default: hands17]')
         self.parser.add_argument(
-            '--out_dir', default='output',
+            '--out_root', default=os.path.join(proj_root, 'output'),
             help='Output dir [default: output]')
+        # self.parser.add_argument(
+        #     '--rebuild_data', default=False,
+        #     help='rebuild data structure and preprocess [default: False]')
         self.parser.add_argument(
-            '--rebuild_data', default=False,
-            help='rebuild data structure and preprocess [default: False]')
-        self.parser.add_argument(
-            '--log_file', default='univue.log',
-            help='Log file name [default: univue.log]')
-        self.parser.add_argument(
-            '--model_ckpt', default='model.ckpt',
-            help='Model checkpoint name [default: model.ckpt]')
+            '--retrain', default=False,
+            help='retrain the model [default: False]')
+        # self.parser.add_argument(
+        #     '--model_ckpt', default='model.ckpt',
+        #     help='Model checkpoint name [default: model.ckpt]')
 
         # system parameters
         self.parser.add_argument(
@@ -41,14 +44,6 @@ class args_holder:
             help='Model name [default: base_clean], from \
             [base_regre, base_clean, ortho3view, base_conv3, trunc_dist]'
         )
-
-        # input preprocessing
-        # self.parser.add_argument(
-        #     '--crop_size', type=int, default=96,
-        #     help='Resized image size of cropped area [default: 96]')
-        # self.parser.add_argument(
-        #     '--pose_dim', type=int, default=63,
-        #     help='Output tensor length of pose [default: 63]')
 
         # learning parameters
         self.parser.add_argument(
@@ -75,21 +70,108 @@ class args_holder:
             # fast decay, as using adaptive optimizer
             help='Decay rate for lr decay [default: 0.9]')
 
+    def make_new_log(self):
+        log_dir = os.path.join(self.args.out_dir, 'log')
+        blinks = os.path.join(log_dir, 'blinks')
+        if not os.path.exists(blinks):
+            os.makedirs(blinks)
+        log_dir_ln = os.path.join(
+            blinks, self.args.model_name)
+        if (not os.path.exists(log_dir_ln)):
+            from datetime import datetime
+            log_time = datetime.now().strftime('%y%m%d-%H%M%S')
+            # git_hash = subprocess.check_output(
+            #     ['git', 'rev-parse', '--short', 'HEAD'])
+            self.args.log_dir_t = os.path.join(
+                log_dir, 'log-{}'.format(log_time)
+            )
+            os.makedirs(self.args.log_dir_t)
+            os.symlink(self.args.log_dir_t, log_dir_ln + '-tmp')
+            os.rename(log_dir_ln + '-tmp', log_dir_ln)
+        else:
+            self.args.log_dir_t = os.readlink(log_dir_ln)
+
+    def make_logging(self):
+        logFormatter = logging.Formatter(
+            '%(asctime)s [%(levelname)-5.5s]  %(message)s (%(filename)s:%(lineno)s)',
+            datefmt='%y-%m-%d %H:%M:%S')
+        logger = logging.getLogger('univue')
+        logger.setLevel(logging.INFO)
+        fileHandler = logging.FileHandler(
+            os.path.join(
+                self.args.out_dir, 'log', 'univue.log'),
+            mode='a'
+        )
+        fileHandler.setFormatter(logFormatter)
+        logger.addHandler(fileHandler)
+        consoleHandler = logging.StreamHandler(stream=sys.stdout)
+        consoleHandler.setFormatter(logFormatter)
+        logger.addHandler(consoleHandler)
+        self.args.logger = logger
+        logger = logging.getLogger('train')
+        logger.setLevel(logging.INFO)
+        if self.args.retrain:
+            fileHandler = logging.FileHandler(
+                os.path.join(self.args.log_dir_t, 'train.log'),
+                mode='w'
+            )
+        else:
+            fileHandler = logging.FileHandler(
+                os.path.join(self.args.log_dir_t, 'train.log'),
+                mode='a'
+            )
+        fileHandler.setFormatter(logFormatter)
+        logger.addHandler(fileHandler)
+        consoleHandler = logging.StreamHandler(stream=sys.stdout)
+        consoleHandler.setFormatter(logFormatter)
+        logger.addHandler(consoleHandler)
+
+    @staticmethod
+    def write_args(args):
+        import inspect
+        with open(os.path.join(args.log_dir_t, 'args.txt'), 'w') as writer:
+            for arg in vars(args):
+                att = getattr(args, arg)
+                if inspect.ismodule(att) or inspect.isclass(att):
+                    continue
+                writer.write('--{}={}\n'.format(arg, att))
+                # print(arg, getattr(args, arg))
+
     def parse_args(self):
         self.args = self.parser.parse_args()
-        self.args.data_dir = os.path.join(self.args.data_root, self.args.data_name)
-        this_dir = os.path.dirname(os.path.abspath(__file__))
-        self.args.proj_root = os.path.abspath(os.path.join(this_dir, os.pardir))
-        self.args.out_dir = os.path.join(self.args.proj_root, self.args.out_dir)
-        if not os.path.exists(self.args.out_dir):
-            os.makedirs(self.args.out_dir)
-        self.args.out_dir = os.path.join(self.args.out_dir, self.args.data_name)
-        if not os.path.exists(self.args.out_dir):
-            os.makedirs(self.args.out_dir)
-        self.args.log_dir = os.path.join(self.args.out_dir, 'log')
-        self.args.cpu_count = multiprocessing.cpu_count()
+        self.args.data_dir = os.path.join(
+            self.args.data_root,
+            self.args.data_name)
+        self.args.out_dir = os.path.join(
+            self.args.out_root,
+            self.args.data_name
+        )
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        logger = logging.getLogger('univue')
+        for handler in logger.handlers[:]:
+            handler.close()
+            logger.removeHandler(handler)
+        logger = logging.getLogger('train')
+        for handler in logger.handlers[:]:
+            handler.close()
+            logger.removeHandler(handler)
+        logging.shutdown()
+        # if exc_type is not None:
+        #     print(exc_type, exc_value, exc_traceback)
+        return self
 
     def create_instance(self):
+        self.make_new_log()
+        if not os.path.exists(os.path.join(
+                self.args.log_dir_t, 'model.ckpt.meta')):
+            self.args.retrain = True
+        self.make_logging()
+        self.args.logger.info('######## {} [{}] ########'.format(
+            self.args.data_name, self.args.model_name))
         self.args.model_class = getattr(
             import_module('train.' + self.args.model_name),
             self.args.model_name
@@ -111,23 +193,15 @@ class args_holder:
             self.args.data_name + 'holder'
         )
         self.args.data_inst = self.args.data_class(self.args)
-        self.args.data_inst.init_data(
-            self.args.rebuild_data
-        )
+        self.args.data_inst.init_data()
         self.args.model_inst.receive_data(self.args.data_inst, self.args)
         self.args.model_inst.check_dir(self.args.data_inst, self.args)
-
-    def write_args(self, log_dir):
-        with open(os.path.join(log_dir, 'args.txt'), 'w') as writer:
-            for arg in vars(self.args):
-                writer.write('--{}={}'.format(arg, getattr(self.args, arg)))
-                # print(arg, getattr(self.args, arg))
+        self.write_args(self.args)
 
 
 if __name__ == "__main__":
     # python args_holder.py --batch_size=16
-    argsholder = args_holder()
-    argsholder.parse_args()
-    ARGS = argsholder.args
-    ARGS.rebuild_data = True  # this is very slow
-    argsholder.create_instance()
+    with args_holder() as argsholder:
+        argsholder.parse_args()
+        ARGS = argsholder.args
+        argsholder.create_instance()

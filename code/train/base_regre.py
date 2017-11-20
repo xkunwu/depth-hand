@@ -2,6 +2,7 @@ import tensorflow as tf
 import os
 import sys
 from importlib import import_module
+from timeit import default_timer as timer
 from psutil import virtual_memory
 import numpy as np
 import progressbar
@@ -189,17 +190,16 @@ class base_regre(object):
         """ Tweak algorithm specific parameters """
         args.crop_size = self.crop_size
 
-    def prepare_data(self, thedata, batchallot, file_annot, name_appen):
+    def prepare_data(self, thedata, args, batchallot, file_annot, name_appen):
         num_line = int(sum(1 for line in file_annot))
         file_annot.seek(0)
         batchallot.allot(num_line)
         store_size = batchallot.store_size
         num_stores = int(np.ceil(float(num_line) / store_size))
-        print('[{}] preparing data: {:d} lines \n\
-              (producing {:.4f} GB for store size {:d}) ...'.format(
-            self.__class__.__name__, num_line,
-            float(batchallot.store_bytes) / (2 << 30), store_size
-        ))
+        args.logger.debug(
+            'preparing data [{}]: {:d} lines (producing {:.4f} GB for store size {:d}) ...'.format(
+                self.__class__.__name__, num_line,
+                float(batchallot.store_bytes) / (2 << 30), store_size))
         timerbar = progressbar.ProgressBar(
             maxval=num_stores,
             widgets=[
@@ -266,23 +266,25 @@ class base_regre(object):
     def check_dir(self, thedata, args):
         first_run = False
         if (
-                args.rebuild_data or
                 (not os.path.exists(self.appen_train)) or
                 (not os.path.exists(self.appen_test))
         ):
             first_run = True
         if not first_run:
             return
+        time_s = timer()
         batchallot = self.batch_allot(
             self.batch_size, self.crop_size, self.pose_dim,
             self.num_channel, self.num_appen)
         with file_pack() as filepack:
             file_annot = filepack.push_file(thedata.training_annot_train)
-            self.prepare_data(thedata, batchallot, file_annot, self.appen_train)
+            self.prepare_data(thedata, args, batchallot, file_annot, self.appen_train)
         with file_pack() as filepack:
             file_annot = filepack.push_file(thedata.training_annot_test)
-            self.prepare_data(thedata, batchallot, file_annot, self.appen_test)
-        print('data prepared: {}'.format(self.prep_dir))
+            self.prepare_data(thedata, args, batchallot, file_annot, self.appen_test)
+        time_e = timer() - time_s
+        args.logger.info('data prepared [{}], time: {}'.format(
+            self.__class__.__name__, time_e))
 
     def receive_data(self, thedata, args):
         """ Receive parameters specific to the data """

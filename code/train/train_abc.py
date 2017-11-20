@@ -3,7 +3,6 @@ import sys
 from importlib import import_module
 import logging
 from timeit import default_timer as timer
-from datetime import datetime
 import tensorflow as tf
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -26,6 +25,7 @@ class train_abc():
     """
 
     def train(self):
+        self.logger.info('######## Training ########')
         tf.reset_default_graph()
         with tf.Graph().as_default():
             with tf.device('/gpu:' + str(self.args.gpu_id)):
@@ -52,7 +52,7 @@ class train_abc():
                 train_op = optimizer.minimize(loss, global_step=batch)
 
                 # Add ops to save and restore all the variables.
-                saver = tf.train.Saver()
+                saver = tf.train.Saver(max_to_keep=4)
 
             # Create a session
             config = tf.ConfigProto()
@@ -63,14 +63,19 @@ class train_abc():
                 # Add summary writers
                 merged = tf.summary.merge_all()
                 train_writer = tf.summary.FileWriter(
-                    os.path.join(self.log_dir_t, 'train'),
+                    os.path.join(self.args.log_dir_t, 'train'),
                     sess.graph)
                 test_writer = tf.summary.FileWriter(
-                    os.path.join(self.log_dir_t, 'test'))
+                    os.path.join(self.args.log_dir_t, 'test'))
 
+                model_path = os.path.join(self.args.log_dir_t, 'model.ckpt')
                 # Init variables
-                init = tf.global_variables_initializer()
-                sess.run(init)
+                if self.args.retrain:
+                    init = tf.global_variables_initializer()
+                    sess.run(init)
+                else:
+                    saver.restore(sess, model_path)
+                    self.logger.info('Model restored from: {}.'.format(model_path))
 
                 ops = {
                     'batch_frame': frames_tf,
@@ -84,6 +89,7 @@ class train_abc():
                 }
 
                 with file_pack() as filepack:
+                    time_all_s = timer()
                     self.args.model_inst.start_train()
                     for epoch in range(self.args.max_epoch):
                         self.logger.info('**** Epoch #{:03d} ****'.format(epoch))
@@ -96,16 +102,22 @@ class train_abc():
                         self.logger.info('** Testing **')
                         self.args.model_inst.start_epoch_test(filepack)
                         self.test_one_epoch(sess, ops, test_writer)
-                        self.logger.info('Epoch #{:03d} processing time: {}'.format(
-                            epoch,
-                            timer() - time_s))
+                        time_e = timer() - time_s
+                        # self.logger.info('Epoch #{:03d} processing time: {}'.format(
+                        #     epoch, time_e))
+                        self.args.logger.info('Epoch #{:03d} processing time: {}'.format(
+                            epoch, time_e))
 
                         # Save the variables to disk.
                         if epoch % 10 == 0:
-                            save_path = saver.save(
-                                sess, os.path.join(self.log_dir_t, self.args.model_ckpt))
+                            save_path = saver.save(sess, model_path)
                             self.logger.info("Model saved in file: {}".format(save_path))
                     self.args.model_inst.end_train()
+                    time_all_e = timer() - time_all_s
+                    # self.logger.info('Total training time: {}'.format(
+                    #     time_all_e))
+                    self.args.logger.info('Total training time: {}'.format(
+                        time_all_e))
 
     def train_one_epoch(self, sess, ops, train_writer):
         """ ops: dict mapping from string to tf ops """
@@ -152,10 +164,14 @@ class train_abc():
             sys.stdout.write('.')
             sys.stdout.flush()
         print('\n')
-        self.logger.info('epoch evaluate mean loss (half-squared): {}'.format(
-            loss_sum / batch_count))
+        mean_loss = loss_sum / batch_count
+        self.logger.info('epoch testing mean loss (half-squared): {}'.format(
+            mean_loss))
+        # self.args.logger.info('epoch testing mean loss (half-squared): {}'.format(
+        #     mean_loss))
 
     def evaluate(self):
+        self.logger.info('######## Evaluating ########')
         tf.reset_default_graph()
         with tf.device('/gpu:' + str(self.args.gpu_id)):
             frames_tf, poses_tf = self.args.model_inst.placeholder_inputs()
@@ -176,9 +192,9 @@ class train_abc():
         config.log_device_placement = False
         with tf.Session(config=config) as sess:
             # Restore variables from disk.
-            model_path = os.path.join(self.log_dir_t, self.args.model_ckpt)
+            model_path = os.path.join(self.args.log_dir_t, 'model.ckpt')
             saver.restore(sess, model_path)
-            self.logger.info("Model restored from: {}.".format(model_path))
+            self.logger.info('Model restored from: {}.'.format(model_path))
 
             ops = {
                 'batch_frame': frames_tf,
@@ -221,15 +237,18 @@ class train_abc():
             #     out_list = np.append(
             #         pred_val[bi, :].flatten(),
             #         batch_resce[bi, :].flatten()).flatten()
-            #     crimg_line = ''.join("%12.4f" % x for x in out_list)
+            #     crimg_line = ''.join('%12.4f' % x for x in out_list)
             #     writer.write(image_names[bi] + crimg_line + '\n')
             batch_count += 1
             loss_sum += loss_val
             sys.stdout.write('.')
             sys.stdout.flush()
         print('\n')
+        mean_loss = loss_sum / batch_count
         self.logger.info('epoch evaluate mean loss (half-squared): {}'.format(
-            loss_sum / batch_count))
+            mean_loss))
+        # self.args.logger.info('epoch evaluate mean loss (half-squared): {}'.format(
+        #     mean_loss))
 
     def get_learning_rate(self, batch):
         learning_rate = tf.train.exponential_decay(
@@ -256,70 +275,16 @@ class train_abc():
         bn_decay = 1 - tf.maximum(1e-2, bn_momentum)
         return bn_decay
 
-    @staticmethod
-    def write_args(log_dir, args):
-        with open(os.path.join(log_dir, 'args.txt'), 'w') as writer:
-            for arg in vars(args):
-                writer.write('--{}={}\n'.format(arg, getattr(args, arg)))
-                # print(arg, getattr(args, arg))
-
-    def make_new_log(self):
-        log_time = datetime.now().strftime('%y%m%d-%H%M%S')
-        # git_hash = subprocess.check_output(
-        #     ['git', 'rev-parse', '--short', 'HEAD'])
-        self.log_dir_t = os.path.join(
-            self.args.log_dir, 'log-{}'.format(log_time)
-        )
-        os.makedirs(self.log_dir_t)
-        os.symlink(self.log_dir_t, self.log_dir_ln + '-tmp')
-        os.rename(self.log_dir_ln + '-tmp', self.log_dir_ln)
-
     def __init__(self, args, new_log=True):
         self.args = args
-        blinks = os.path.join(self.args.log_dir, 'blinks')
-        if not os.path.exists(blinks):
-            os.makedirs(blinks)
-        self.log_dir_ln = os.path.join(
-            blinks, self.args.model_name)
-        if (not os.path.exists(self.log_dir_ln) or new_log):
-            self.make_new_log()
-        else:
-            self.log_dir_t = os.readlink(self.log_dir_ln)
-        self.write_args(self.log_dir_t, args)
-
-        # add both console and file logging
-        logFormatter = logging.Formatter(
-            "%(asctime)s [%(levelname)-5.5s]  %(message)s")
-        self.logger = logging.getLogger()
-        self.logger.setLevel(logging.INFO)
-        fileHandler = logging.FileHandler(
-            "{0}/{1}".format(self.log_dir_t, self.args.log_file))
-        fileHandler.setFormatter(logFormatter)
-        self.logger.addHandler(fileHandler)
-        consoleHandler = logging.StreamHandler()
-        consoleHandler.setFormatter(logFormatter)
-        self.logger.addHandler(consoleHandler)
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_value, exc_traceback):
-        handlers = self.logger.handlers[:]
-        for handler in handlers:
-            handler.close()
-            self.logger.removeHandler(handler)
-        logging.shutdown()
-        del self.logger
-        if exc_type is not None:
-            print(exc_type, exc_value, exc_traceback)
-        return self
+        self.logger = logging.getLogger('train')
 
 
 if __name__ == "__main__":
     # python train_abc.py --max_epoch=1 --batch_size=16 --model_name=base_regre
-    argsholder = args_holder()
-    argsholder.parse_args()
-    argsholder.create_instance()
-    trainer = train_abc(argsholder.args)
-    trainer.train()
-    trainer.evaluate()
+    with args_holder() as argsholder:
+        argsholder.parse_args()
+        argsholder.create_instance()
+        trainer = train_abc(argsholder.args)
+        trainer.train()
+        trainer.evaluate()

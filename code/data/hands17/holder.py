@@ -123,6 +123,8 @@ class hands17holder:
                 #     os.path.join(self.training_cropped, name),
                 #     os.path.join(self.evaluate_cropped, name))
                 f.write(line)
+        self.logger.info('splitted data: {} training, {} test ({:d} portions).'.format(
+            self.range_train, self.range_test, self.tt_split))
 
     # def crop_resize_save(self, annot_line, messages=None):
     #     img_name, img_crop, p3z_crop, resce = self.get_rect_crop_resize(
@@ -141,29 +143,27 @@ class hands17holder:
     #         messages.put(pose_l)
     #     return pose_l
 
-    def init_data(self, rebuild=False):
-        if rebuild:
-            shutil.rmtree(self.out_dir)
-            os.makedirs(self.out_dir)
+    def init_data(self):
+        # if rebuild:
+        #     shutil.rmtree(self.out_dir)
+        #     os.makedirs(self.out_dir)
         if (not os.path.exists(self.training_annot_cleaned)):
-            print('cleaning data ...')
-            # from timeit import default_timer as timer
+            from timeit import default_timer as timer
+            time_s = timer()
+            self.logger.info('cleaning data ...')
             self.remove_out_frame_annot()
-            print('data cleaned, using: {}'.format(
-                self.training_annot_cleaned))
+            time_e = timer() - time_s
+            self.logger.info('{} images after cleaning, time: {}'.format(
+                self.num_training, time_e))
         else:
             self.num_training = int(sum(
                 1 for line in open(self.training_annot_cleaned, 'r')))
-        print('total number of images: {:d}'.format(
-            self.num_training))
 
         portion = int(self.num_training / self.tt_split)
         self.range_train[0] = int(0)
         self.range_train[1] = int(portion * (self.tt_split - 1))
         self.range_test[0] = self.range_train[1]
         self.range_test[1] = self.num_training
-        print('splitted data: {} training, {} test.'.format(
-            self.range_train, self.range_test))
 
         if ((not os.path.exists(self.training_annot_train)) or
                 (not os.path.exists(self.training_annot_test))):
@@ -171,12 +171,11 @@ class hands17holder:
         test_file = os.path.basename(self.training_annot_test)
         if not os.path.exists(os.path.join(self.predict_dir, test_file)):
             shutil.copy2(self.training_annot_test, self.predict_dir)
-        print('images are splitted out for evaluation: {:d} portions'.format(
-            self.tt_split))
 
     def __init__(self, args):
         self.data_dir = args.data_dir
         self.out_dir = args.out_dir
+        self.logger = args.logger
         self.crop_size = args.crop_size
         self.prep_dir = os.path.join(self.out_dir, 'prepared')
         if not os.path.exists(self.prep_dir):

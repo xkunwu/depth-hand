@@ -14,7 +14,7 @@ args_holder = getattr(
 )
 
 
-def run_one(args):
+def run_one(args, with_train=False):
     import matplotlib as mpl
     mpl.use('Agg')
     mpplot = import_module('matplotlib.pyplot')
@@ -24,14 +24,12 @@ def run_one(args):
     predict_file = os.path.join(
         data_inst.predict_dir, args.model_inst.predict_file)
 
-    with train_abc(args, False) as trainer:
-        if (not os.path.exists(os.path.join(
-                trainer.log_dir_t, args.model_ckpt + '.index'))):
-            trainer.train()
-        # trainer.train()
-        if (not os.path.exists(predict_file)):
-            trainer.evaluate()
-        # trainer.evaluate()
+    trainer = train_abc(args, False)
+    if with_train or (not os.path.exists(os.path.join(
+            args.log_dir_t, 'model.ckpt.meta'))):
+        trainer.train()
+    if with_train or (not os.path.exists(predict_file)):
+        trainer.evaluate()
 
     print('evaluating {} ...'.format(args.model_name))
 
@@ -70,6 +68,9 @@ def run_one(args):
         errors, mpplot.gca())
     fname = '{}_error_dist.png'.format(args.model_name)
     mpplot.savefig(os.path.join(args.data_inst.predict_dir, fname))
+    args.logger.info('per-joint mean error maximum: {}'.format(
+        np.max(np.mean(errors, axis=1))
+    ))
     print('figures saved')
 
     # draw_sum = 3
@@ -167,19 +168,19 @@ def test_dataops(args):
 
 if __name__ == "__main__":
     # python evaluate.py --max_epoch=1 --batch_size=16 --model_name=base_clean
-    argsholder = args_holder()
-    argsholder.parse_args()
-    args = argsholder.args
+    with args_holder() as argsholder:
+        argsholder.parse_args()
+        args = argsholder.args
 
-    test_dataops(args)
-    sys.exit()
+        # test_dataops(args)
+        # sys.exit()
 
-    # scp_t = os.path.join(args.out_dir, 'predict_sipadan')
-    # draw_compare(args, scp_t)
-    # sys.exit()
+        # scp_t = os.path.join(args.out_dir, 'predict_sipadan')
+        # draw_compare(args, scp_t)
+        # sys.exit()
 
-    # run_one(args)
-    # sys.exit()
+        # run_one(args)
+        # sys.exit()
 
     methlist = [
         'direc_tsdf',
@@ -190,7 +191,11 @@ if __name__ == "__main__":
         'base_regre',
     ]
     for meth in methlist:
-        args.model_name = meth
-        run_one(args)
+        with args_holder() as argsholder:
+            argsholder.parse_args()
+            args = argsholder.args
+            args.model_name = meth
+            run_one(args, True)
+            # test_dataops(args)
 
     draw_compare(args)
