@@ -2,7 +2,6 @@ import os
 import sys
 from importlib import import_module
 import logging
-from timeit import default_timer as timer
 import tensorflow as tf
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -88,6 +87,8 @@ class train_abc():
                     'pred': pred
                 }
 
+                from timeit import default_timer as timer
+                from datetime import timedelta
                 with file_pack() as filepack:
                     time_all_s = timer()
                     self.args.model_inst.start_train()
@@ -102,9 +103,7 @@ class train_abc():
                         self.logger.info('** Testing **')
                         self.args.model_inst.start_epoch_test(filepack)
                         self.test_one_epoch(sess, ops, test_writer)
-                        time_e = timer() - time_s
-                        # self.logger.info('Epoch #{:03d} processing time: {}'.format(
-                        #     epoch, time_e))
+                        time_e = "{:0>8}".format(timedelta(seconds=(timer() - time_s)))
                         self.args.logger.info('Epoch #{:03d} processing time: {}'.format(
                             epoch, time_e))
 
@@ -113,9 +112,7 @@ class train_abc():
                             save_path = saver.save(sess, model_path)
                             self.logger.info("Model saved in file: {}".format(save_path))
                     self.args.model_inst.end_train()
-                    time_all_e = timer() - time_all_s
-                    # self.logger.info('Total training time: {}'.format(
-                    #     time_all_e))
+                    time_all_e = "{:0>8}".format(timedelta(seconds=(timer() - time_all_s)))
                     self.args.logger.info('Total training time: {}'.format(
                         time_all_e))
 
@@ -136,7 +133,6 @@ class train_abc():
                     ops['loss'], ops['pred']],
                 feed_dict=feed_dict)
             train_writer.add_summary(summary, step)
-            # batch_count += 1
             self.logger.info('batch training loss (half-squared): {}'.format(
                 loss_val))
 
@@ -167,8 +163,6 @@ class train_abc():
         mean_loss = loss_sum / batch_count
         self.logger.info('epoch testing mean loss (half-squared): {}'.format(
             mean_loss))
-        # self.args.logger.info('epoch testing mean loss (half-squared): {}'.format(
-        #     mean_loss))
 
     def evaluate(self):
         self.logger.info('######## Evaluating ########')
@@ -233,12 +227,6 @@ class train_abc():
                 batch_data['batch_resce'],
                 pred_val
             )
-            # for bi, _ in enumerate(next_n_lines):
-            #     out_list = np.append(
-            #         pred_val[bi, :].flatten(),
-            #         batch_resce[bi, :].flatten()).flatten()
-            #     crimg_line = ''.join('%12.4f' % x for x in out_list)
-            #     writer.write(image_names[bi] + crimg_line + '\n')
             batch_count += 1
             loss_sum += loss_val
             sys.stdout.write('.')
@@ -247,8 +235,6 @@ class train_abc():
         mean_loss = loss_sum / batch_count
         self.logger.info('epoch evaluate mean loss (half-squared): {}'.format(
             mean_loss))
-        # self.args.logger.info('epoch evaluate mean loss (half-squared): {}'.format(
-        #     mean_loss))
 
     def get_learning_rate(self, batch):
         learning_rate = tf.train.exponential_decay(

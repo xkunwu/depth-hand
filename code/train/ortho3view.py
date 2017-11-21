@@ -45,8 +45,7 @@ class ortho3view(base_regre):
             resce_h5 = h5file['resce'][frame_id, ...]
 
         print('[{}] drawing pose #{:d}'.format(self.__class__.__name__, img_id))
-        fig_size = (3 * 5, 3 * 5)
-        mpplot.subplots(nrows=3, ncols=3, figsize=fig_size)
+        mpplot.subplots(nrows=2, ncols=2, figsize=(3 * 5, 3 * 5))
         resce2 = resce_h5[0:3]
         resce3 = resce_h5[3:11]
         cube = iso_cube()

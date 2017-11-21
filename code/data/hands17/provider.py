@@ -112,11 +112,9 @@ def put_worker(args, worker, image_dir, caminfo, batchallot):
 
 def test_puttensor(next_n_lines, worker, image_dir, caminfo, batchallot):
     import copy
-    # time_s = timer()
     test_copy = copy.deepcopy(batchallot)
     for bi, line in enumerate(next_n_lines):
         put_worker((bi, line), worker, image_dir, caminfo, test_copy)
-    # print('single tread time: {:.4f}'.format(timer() - time_s))
     print('this is TEST only!!! DO NOT forget to write using mp version')
 
 
@@ -126,10 +124,14 @@ def puttensor_mt(fanno, worker, image_dir, caminfo, batchallot):
         return -1
     num_line = len(next_n_lines)
 
+    # from timeit import default_timer as timer
+    # from datetime import timedelta
+    # time_s = timer()
     # test_copy = test_puttensor(next_n_lines, worker, image_dir, caminfo, batchallot)
+    # time_e = "{:0>8}".format(timedelta(seconds=timer() - time_s))
+    # print('single tread time: {:.4f}'.format(time_e))
     # return num_line
 
-    # from timeit import default_timer as timer
     from functools import partial
     from multiprocessing.dummy import Pool as ThreadPool
     # time_s = timer()
@@ -143,7 +145,8 @@ def puttensor_mt(fanno, worker, image_dir, caminfo, batchallot):
     #     zip(range(num_line), next_n_lines))
     thread_pool.close()
     thread_pool.join()
-    # print('multiprocessing time: {:.4f}'.format(timer() - time_s))
+    # time_e = "{:0>8}".format(timedelta(seconds=timer() - time_s))
+    # print('multiprocessing time: {:.4f}'.format(time_e))
 
     # import numpy as np
     # print(np.linalg.norm(batchallot.batch_index - test_copy.batch_index))

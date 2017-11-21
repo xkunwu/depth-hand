@@ -126,34 +126,15 @@ class hands17holder:
         self.logger.info('splitted data: {} training, {} test ({:d} portions).'.format(
             self.range_train, self.range_test, self.tt_split))
 
-    # def crop_resize_save(self, annot_line, messages=None):
-    #     img_name, img_crop, p3z_crop, resce = self.get_rect_crop_resize(
-    #         annot_line)
-    #     img_crop[self.z_near > img_crop] = self.z_max
-    #     img_crop[self.z_far < img_crop] = self.z_max
-    #     dataio.save_image(
-    #         os.path.join(self.training_cropped, img_name),
-    #         img_crop
-    #     )
-    #     # self.draw_hist_random(self.training_cropped, img_name)
-    #     out_list = np.append(p3z_crop.flatten(), resce.flatten()).flatten()
-    #     crimg_line = ''.join("%12.4f" % x for x in out_list)
-    #     pose_l = img_name + crimg_line + '\n'
-    #     if messages is not None:
-    #         messages.put(pose_l)
-    #     return pose_l
-
     def init_data(self):
-        # if rebuild:
-        #     shutil.rmtree(self.out_dir)
-        #     os.makedirs(self.out_dir)
         if (not os.path.exists(self.training_annot_cleaned)):
             from timeit import default_timer as timer
+            from datetime import timedelta
             time_s = timer()
             self.logger.info('cleaning data ...')
             self.remove_out_frame_annot()
-            time_e = timer() - time_s
-            self.logger.info('{} images after cleaning, time: {}'.format(
+            time_e = "{:0>8}".format(timedelta(seconds=timer() - time_s))
+            self.logger.info('{:d} images after cleaning, time: {}'.format(
                 self.num_training, time_e))
         else:
             self.num_training = int(sum(

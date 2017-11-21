@@ -253,11 +253,10 @@ class base_conv3(base_regre):
             resce_h5 = h5file['resce'][frame_id, ...]
 
         print('[{}] drawing pose #{:d}'.format(self.__class__.__name__, img_id))
-        fig_size = (2 * 5, 2 * 5)
         resce3 = resce_h5[0:8]
         cube = iso_cube()
         cube.load(resce3)
-        mpplot.subplots(nrows=2, ncols=2, figsize=fig_size)
+        mpplot.subplots(nrows=2, ncols=2, figsize=(2 * 5, 2 * 5))
         mpplot.subplot(2, 2, 1)
         annot_line = args.data_io.get_line(
             thedata.training_annot_cleaned, img_id)

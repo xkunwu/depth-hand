@@ -69,8 +69,7 @@ class base_clean(base_regre):
         print('[{}] drawing pose #{:d}'.format(self.__class__.__name__, img_id))
         resce2 = resce_h5[0:3]
         resce3 = resce_h5[3:11]
-        fig_size = (2 * 5, 2 * 5)
-        mpplot.subplots(nrows=2, ncols=2, figsize=fig_size)
+        mpplot.subplots(nrows=2, ncols=2, figsize=(2 * 5, 2 * 5))
 
         mpplot.subplot(2, 2, 3)
         mpplot.imshow(frame_h5, cmap='bone')

@@ -24,10 +24,12 @@ def compare_error(thedata, fname_echt, fname_pred):
             error_l.append(np.sqrt(
                 np.sum((p3d_s - p3d_t) ** 2, axis=1)
             ))
-    return np.expand_dims(error_l, axis=0)
+    # return np.expand_dims(np.stack(error_l, axis=0), axis=0)
+    return np.stack(error_l, axis=0)
 
 
 def draw_mean_error_distribution(errors, ax):
+    """ errors: FxJ """
     errors = np.squeeze(errors, 0)
     err_mean = np.mean(errors, axis=1)
     mpplot.hist(
@@ -41,6 +43,7 @@ def draw_mean_error_distribution(errors, ax):
 
 
 def draw_error_percentage_curve(errors, methods, ax):
+    """ errors: MxFxJ """
     err_max = np.max(errors, axis=-1)
     num_v = err_max.shape[1]
     num_m = err_max.shape[0]
@@ -76,6 +79,7 @@ def draw_error_percentage_curve(errors, methods, ax):
 
 
 def draw_error_per_joint(errors, methods, ax, join_name=None, draw_std=False):
+    """ errors: MxFxJ """
     err_mean = np.mean(errors, axis=1)
     err_max = np.max(errors, axis=1)
     err_min = np.min(errors, axis=1)
@@ -122,8 +126,7 @@ def draw_error_per_joint(errors, methods, ax, join_name=None, draw_std=False):
     ylim_top = max(np.max(err_mean[:, 0:7]), np.max(err_mean))
     ax.set_ylabel('Mean error (mm)')
     ax.set_ylim(0, ylim_top + float(num_m) * ylim_top * 0.1)
-    # ax.set_xlim([-2 * wsl - 1, jloc[-1] + 1 + 2 * wsl])
-    ax.set_xlim([-2 * wsl, jloc[-1] + 2 * wsl])
+    ax.set_xlim(jloc[0] - wsl - 0.5, jloc[-1] + wsl + 0.5)
     mpplot.xticks(jloc, jtick, rotation='vertical')
     mpplot.margins(0.1)
     mpplot.tight_layout()

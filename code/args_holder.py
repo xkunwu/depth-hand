@@ -23,9 +23,6 @@ class args_holder:
         self.parser.add_argument(
             '--out_root', default=os.path.join(proj_root, 'output'),
             help='Output dir [default: output]')
-        # self.parser.add_argument(
-        #     '--rebuild_data', default=False,
-        #     help='rebuild data structure and preprocess [default: False]')
         self.parser.add_argument(
             '--retrain', default=False,
             help='retrain the model [default: False]')
@@ -93,7 +90,8 @@ class args_holder:
 
     def make_logging(self):
         logFormatter = logging.Formatter(
-            '%(asctime)s [%(levelname)-5.5s]  %(message)s (%(filename)s:%(lineno)s)',
+            # '%(asctime)s [%(levelname)-5.5s]  %(message)s (%(filename)s:%(lineno)s)',
+            '%(asctime)s [%(levelname)-5.5s]  %(message)s',
             datefmt='%y-%m-%d %H:%M:%S')
         logger = logging.getLogger('univue')
         logger.setLevel(logging.INFO)

@@ -35,8 +35,7 @@ def run_one(args, with_train=False):
 
     datadraw = import_module(
         'data.' + args.data_name + '.draw')
-    # mpplot.gcf().clear()
-    mpplot.figure()
+    mpplot.figure(figsize=(2 * 5, 1 * 5))
     datadraw.draw_pred_random(
         data_inst,
         data_inst.training_images,
@@ -54,6 +53,12 @@ def run_one(args, with_train=False):
         predict_file
     )
     mpplot.gcf().clear()
+    dataeval.draw_mean_error_distribution(
+        errors, mpplot.gca())
+    fname = '{}_error_dist.png'.format(args.model_name)
+    mpplot.savefig(os.path.join(args.data_inst.predict_dir, fname))
+    errors = np.expand_dims(errors, axis=0)
+    mpplot.gcf().clear()
     dataeval.draw_error_percentage_curve(
         errors, [args.model_name], mpplot.gca())
     fname = '{}_error_rate.png'.format(args.model_name)
@@ -63,12 +68,8 @@ def run_one(args, with_train=False):
         errors, [args.model_name], mpplot.gca(), data_inst.join_name)
     fname = '{}_error_bar.png'.format(args.model_name)
     mpplot.savefig(os.path.join(args.data_inst.predict_dir, fname))
-    mpplot.gcf().clear()
-    dataeval.draw_mean_error_distribution(
-        errors, mpplot.gca())
-    fname = '{}_error_dist.png'.format(args.model_name)
-    mpplot.savefig(os.path.join(args.data_inst.predict_dir, fname))
-    args.logger.info('per-joint mean error maximum: {}'.format(
+
+    args.logger.info('maximal per-joint mean error: {}'.format(
         np.max(np.mean(errors, axis=1))
     ))
     print('figures saved')
@@ -107,27 +108,29 @@ def draw_compare(args, predict_dir=None):
             predictions.append(os.path.join(predict_dir, file))
             methods.append(m.group(1))
     annot_test = args.data_inst.training_annot_test
-    error_l = None
+    error_l = []
     for predict in predictions:
-        errors = dataeval.compare_error(
+        error_l.append(dataeval.compare_error(
             args.data_inst,
             annot_test,
             predict
-        )
-        if error_l is None:
-            error_l = errors
-        else:
-            error_l = np.concatenate((error_l, errors), axis=0)
-    mpplot.gcf().clear()
+        ))
+    errors = np.stack(error_l, axis=0)
+    mpplot.figure(figsize=(2 * 5, 1 * 5))
     dataeval.draw_error_percentage_curve(
-        error_l, methods, mpplot.gca())
+        errors, methods, mpplot.gca())
     mpplot.savefig(os.path.join(args.data_inst.predict_dir, 'error_rate.png'))
-    # mpplot.show()
     mpplot.gcf().clear()
     dataeval.draw_error_per_joint(
-        error_l, methods, mpplot.gca(), args.data_inst.join_name)
+        errors, methods, mpplot.gca(), args.data_inst.join_name)
     mpplot.savefig(os.path.join(args.data_inst.predict_dir, 'error_bar.png'))
-    # mpplot.show()
+
+    maxmean = np.max(np.mean(errors, axis=1), axis=1)
+    idx = np.argsort(maxmean)
+    restr = 'maximal per-joint mean error summary:'
+    for ii in idx:
+        restr += ' {}({:.2f})'.format(methods[ii], maxmean[ii])
+    args.logger.info(restr)
     print('figures saved')
 
 
@@ -168,19 +171,19 @@ def test_dataops(args):
 
 if __name__ == "__main__":
     # python evaluate.py --max_epoch=1 --batch_size=16 --model_name=base_clean
+    with_train = True
     with args_holder() as argsholder:
         argsholder.parse_args()
         args = argsholder.args
+        # import shutil
+        # shutil.rmtree(args.out_dir)
+        # os.makedirs(args.out_dir)
 
         # test_dataops(args)
-        # sys.exit()
 
-        # scp_t = os.path.join(args.out_dir, 'predict_sipadan')
-        # draw_compare(args, scp_t)
-        # sys.exit()
-
-        # run_one(args)
-        # sys.exit()
+    #     run_one(args, with_train)
+    # draw_compare(args)
+    # sys.exit()
 
     methlist = [
         'direc_tsdf',
@@ -195,7 +198,6 @@ if __name__ == "__main__":
             argsholder.parse_args()
             args = argsholder.args
             args.model_name = meth
-            run_one(args, True)
+            run_one(args, with_train)
             # test_dataops(args)
-
     draw_compare(args)

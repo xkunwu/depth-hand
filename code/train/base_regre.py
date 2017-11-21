@@ -2,7 +2,6 @@ import tensorflow as tf
 import os
 import sys
 from importlib import import_module
-from timeit import default_timer as timer
 from psutil import virtual_memory
 import numpy as np
 import progressbar
@@ -272,6 +271,8 @@ class base_regre(object):
             first_run = True
         if not first_run:
             return
+        from timeit import default_timer as timer
+        from datetime import timedelta
         time_s = timer()
         batchallot = self.batch_allot(
             self.batch_size, self.crop_size, self.pose_dim,
@@ -282,7 +283,7 @@ class base_regre(object):
         with file_pack() as filepack:
             file_annot = filepack.push_file(thedata.training_annot_test)
             self.prepare_data(thedata, args, batchallot, file_annot, self.appen_test)
-        time_e = timer() - time_s
+        time_e = "{:0>8}".format(timedelta(seconds=timer() - time_s))
         args.logger.info('data prepared [{}], time: {}'.format(
             self.__class__.__name__, time_e))
 
@@ -323,8 +324,7 @@ class base_regre(object):
         # resce2 = np.append(resce_h5[0], rect.cll)
         resce2 = resce_h5[0:3]
         resce3 = resce_h5[3:7]
-        fig_size = (2 * 5, 2 * 5)
-        mpplot.subplots(nrows=2, ncols=2, figsize=fig_size)
+        mpplot.subplots(nrows=2, ncols=2, figsize=(2 * 5, 2 * 5))
 
         mpplot.subplot(2, 2, 3)
         mpplot.imshow(frame_h5, cmap='bone')
