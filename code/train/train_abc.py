@@ -37,8 +37,9 @@ class train_abc():
                 tf.summary.scalar('bn_decay', bn_decay)
 
                 # Get model and loss
-                pred, end_points = self.args.model_inst.get_model(
+                pred, shapestr, end_points = self.args.model_inst.get_model(
                     frames_tf, is_training_tf, bn_decay=bn_decay)
+                self.args.logger.info('network structure:\n{}'.format(shapestr))
                 loss = self.args.model_inst.get_loss(pred, poses_tf, end_points)
                 regre_error = tf.sqrt(loss * 2)
                 tf.summary.scalar('regression_error', regre_error)
@@ -172,7 +173,7 @@ class train_abc():
             is_training_tf = tf.placeholder(tf.bool, shape=())
 
             # Get model and loss
-            pred, end_points = self.args.model_inst.get_model(
+            pred, _, end_points = self.args.model_inst.get_model(
                 frames_tf, is_training_tf)
             loss = self.args.model_inst.get_loss(pred, poses_tf, end_points)
 

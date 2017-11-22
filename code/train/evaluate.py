@@ -1,6 +1,7 @@
 import os
 import sys
 from importlib import import_module
+from shutil import copyfile
 import numpy as np
 import re
 from train_abc import train_abc
@@ -14,15 +15,9 @@ args_holder = getattr(
 )
 
 
-def run_one(args, with_train=False):
-    import matplotlib as mpl
-    mpl.use('Agg')
-    mpplot = import_module('matplotlib.pyplot')
-
-    argsholder.create_instance()
+def run_one(args, mpplot, with_train=False):
     data_inst = args.data_inst
-    predict_file = os.path.join(
-        data_inst.predict_dir, args.model_inst.predict_file)
+    predict_file = args.model_inst.predict_file
 
     trainer = train_abc(args, False)
     if with_train or (not os.path.exists(os.path.join(
@@ -43,7 +38,7 @@ def run_one(args, with_train=False):
         predict_file
     )
     fname = 'prediction_{}.png'.format(args.model_name)
-    mpplot.savefig(os.path.join(args.data_inst.predict_dir, fname))
+    mpplot.savefig(os.path.join(args.predict_dir, fname))
 
     dataeval = import_module(
         'data.' + args.data_name + '.eval')
@@ -52,22 +47,23 @@ def run_one(args, with_train=False):
         data_inst.training_annot_test,
         predict_file
     )
+    # import pdb; pdb.set_trace()
     mpplot.gcf().clear()
     dataeval.draw_mean_error_distribution(
         errors, mpplot.gca())
     fname = '{}_error_dist.png'.format(args.model_name)
-    mpplot.savefig(os.path.join(args.data_inst.predict_dir, fname))
+    mpplot.savefig(os.path.join(args.predict_dir, fname))
     errors = np.expand_dims(errors, axis=0)
     mpplot.gcf().clear()
     dataeval.draw_error_percentage_curve(
         errors, [args.model_name], mpplot.gca())
     fname = '{}_error_rate.png'.format(args.model_name)
-    mpplot.savefig(os.path.join(args.data_inst.predict_dir, fname))
+    mpplot.savefig(os.path.join(args.predict_dir, fname))
     mpplot.gcf().clear()
     dataeval.draw_error_per_joint(
         errors, [args.model_name], mpplot.gca(), data_inst.join_name)
     fname = '{}_error_bar.png'.format(args.model_name)
-    mpplot.savefig(os.path.join(args.data_inst.predict_dir, fname))
+    mpplot.savefig(os.path.join(args.predict_dir, fname))
 
     args.logger.info('maximal per-joint mean error: {}'.format(
         np.max(np.mean(errors, axis=1))
@@ -90,16 +86,11 @@ def run_one(args, with_train=False):
     # mpplot.show()
 
 
-def draw_compare(args, predict_dir=None):
-    import matplotlib as mpl
-    mpl.use('Agg')
-    mpplot = import_module('matplotlib.pyplot')
-
-    argsholder.create_instance()
+def draw_compare(args, mpplot, predict_dir=None):
     dataeval = import_module(
         'data.' + args.data_name + '.eval')
     if predict_dir is None:
-        predict_dir = args.data_inst.predict_dir
+        predict_dir = args.predict_dir
     predictions = []
     methods = []
     for file in os.listdir(predict_dir):
@@ -119,11 +110,11 @@ def draw_compare(args, predict_dir=None):
     mpplot.figure(figsize=(2 * 5, 1 * 5))
     dataeval.draw_error_percentage_curve(
         errors, methods, mpplot.gca())
-    mpplot.savefig(os.path.join(args.data_inst.predict_dir, 'error_rate.png'))
+    mpplot.savefig(os.path.join(predict_dir, 'error_rate.png'))
     mpplot.gcf().clear()
     dataeval.draw_error_per_joint(
         errors, methods, mpplot.gca(), args.data_inst.join_name)
-    mpplot.savefig(os.path.join(args.data_inst.predict_dir, 'error_bar.png'))
+    mpplot.savefig(os.path.join(predict_dir, 'error_bar.png'))
 
     maxmean = np.max(np.mean(errors, axis=1), axis=1)
     idx = np.argsort(maxmean)
@@ -135,7 +126,6 @@ def draw_compare(args, predict_dir=None):
 
 
 def test_dataops(args):
-    argsholder.create_instance()
     data_inst = args.data_inst
 
     args.model_inst.draw_random(data_inst, args)
@@ -171,18 +161,23 @@ def test_dataops(args):
 
 if __name__ == "__main__":
     # python evaluate.py --max_epoch=1 --batch_size=16 --model_name=base_clean
-    with_train = True
-    with args_holder() as argsholder:
-        argsholder.parse_args()
-        args = argsholder.args
-        # import shutil
-        # shutil.rmtree(args.out_dir)
-        # os.makedirs(args.out_dir)
 
-        # test_dataops(args)
-
-    #     run_one(args, with_train)
-    # draw_compare(args)
+    mpl = import_module('matplotlib')
+    mpl.use('Agg')
+    mpplot = import_module('matplotlib.pyplot')
+    # with args_holder() as argsholder:
+    #     argsholder.parse_args()
+    #     args = argsholder.args
+    #     argsholder.create_instance()
+    #     import shutil
+    #     shutil.rmtree(args.out_dir)
+    #     os.makedirs(args.out_dir)
+    #
+    #     test_dataops(args)
+    #
+    #     run_one(args, mpplot, False)
+    #
+    #     draw_compare(args, mpplot)
     # sys.exit()
 
     methlist = [
@@ -198,6 +193,11 @@ if __name__ == "__main__":
             argsholder.parse_args()
             args = argsholder.args
             args.model_name = meth
-            run_one(args, with_train)
+            argsholder.create_instance()
+            run_one(args, mpplot, False)
             # test_dataops(args)
-    draw_compare(args)
+    draw_compare(args, mpplot)
+    copyfile(
+        os.path.join(args.out_dir, 'log', 'univue.log'),
+        os.path.join(args.predict_dir, 'univue.log')
+    )

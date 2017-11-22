@@ -30,7 +30,6 @@ def compare_error(thedata, fname_echt, fname_pred):
 
 def draw_mean_error_distribution(errors, ax):
     """ errors: FxJ """
-    errors = np.squeeze(errors, 0)
     err_mean = np.mean(errors, axis=1)
     mpplot.hist(
         err_mean, 100,

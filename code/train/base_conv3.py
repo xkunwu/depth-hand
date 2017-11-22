@@ -157,7 +157,7 @@ class base_conv3(base_regre):
         pose_dim = batchallot.pose_dim
         num_channel = batchallot.num_channel
         num_appen = batchallot.num_appen
-        with h5py.File(os.path.join(self.prep_dir, name_appen), 'w') as h5file:
+        with h5py.File(os.path.join(self.prepare_dir, name_appen), 'w') as h5file:
             h5file.create_dataset(
                 'index',
                 (num_line, 1),
@@ -244,7 +244,7 @@ class base_conv3(base_regre):
         # mlab.show()
         # sys.exit()
 
-        with h5py.File(os.path.join(self.prep_dir, self.appen_train), 'r') as h5file:
+        with h5py.File(self.appen_train, 'r') as h5file:
             store_size = h5file['index'].shape[0]
             frame_id = np.random.choice(store_size)
             img_id = h5file['index'][frame_id, 0]
@@ -356,7 +356,7 @@ class base_conv3(base_regre):
         # print(frame[12:20, 12:20, 16])
         mlab.outline()
         mpplot.savefig(os.path.join(
-            args.data_inst.predict_dir,
+            args.predict_dir,
             'draw_{}.png'.format(self.__class__.__name__)))
         mpplot.show()
 
@@ -380,45 +380,27 @@ class base_conv3(base_regre):
         input_image = frames_tf
 
         net = tf_util.conv3d(
-            input_image, 32, [5, 5, 5],
-            padding='VALID', stride=[1, 1, 1],
-            bn=True, is_training=is_training,
-            scope='conv1', bn_decay=bn_decay)
+            input_image, 32, [5, 5, 5], stride=[1, 1, 1], scope='conv1',
+            padding='VALID', is_training=is_training, bn=True, bn_decay=bn_decay)
         net = tf_util.max_pool3d(
-            net, [2, 2, 2],
-            padding='VALID', scope='maxpool1')
+            net, [2, 2, 2], scope='maxpool1', padding='VALID')
         net = tf_util.conv3d(
-            net, 64, [3, 3, 3],
-            padding='VALID', stride=[1, 1, 1],
-            bn=True, is_training=is_training,
-            scope='conv2', bn_decay=bn_decay)
+            net, 64, [3, 3, 3], stride=[1, 1, 1], scope='conv2',
+            padding='VALID', is_training=is_training, bn=True, bn_decay=bn_decay)
         net = tf_util.max_pool3d(
-            net, [2, 2, 2],
-            padding='VALID', scope='maxpool2')
+            net, [2, 2, 2], scope='maxpool2', padding='VALID')
         net = tf_util.conv3d(
-            net, 128, [3, 3, 3],
-            padding='VALID', stride=[1, 1, 1],
-            bn=True, is_training=is_training,
-            scope='conv3', bn_decay=bn_decay)
-        # net = tf_util.max_pool3d(
-        #     net, [2, 2, 2],
-        #     padding='VALID', scope='maxpool3')
+            net, 128, [3, 3, 3], stride=[1, 1, 1], scope='conv3',
+            padding='VALID', is_training=is_training, bn=True, bn_decay=bn_decay)
         # print(net.shape)
 
         net = tf.reshape(net, [batch_size, -1])
         net = tf_util.fully_connected(
-            net, 2048, bn=True, is_training=is_training,
-            scope='fc1', bn_decay=bn_decay)
+            net, 2048, scope='fullconn1',
+            is_training=is_training, bn=True, bn_decay=bn_decay)
         net = tf_util.dropout(
-            net, keep_prob=0.5, is_training=is_training,
-            scope='dp1')
-        # net = tf_util.fully_connected(
-        #     net, 1024, bn=True, is_training=is_training,
-        #     scope='fc2', bn_decay=bn_decay)
-        # net = tf_util.dropout(
-        #     net, keep_prob=0.5, is_training=is_training,
-        #     scope='dp2')
+            net, keep_prob=0.5, scope='dropout1', is_training=is_training)
         net = tf_util.fully_connected(
-            net, self.pose_dim, activation_fn=None, scope='fc3')
+            net, self.pose_dim, scope='fullconn3', activation_fn=None)
 
         return net, end_points

@@ -56,7 +56,7 @@ class direc_tsdf(base_conv3):
         # mlab.show()
         # sys.exit()
 
-        with h5py.File(os.path.join(self.prep_dir, self.appen_train), 'r') as h5file:
+        with h5py.File(self.appen_train, 'r') as h5file:
             store_size = h5file['index'].shape[0]
             frame_id = np.random.choice(store_size)
             img_id = h5file['index'][frame_id, 0]

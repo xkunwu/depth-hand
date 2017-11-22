@@ -144,6 +144,18 @@ class args_holder:
             self.args.out_root,
             self.args.data_name
         )
+        self.args.prepare_dir = os.path.join(
+            self.args.out_dir,
+            'prepared'
+        )
+        if not os.path.exists(self.args.prepare_dir):
+            os.mkdir(self.args.prepare_dir)
+        self.args.predict_dir = os.path.join(
+            self.args.out_dir,
+            'predict'
+        )
+        if not os.path.exists(self.args.predict_dir):
+            os.mkdir(self.args.predict_dir)
 
     def __enter__(self):
         return self

@@ -155,16 +155,12 @@ class base_regre(object):
 
     def start_epoch_train(self, filepack):
         self.batchallot.assign(
-            filepack.push_h5(
-                os.path.join(self.prep_dir, self.appen_train)
-            )
+            filepack.push_h5(self.appen_train)
         )
 
     def start_epoch_test(self, filepack):
         self.batchallot.assign(
-            filepack.push_h5(
-                os.path.join(self.prep_dir, self.appen_test)
-            )
+            filepack.push_h5(self.appen_test)
         )
 
     def fetch_batch_train(self):
@@ -210,7 +206,7 @@ class base_regre(object):
         pose_dim = batchallot.pose_dim
         num_channel = batchallot.num_channel
         num_appen = batchallot.num_appen
-        with h5py.File(os.path.join(self.prep_dir, name_appen), 'w') as h5file:
+        with h5py.File(os.path.join(self.prepare_dir, name_appen), 'w') as h5file:
             h5file.create_dataset(
                 'index',
                 (num_line, 1),
@@ -289,12 +285,12 @@ class base_regre(object):
 
     def receive_data(self, thedata, args):
         """ Receive parameters specific to the data """
-        self.prep_dir = thedata.prep_dir
+        self.prepare_dir = args.prepare_dir
         self.appen_train = os.path.join(
-            self.prep_dir, 'train_{}'.format(self.__class__.__name__))
+            self.prepare_dir, 'train_{}'.format(self.__class__.__name__))
         self.appen_test = os.path.join(
-            self.prep_dir, 'test_{}'.format(self.__class__.__name__))
-        self.predict_dir = thedata.predict_dir
+            self.prepare_dir, 'test_{}'.format(self.__class__.__name__))
+        self.predict_dir = args.predict_dir
         self.predict_file = os.path.join(
             self.predict_dir, 'predict_{}'.format(self.__class__.__name__))
         self.batch_size = args.batch_size
@@ -308,7 +304,7 @@ class base_regre(object):
     def draw_random(self, thedata, args):
         import matplotlib.pyplot as mpplot
 
-        with h5py.File(os.path.join(self.prep_dir, self.appen_train), 'r') as h5file:
+        with h5py.File(self.appen_train, 'r') as h5file:
             store_size = h5file['index'].shape[0]
             frame_id = np.random.choice(store_size)
             img_id = h5file['index'][frame_id, 0]
@@ -377,7 +373,7 @@ class base_regre(object):
             args.data_ops.raw_to_2d(pose_raw, thedata, resce2)
         )
         mpplot.savefig(os.path.join(
-            args.data_inst.predict_dir,
+            args.predict_dir,
             'draw_{}.png'.format(self.__class__.__name__)))
         mpplot.show()
 
@@ -401,43 +397,40 @@ class base_regre(object):
         # input_image = tf.expand_dims(frames_tf, -1)
         input_image = frames_tf
 
-        net = tf_util.conv2d(
-            input_image, 16, [5, 5],
-            padding='VALID', stride=[1, 1],
-            bn=True, is_training=is_training,
-            scope='conv1', bn_decay=bn_decay)
-        net = tf_util.max_pool2d(
-            net, [4, 4],
-            padding='VALID', scope='maxpool1')
-        net = tf_util.conv2d(
-            net, 32, [3, 3],
-            padding='VALID', stride=[1, 1],
-            bn=True, is_training=is_training,
-            scope='conv2', bn_decay=bn_decay)
-        net = tf_util.max_pool2d(
-            net, [2, 2],
-            padding='VALID', scope='maxpool2')
-        net = tf_util.conv2d(
-            net, 64, [3, 3],
-            padding='VALID', stride=[1, 1],
-            bn=True, is_training=is_training,
-            scope='conv3', bn_decay=bn_decay)
-        net = tf_util.max_pool2d(
-            net, [2, 2],
-            padding='VALID', scope='maxpool3')
+        shapestr = 'input: {}'.format(input_image.shape)
+        net, shapestr = tf_util.conv2d(
+            input_image, 16, [5, 5], stride=[1, 1], scope='conv1', shapestr=shapestr,
+            padding='VALID', is_training=is_training, bn=True, bn_decay=bn_decay)
+        net, shapestr = tf_util.max_pool2d(
+            net, [4, 4], scope='maxpool1', shapestr=shapestr, padding='VALID')
+        net, shapestr = tf_util.conv2d(
+            net, 32, [3, 3], stride=[1, 1], scope='conv2', shapestr=shapestr,
+            padding='VALID', is_training=is_training, bn=True, bn_decay=bn_decay)
+        net, shapestr = tf_util.max_pool2d(
+            net, [2, 2], scope='maxpool2', shapestr=shapestr, padding='VALID')
+        net, shapestr = tf_util.conv2d(
+            net, 64, [3, 3], stride=[1, 1], scope='conv3', shapestr=shapestr,
+            padding='VALID', is_training=is_training, bn=True, bn_decay=bn_decay)
+        net, shapestr = tf_util.max_pool2d(
+            net, [2, 2], scope='maxpool3', shapestr=shapestr, padding='VALID')
         # print(net.shape)
 
         net = tf.reshape(net, [batch_size, -1])
-        net = tf_util.fully_connected(
-            net, 1024, bn=True, is_training=is_training,
-            scope='fc1', bn_decay=bn_decay)
-        net = tf_util.dropout(
-            net, keep_prob=0.5, is_training=is_training,
-            scope='dp1')
-        net = tf_util.fully_connected(
-            net, self.pose_dim, activation_fn=None, scope='fc3')
+        net, shapestr = tf_util.fully_connected(
+            net, 1024, scope='fullconn1', shapestr=shapestr,
+            is_training=is_training, bn=True, bn_decay=bn_decay)
+        # net = tf_util.conv2d(
+        #     net, 1024, [1, 1], stride=[1, 1], scope='fullconn1',
+        #     padding='VALID', is_training=is_training, bn=True, bn_decay=bn_decay)
+        net, shapestr = tf_util.dropout(
+            net, keep_prob=0.5, scope='dropout1', shapestr=shapestr, is_training=is_training)
+        net, shapestr = tf_util.fully_connected(
+            net, self.pose_dim, scope='fullconn3', shapestr=shapestr, activation_fn=None)
+        # net = tf_util.conv2d(
+        #     net, self.pose_dim, [1, 1], stride=[1, 1], scope='fullconn3',
+        #     padding='VALID', is_training=is_training, bn=True, bn_decay=bn_decay)
 
-        return net, end_points
+        return net, shapestr, end_points
 
     @staticmethod
     def get_loss(pred, anno, end_points):

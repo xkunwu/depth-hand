@@ -113,6 +113,7 @@ def conv2d(inputs,
            num_output_channels,
            kernel_size,
            scope,
+           shapestr,
            stride=[1, 1],
            padding='SAME',
            use_xavier=True,
@@ -166,7 +167,9 @@ def conv2d(inputs,
 
       if activation_fn is not None:
         outputs = activation_fn(outputs)
-      return outputs
+      shapestr += '\n{}: {} --> {} @ {}'.format(
+          scope, outputs.shape, kernel_size, stride)
+      return outputs, shapestr
 
 
 def conv2d_transpose(inputs,
@@ -253,6 +256,7 @@ def conv3d(inputs,
            num_output_channels,
            kernel_size,
            scope,
+           shapestr,
            stride=[1, 1, 1],
            padding='SAME',
            use_xavier=True,
@@ -306,11 +310,14 @@ def conv3d(inputs,
 
     if activation_fn is not None:
       outputs = activation_fn(outputs)
-    return outputs
+  shapestr += '\n{}: {} --> {} @ {}'.format(
+    scope, outputs.shape, kernel_size, stride)
+  return outputs, shapestr
 
 def fully_connected(inputs,
                     num_outputs,
                     scope,
+                    shapestr,
                     use_xavier=True,
                     stddev=1e-3,
                     weight_decay=0.0,
@@ -345,33 +352,38 @@ def fully_connected(inputs,
 
     if activation_fn is not None:
       outputs = activation_fn(outputs)
-    return outputs
+  shapestr += '\n{}: {}'.format(scope, outputs.shape)
+  return outputs, shapestr
 
 
 def max_pool2d(inputs,
                kernel_size,
                scope,
+               shapestr,
                stride=[2, 2],
                padding='VALID'):
-  """ 2D max pooling.
+    """ 2D max pooling.
 
-  Args:
+    Args:
     inputs: 4-D tensor BxHxWxC
     kernel_size: a list of 2 ints
     stride: a list of 2 ints
 
-  Returns:
+    Returns:
     Variable tensor
-  """
-  with tf.variable_scope(scope) as sc:
-    kernel_h, kernel_w = kernel_size
-    stride_h, stride_w = stride
-    outputs = tf.nn.max_pool(inputs,
-                             ksize=[1, kernel_h, kernel_w, 1],
-                             strides=[1, stride_h, stride_w, 1],
-                             padding=padding,
-                             name=sc.name)
-    return outputs
+    """
+    with tf.variable_scope(scope) as sc:
+        kernel_h, kernel_w = kernel_size
+        stride_h, stride_w = stride
+        outputs = tf.nn.max_pool(
+            inputs,
+            ksize=[1, kernel_h, kernel_w, 1],
+            strides=[1, stride_h, stride_w, 1],
+            padding=padding,
+            name=sc.name)
+    shapestr += '\n{}: {} --> {} @ {}'.format(
+        scope, outputs.shape, kernel_size, stride)
+    return outputs, shapestr
 
 def avg_pool2d(inputs,
                kernel_size,
@@ -402,27 +414,31 @@ def avg_pool2d(inputs,
 def max_pool3d(inputs,
                kernel_size,
                scope,
+               shapestr,
                stride=[2, 2, 2],
                padding='VALID'):
-  """ 3D max pooling.
+    """ 3D max pooling.
 
-  Args:
+    Args:
     inputs: 5-D tensor BxDxHxWxC
     kernel_size: a list of 3 ints
     stride: a list of 3 ints
 
-  Returns:
+    Returns:
     Variable tensor
-  """
-  with tf.variable_scope(scope) as sc:
-    kernel_d, kernel_h, kernel_w = kernel_size
-    stride_d, stride_h, stride_w = stride
-    outputs = tf.nn.max_pool3d(inputs,
-                               ksize=[1, kernel_d, kernel_h, kernel_w, 1],
-                               strides=[1, stride_d, stride_h, stride_w, 1],
-                               padding=padding,
-                               name=sc.name)
-    return outputs
+    """
+    with tf.variable_scope(scope) as sc:
+        kernel_d, kernel_h, kernel_w = kernel_size
+        stride_d, stride_h, stride_w = stride
+        outputs = tf.nn.max_pool3d(
+            inputs,
+            ksize=[1, kernel_d, kernel_h, kernel_w, 1],
+            strides=[1, stride_d, stride_h, stride_w, 1],
+            padding=padding,
+            name=sc.name)
+    shapestr += '\n{}: {} --> {} @ {}'.format(
+        scope, outputs.shape, kernel_size, stride)
+    return outputs, shapestr
 
 def avg_pool3d(inputs,
                kernel_size,
@@ -555,6 +571,7 @@ def batch_norm_for_conv3d(inputs, is_training, bn_decay, scope):
 def dropout(inputs,
             is_training,
             scope,
+            shapestr,
             keep_prob=0.5,
             noise_shape=None):
   """ Dropout layer.
@@ -573,4 +590,5 @@ def dropout(inputs,
     outputs = tf.cond(is_training,
                       lambda: tf.nn.dropout(inputs, keep_prob, noise_shape),
                       lambda: inputs)
-    return outputs
+  shapestr += '\n{}: {}'.format(scope, outputs.shape)
+  return outputs, shapestr
