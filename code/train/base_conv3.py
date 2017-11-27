@@ -379,28 +379,29 @@ class base_conv3(base_regre):
         end_points = {}
         input_image = frames_tf
 
-        net = tf_util.conv3d(
-            input_image, 32, [5, 5, 5], stride=[1, 1, 1], scope='conv1',
+        shapestr = 'input: {}'.format(input_image.shape)
+        net, shapestr = tf_util.conv3d(
+            input_image, 32, [5, 5, 5], stride=[1, 1, 1], scope='conv1', shapestr=shapestr,
             padding='VALID', is_training=is_training, bn=True, bn_decay=bn_decay)
-        net = tf_util.max_pool3d(
-            net, [2, 2, 2], scope='maxpool1', padding='VALID')
-        net = tf_util.conv3d(
-            net, 64, [3, 3, 3], stride=[1, 1, 1], scope='conv2',
+        net, shapestr = tf_util.max_pool3d(
+            net, [2, 2, 2], scope='maxpool1', shapestr=shapestr, padding='VALID')
+        net, shapestr = tf_util.conv3d(
+            net, 64, [3, 3, 3], stride=[1, 1, 1], scope='conv2', shapestr=shapestr,
             padding='VALID', is_training=is_training, bn=True, bn_decay=bn_decay)
-        net = tf_util.max_pool3d(
-            net, [2, 2, 2], scope='maxpool2', padding='VALID')
-        net = tf_util.conv3d(
-            net, 128, [3, 3, 3], stride=[1, 1, 1], scope='conv3',
+        net, shapestr = tf_util.max_pool3d(
+            net, [2, 2, 2], scope='maxpool2', shapestr=shapestr, padding='VALID')
+        net, shapestr = tf_util.conv3d(
+            net, 128, [3, 3, 3], stride=[1, 1, 1], scope='conv3', shapestr=shapestr,
             padding='VALID', is_training=is_training, bn=True, bn_decay=bn_decay)
         # print(net.shape)
 
         net = tf.reshape(net, [batch_size, -1])
-        net = tf_util.fully_connected(
-            net, 2048, scope='fullconn1',
+        net, shapestr = tf_util.fully_connected(
+            net, 2048, scope='fullconn1', shapestr=shapestr,
             is_training=is_training, bn=True, bn_decay=bn_decay)
-        net = tf_util.dropout(
-            net, keep_prob=0.5, scope='dropout1', is_training=is_training)
-        net = tf_util.fully_connected(
-            net, self.pose_dim, scope='fullconn3', activation_fn=None)
+        net, shapestr = tf_util.dropout(
+            net, keep_prob=0.5, scope='dropout1', shapestr=shapestr, is_training=is_training)
+        net, shapestr = tf_util.fully_connected(
+            net, self.pose_dim, scope='fullconn3', shapestr=shapestr, activation_fn=None)
 
-        return net, end_points
+        return net, shapestr, end_points

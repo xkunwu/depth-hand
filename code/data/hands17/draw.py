@@ -9,8 +9,8 @@ import imageio
 from colour import Color
 import linecache
 import csv
-import ops as dataops
-import io as dataio
+from . import ops as dataops
+from . import io as dataio
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 BASE_DIR = os.path.abspath(os.path.join(BASE_DIR, os.pardir))
@@ -107,7 +107,9 @@ def draw_pose_raw(thedata, img, pose_raw, show_margin=False):
     # print(pose_raw - points3)
 
     # draw bounding cube
-    rect = dataops.get_rect3(pose_raw, thedata)
+    cube = iso_cube()
+    cube.build(pose_raw)
+    rect = dataops.get_rect3(cube, thedata)
     rect.draw()
 
     img_posed = draw_pose2d(
@@ -280,7 +282,7 @@ def draw_raw3d(thedata, img, pose_raw):
     for spi in range(3):
         mpplot.subplot(1, 3, spi + 1)
         coord, depth = cube.project_pca(points3_trans, roll=spi)
-        img = cube.print_image(coord, depth)
+        img = cube.print_image(coord, depth, thedata.crop_size)
         pose2d, _ = cube.project_pca(pose_trans, roll=spi, sort=False)
         draw_pose2d(thedata, pose2d)
         mpplot.imshow(img, cmap='bone')

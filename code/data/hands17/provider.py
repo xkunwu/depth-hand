@@ -1,8 +1,8 @@
 import os
 import numpy as np
 from itertools import islice
-import ops as dataops
-import io as dataio
+from . import ops as dataops
+from . import io as dataio
 
 
 def prow_dirtsdf(line, image_dir, caminfo):
@@ -57,14 +57,14 @@ def prow_ortho3v(line, image_dir, caminfo):
     img = dataio.read_image(os.path.join(image_dir, img_name))
     img_crop_resize, resce = dataops.proj_ortho3(
         img, pose_raw, caminfo)
-    resce3 = resce[3:11]
+    resce3 = resce[0:8]
     pose_pca = dataops.raw_to_pca(pose_raw, resce3)
     return (img_name, img_crop_resize,
             pose_pca.flatten().T, resce)
 
 
 def yank_ortho3v(pose_local, resce):
-    resce3 = resce[3:11]
+    resce3 = resce[0:8]
     return dataops.pca_to_raw(pose_local, resce3)
 
 
@@ -73,14 +73,14 @@ def prow_cleaned(line, image_dir, caminfo):
     img = dataio.read_image(os.path.join(image_dir, img_name))
     img_crop_resize, resce = dataops.crop_resize_pca(
         img, pose_raw, caminfo)
-    resce3 = resce[3:11]
+    resce3 = resce[0:8]
     pose_pca = dataops.raw_to_pca(pose_raw, resce3)
     return (img_name, np.expand_dims(img_crop_resize, axis=2),
             pose_pca.flatten().T, resce)
 
 
 def yank_cleaned(pose_local, resce):
-    resce3 = resce[3:11]
+    resce3 = resce[0:8]
     return dataops.pca_to_raw(pose_local, resce3)
 
 
@@ -128,8 +128,8 @@ def puttensor_mt(fanno, worker, image_dir, caminfo, batchallot):
     # from datetime import timedelta
     # time_s = timer()
     # test_copy = test_puttensor(next_n_lines, worker, image_dir, caminfo, batchallot)
-    # time_e = "{:0>8}".format(timedelta(seconds=timer() - time_s))
-    # print('single tread time: {:.4f}'.format(time_e))
+    # time_e = str(timedelta(seconds=timer() - time_s))
+    # print('single tread time: {}'.format(time_e))
     # return num_line
 
     from functools import partial
@@ -145,7 +145,7 @@ def puttensor_mt(fanno, worker, image_dir, caminfo, batchallot):
     #     zip(range(num_line), next_n_lines))
     thread_pool.close()
     thread_pool.join()
-    # time_e = "{:0>8}".format(timedelta(seconds=timer() - time_s))
+    # time_e = str(timedelta(seconds=timer() - time_s))
     # print('multiprocessing time: {:.4f}'.format(time_e))
 
     # import numpy as np

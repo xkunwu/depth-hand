@@ -4,8 +4,8 @@ import shutil
 import numpy as np
 from colour import Color
 import progressbar
-import ops as dataops
-import io as dataio
+from . import ops as dataops
+from . import io as dataio
 
 
 class hands17holder:
@@ -32,7 +32,7 @@ class hands17holder:
 
     # cropped & resized training images
     image_size = [640, 480]
-    crop_size = 96
+    crop_size = 128
     z_near = 1.
     z_far = 3333.
     z_max = 9999.  # max distance set to 10m
@@ -132,7 +132,7 @@ class hands17holder:
             time_s = timer()
             self.logger.info('cleaning data ...')
             self.remove_out_frame_annot()
-            time_e = "{:0>8}".format(timedelta(seconds=timer() - time_s))
+            time_e = str(timedelta(seconds=timer() - time_s))
             self.logger.info('{:d} images after cleaning, time: {}'.format(
                 self.num_training, time_e))
         else:
@@ -156,8 +156,8 @@ class hands17holder:
         self.data_dir = args.data_dir
         self.out_dir = args.out_dir
         self.logger = args.logger
-        self.crop_size = args.crop_size
         self.predict_dir = args.predict_dir
+        self.crop_size = args.crop_size
         self.training_images = os.path.join(self.data_dir, 'training/images')
         self.frame_images = os.path.join(self.data_dir, 'frame/images')
         self.training_annot_origin = os.path.join(

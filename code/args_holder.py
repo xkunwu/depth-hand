@@ -4,6 +4,17 @@ from importlib import import_module
 import argparse
 import logging
 
+model_map = {
+    'direc_tsdf': 'train.direc_tsdf',
+    'trunc_dist': 'train.trunc_dist',
+    'base_conv3': 'train.base_conv3',
+    'ortho3view': 'train.ortho3view',
+    'base_clean': 'train.base_clean',
+    'base_regre': 'train.base_regre',
+    'base_clean_inres': 'train.base_inres',
+    'base_regre_inres': 'train.base_inres',
+}
+
 
 class args_holder:
     """ this class holds all arguments, and provides parsing functionality """
@@ -170,8 +181,10 @@ class args_holder:
             handler.close()
             logger.removeHandler(handler)
         logging.shutdown()
-        # if exc_type is not None:
-        #     print(exc_type, exc_value, exc_traceback)
+        if exc_type is not None:
+            import traceback
+            traceback.print_exception(exc_type, exc_value, exc_traceback)
+            sys.exit()
         return self
 
     def create_instance(self):
@@ -183,7 +196,7 @@ class args_holder:
         self.args.logger.info('######## {} [{}] ########'.format(
             self.args.data_name, self.args.model_name))
         self.args.model_class = getattr(
-            import_module('train.' + self.args.model_name),
+            import_module(model_map[self.args.model_name]),
             self.args.model_name
         )
         self.args.model_inst = self.args.model_class()

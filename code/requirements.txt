@@ -11,9 +11,8 @@ jupyter
 notebook
 imageio
 opencv
-progressbar
-vtk
+progressbar2
 traits
-pyside
 configobj
 envisage
+h5py

@@ -1,9 +1,10 @@
-import tensorflow as tf
 import os
 import sys
 from importlib import import_module
 from psutil import virtual_memory
 import numpy as np
+import tensorflow as tf
+from tensorflow.contrib import slim
 import progressbar
 import h5py
 
@@ -11,7 +12,6 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 BASE_DIR = os.path.abspath(os.path.join(BASE_DIR, os.pardir))
 sys.path.append(BASE_DIR)
 sys.path.append(os.path.join(BASE_DIR, 'utils'))
-tf_util = import_module('tf_util')
 file_pack = getattr(
     import_module('coder'),
     'file_pack'
@@ -30,7 +30,7 @@ class base_regre(object):
     """ This class holds baseline training approach using plain regression.
     """
     def __init__(self):
-        self.crop_size = 96
+        self.crop_size = 128
         self.num_channel = 1
         self.num_appen = 7
         self.batchallot = None
@@ -279,7 +279,7 @@ class base_regre(object):
         with file_pack() as filepack:
             file_annot = filepack.push_file(thedata.training_annot_test)
             self.prepare_data(thedata, args, batchallot, file_annot, self.appen_test)
-        time_e = "{:0>8}".format(timedelta(seconds=timer() - time_s))
+        time_e = str(timedelta(seconds=timer() - time_s))
         args.logger.info('data prepared [{}], time: {}'.format(
             self.__class__.__name__, time_e))
 
@@ -303,6 +303,7 @@ class base_regre(object):
 
     def draw_random(self, thedata, args):
         import matplotlib.pyplot as mpplot
+        from cv2 import resize as cv2resize
 
         with h5py.File(self.appen_train, 'r') as h5file:
             store_size = h5file['index'].shape[0]
@@ -311,8 +312,9 @@ class base_regre(object):
             frame_h5 = np.squeeze(h5file['frame'][frame_id, ...], -1)
             poses_h5 = h5file['poses'][frame_id, ...].reshape(-1, 3)
             resce_h5 = h5file['resce'][frame_id, ...]
-            # print(np.histogram(frame_h5))
-            # print(poses_h5)
+            print(np.min(frame_h5), np.max(frame_h5))
+            print(np.histogram(frame_h5, range=(1e-4, np.max(frame_h5))))
+            print(np.min(poses_h5, axis=0), np.max(poses_h5, axis=0))
 
         print('[{}] drawing pose #{:d}'.format(self.__class__.__name__, img_id))
         # aabb = iso_aabb(resce_h5[2:5], resce_h5[1])
@@ -323,11 +325,16 @@ class base_regre(object):
         mpplot.subplots(nrows=2, ncols=2, figsize=(2 * 5, 2 * 5))
 
         mpplot.subplot(2, 2, 3)
-        mpplot.imshow(frame_h5, cmap='bone')
+        sizel = np.floor(resce2[0]).astype(int)
+        resce_cp = np.copy(resce2)
+        resce_cp[0] = 1
+        mpplot.imshow(
+            cv2resize(frame_h5, (sizel, sizel)),
+            cmap='bone')
         pose_raw = args.data_ops.local_to_raw(poses_h5, resce3)
         args.data_draw.draw_pose2d(
             thedata,
-            args.data_ops.raw_to_2d(pose_raw, thedata, resce2)
+            args.data_ops.raw_to_2d(pose_raw, thedata, resce_cp)
         )
 
         mpplot.subplot(2, 2, 4)
@@ -346,7 +353,9 @@ class base_regre(object):
         img_name, pose_raw = args.data_io.parse_line_annot(annot_line)
         img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
         mpplot.imshow(img, cmap='bone')
-        rect = iso_rect(resce_h5[1:3], self.crop_size / resce_h5[0])
+        # rect = iso_rect(resce_h5[1:3], self.crop_size / resce_h5[0])
+        rect = iso_rect()
+        rect.load(resce2)
         rect.draw()
         args.data_draw.draw_pose2d(
             thedata,
@@ -366,11 +375,16 @@ class base_regre(object):
             print('ERROR - h5 storage corrupted!')
         resce2 = resce[0:3]
         resce3 = resce[3:7]
-        mpplot.imshow(frame, cmap='bone')
+        sizel = np.floor(resce2[0]).astype(int)
+        resce_cp = np.copy(resce2)
+        resce_cp[0] = 1
+        mpplot.imshow(
+            cv2resize(frame, (sizel, sizel)),
+            cmap='bone')
         pose_raw = args.data_ops.local_to_raw(poses, resce3)
         args.data_draw.draw_pose2d(
             thedata,
-            args.data_ops.raw_to_2d(pose_raw, thedata, resce2)
+            args.data_ops.raw_to_2d(pose_raw, thedata, resce_cp)
         )
         mpplot.savefig(os.path.join(
             args.predict_dir,
@@ -387,50 +401,105 @@ class base_regre(object):
             tf.float32, shape=(self.batch_size, self.pose_dim))
         return frames_tf, poses_tf
 
-    def get_model(self, frames_tf, is_training, bn_decay=None):
-        """ directly predict all joints' location using regression
-            frames_tf: BxHxWx1
+    def get_model(
+            self, input_tensor, is_training,
+            scope=None, final_endpoint='poseout'):
+        """ input_tensor: BxHxWxC
             pose_dim: BxJ, where J is flattened 3D locations
         """
-        batch_size = frames_tf.get_shape()[0].value
+        # batch_size = frames_tf.get_shape()[0].value
         end_points = {}
-        # input_image = tf.expand_dims(frames_tf, -1)
-        input_image = frames_tf
+        self.end_point_list = []
 
-        shapestr = 'input: {}'.format(input_image.shape)
-        net, shapestr = tf_util.conv2d(
-            input_image, 16, [5, 5], stride=[1, 1], scope='conv1', shapestr=shapestr,
-            padding='VALID', is_training=is_training, bn=True, bn_decay=bn_decay)
-        net, shapestr = tf_util.max_pool2d(
-            net, [4, 4], scope='maxpool1', shapestr=shapestr, padding='VALID')
-        net, shapestr = tf_util.conv2d(
-            net, 32, [3, 3], stride=[1, 1], scope='conv2', shapestr=shapestr,
-            padding='VALID', is_training=is_training, bn=True, bn_decay=bn_decay)
-        net, shapestr = tf_util.max_pool2d(
-            net, [2, 2], scope='maxpool2', shapestr=shapestr, padding='VALID')
-        net, shapestr = tf_util.conv2d(
-            net, 64, [3, 3], stride=[1, 1], scope='conv3', shapestr=shapestr,
-            padding='VALID', is_training=is_training, bn=True, bn_decay=bn_decay)
-        net, shapestr = tf_util.max_pool2d(
-            net, [2, 2], scope='maxpool3', shapestr=shapestr, padding='VALID')
-        # print(net.shape)
+        def add_and_check_final(name, net):
+            end_points[name] = net
+            return name == final_endpoint
 
-        net = tf.reshape(net, [batch_size, -1])
-        net, shapestr = tf_util.fully_connected(
-            net, 1024, scope='fullconn1', shapestr=shapestr,
-            is_training=is_training, bn=True, bn_decay=bn_decay)
-        # net = tf_util.conv2d(
-        #     net, 1024, [1, 1], stride=[1, 1], scope='fullconn1',
+        with tf.variable_scope(scope, self.__class__.__name__, [input_tensor]):
+            with slim.arg_scope(
+                    [slim.batch_norm, slim.dropout], is_training=is_training), \
+                slim.arg_scope(
+                    [slim.fully_connected],
+                    activation_fn=tf.nn.relu, normalizer_fn=slim.batch_norm), \
+                slim.arg_scope(
+                    [slim.max_pool2d, slim.avg_pool2d],
+                    stride=1, padding='SAME'), \
+                slim.arg_scope(
+                    [slim.conv2d],
+                    stride=1, padding='SAME', activation_fn=tf.nn.relu,
+                    normalizer_fn=slim.batch_norm):
+                with tf.variable_scope('stage128'):
+                    sc = 'stage128'
+                    net = slim.conv2d(input_tensor, 16, 3, scope='conv128_3x3_1')
+                    net = slim.conv2d(net, 16, 3, stride=2, scope='conv128_3x3_2')
+                    net = slim.max_pool2d(net, 3, scope='maxpool128_3x3_1')
+                    net = slim.conv2d(net, 32, 3, scope='conv64_3x3_1')
+                    net = slim.max_pool2d(net, 3, stride=2, scope='maxpool64_3x3_2')
+                    self.end_point_list.append(sc)
+                    if add_and_check_final(sc, net):
+                        return net, end_points
+                with tf.variable_scope('stage32'):
+                    sc = 'stage32'
+                    net = slim.conv2d(net, 64, 3, scope='conv32_3x3_1')
+                    net = slim.max_pool2d(net, 3, stride=2, scope='maxpool32_3x3_2')
+                    self.end_point_list.append(sc)
+                    if add_and_check_final(sc, net):
+                        return net, end_points
+                with tf.variable_scope('stage16'):
+                    sc = 'stage16'
+                    net = slim.conv2d(net, 128, 3, scope='conv16_3x3_1')
+                    net = slim.max_pool2d(net, 3, stride=2, scope='maxpool16_3x3_2')
+                    self.end_point_list.append(sc)
+                    if add_and_check_final(sc, net):
+                        return net, end_points
+                with tf.variable_scope('stage8'):
+                    net = slim.flatten(net)
+                    sc = 'poseout'
+                    net = slim.fully_connected(net, 768, scope='fullconn8')
+                    net = slim.dropout(
+                        net, 0.5, is_training=is_training, scope='dropout8')
+                    net = slim.fully_connected(
+                        net, self.pose_dim, activation_fn=None, scope='poseout')
+                    # self.end_point_list.append(sc)
+                    if add_and_check_final(sc, net):
+                        return net, end_points
+
+        raise ValueError('final_endpoint (%s) not recognized', final_endpoint)
+
+        # shapestr = 'input: {}'.format(input_image.shape)
+        # net, shapestr = tf_util.conv2d(
+        #     input_image, 16, [5, 5], stride=[1, 1], scope='conv1', shapestr=shapestr,
         #     padding='VALID', is_training=is_training, bn=True, bn_decay=bn_decay)
-        net, shapestr = tf_util.dropout(
-            net, keep_prob=0.5, scope='dropout1', shapestr=shapestr, is_training=is_training)
-        net, shapestr = tf_util.fully_connected(
-            net, self.pose_dim, scope='fullconn3', shapestr=shapestr, activation_fn=None)
-        # net = tf_util.conv2d(
-        #     net, self.pose_dim, [1, 1], stride=[1, 1], scope='fullconn3',
+        # net, shapestr = tf_util.max_pool2d(
+        #     net, [4, 4], scope='maxpool1', shapestr=shapestr, padding='VALID')
+        # net, shapestr = tf_util.conv2d(
+        #     net, 32, [3, 3], stride=[1, 1], scope='conv2', shapestr=shapestr,
         #     padding='VALID', is_training=is_training, bn=True, bn_decay=bn_decay)
+        # net, shapestr = tf_util.max_pool2d(
+        #     net, [2, 2], scope='maxpool2', shapestr=shapestr, padding='VALID')
+        # net, shapestr = tf_util.conv2d(
+        #     net, 64, [3, 3], stride=[1, 1], scope='conv3', shapestr=shapestr,
+        #     padding='VALID', is_training=is_training, bn=True, bn_decay=bn_decay)
+        # net, shapestr = tf_util.max_pool2d(
+        #     net, [2, 2], scope='maxpool3', shapestr=shapestr, padding='VALID')
+        # # print(net.shape)
+        #
+        # net = tf.reshape(net, [batch_size, -1])
+        # net, shapestr = tf_util.fully_connected(
+        #     net, 1024, scope='fullconn1', shapestr=shapestr,
+        #     is_training=is_training, bn=True, bn_decay=bn_decay)
+        # # net = tf_util.conv2d(
+        # #     net, 1024, [1, 1], stride=[1, 1], scope='fullconn1',
+        # #     padding='VALID', is_training=is_training, bn=True, bn_decay=bn_decay)
+        # net, shapestr = tf_util.dropout(
+        #     net, keep_prob=0.5, scope='dropout1', shapestr=shapestr, is_training=is_training)
+        # net, shapestr = tf_util.fully_connected(
+        #     net, self.pose_dim, scope='fullconn3', shapestr=shapestr, activation_fn=None)
+        # # net = tf_util.conv2d(
+        # #     net, self.pose_dim, [1, 1], stride=[1, 1], scope='fullconn3',
+        # #     padding='VALID', is_training=is_training, bn=True, bn_decay=bn_decay)
 
-        return net, shapestr, end_points
+        # return net, end_points
 
     @staticmethod
     def get_loss(pred, anno, end_points):
@@ -439,6 +508,6 @@ class base_regre(object):
             anno: BxJ
         """
         # loss = tf.reduce_sum(tf.pow(tf.subtract(pred, anno), 2)) / 2
-        # loss = tf.nn.l2_loss(pred - anno)  # already divided by 2
-        loss = tf.reduce_mean(tf.squared_difference(pred, anno)) / 2
+        loss = tf.nn.l2_loss(pred - anno)  # already divided by 2
+        # loss = tf.reduce_mean(tf.squared_difference(pred, anno)) / 2
         return loss

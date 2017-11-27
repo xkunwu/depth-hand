@@ -4,8 +4,9 @@ Author: Charles R. Qi
 Date: November 2016
 """
 
-import numpy as np
+from functools import reduce
 import tensorflow as tf
+
 
 def _variable_on_cpu(name, shape, initializer, use_fp16=False):
   """Helper to create a Variable stored on CPU memory.
@@ -20,6 +21,7 @@ def _variable_on_cpu(name, shape, initializer, use_fp16=False):
     dtype = tf.float16 if use_fp16 else tf.float32
     var = tf.get_variable(name, shape, initializer=initializer, dtype=dtype)
   return var
+
 
 def _variable_with_weight_decay(name, shape, stddev, wd, use_xavier=True):
   """Helper to create an initialized Variable with weight decay.
@@ -38,11 +40,10 @@ def _variable_with_weight_decay(name, shape, stddev, wd, use_xavier=True):
   Returns:
     Variable Tensor
   """
-  ## NOTE: contrib mysteriously broken!!!
-  # if use_xavier:
-  #   initializer = tf.contrib.layers.xavier_initializer()
-  # else:
-  #   initializer = tf.truncated_normal_initializer(stddev=stddev)
+  if use_xavier:
+    initializer = tf.contrib.layers.xavier_initializer()
+  else:
+    initializer = tf.truncated_normal_initializer(stddev=stddev)
   initializer = tf.truncated_normal_initializer(stddev=stddev)
   var = _variable_on_cpu(name, shape, initializer)
   if wd is not None:
@@ -123,9 +124,9 @@ def conv2d(inputs,
            bn=False,
            bn_decay=None,
            is_training=None):
-  """ 2D convolution with non-linear operation.
+    """ 2D convolution with non-linear operation.
 
-  Args:
+    Args:
     inputs: 4-D tensor variable BxHxWxC
     num_output_channels: int
     kernel_size: a list of 2 ints
@@ -140,36 +141,43 @@ def conv2d(inputs,
     bn_decay: float or float tensor variable in [0,1]
     is_training: bool Tensor variable
 
-  Returns:
+    Returns:
     Variable tensor
-  """
-  with tf.variable_scope(scope) as sc:
-      kernel_h, kernel_w = kernel_size
-      num_in_channels = inputs.get_shape()[-1].value
-      kernel_shape = [kernel_h, kernel_w,
-                      num_in_channels, num_output_channels]
-      kernel = _variable_with_weight_decay('weights',
-                                           shape=kernel_shape,
-                                           use_xavier=use_xavier,
-                                           stddev=stddev,
-                                           wd=weight_decay)
-      stride_h, stride_w = stride
-      outputs = tf.nn.conv2d(inputs, kernel,
-                             [1, stride_h, stride_w, 1],
-                             padding=padding)
-      biases = _variable_on_cpu('biases', [num_output_channels],
-                                tf.constant_initializer(0.0))
-      outputs = tf.nn.bias_add(outputs, biases)
+    """
+    with tf.variable_scope(scope) as sc:
+        kernel_h, kernel_w = kernel_size
+        num_in_channels = inputs.get_shape()[-1].value
+        kernel_shape = [
+            kernel_h, kernel_w,
+            num_in_channels, num_output_channels]
+        kernel = _variable_with_weight_decay(
+            'weights',
+            shape=kernel_shape,
+            use_xavier=use_xavier,
+            stddev=stddev,
+            wd=weight_decay)
+        stride_h, stride_w = stride
+        outputs = tf.nn.conv2d(
+            inputs, kernel,
+            [1, stride_h, stride_w, 1],
+            padding=padding)
+        biases = _variable_on_cpu(
+            'biases', [num_output_channels],
+            tf.constant_initializer(0.0))
+        outputs = tf.nn.bias_add(outputs, biases)
 
-      if bn:
-        outputs = batch_norm_for_conv2d(outputs, is_training,
-                                        bn_decay=bn_decay, scope='bn')
+        if bn:
+            outputs = batch_norm_for_conv2d(
+                outputs, is_training,
+                bn_decay=bn_decay, scope='bn')
 
-      if activation_fn is not None:
-        outputs = activation_fn(outputs)
-      shapestr += '\n{}: {} --> {} @ {}'.format(
-          scope, outputs.shape, kernel_size, stride)
-      return outputs, shapestr
+        if activation_fn is not None:
+            outputs = activation_fn(outputs)
+        shapestr += '\n{}: {} = ({}, {}) --> {} @ {}'.format(
+            scope, outputs.shape,
+            outputs.shape[0], reduce(lambda x, y: x * y, outputs.shape[1:]),
+            kernel_size, stride)
+        return outputs, shapestr
 
 
 def conv2d_transpose(inputs,
@@ -251,7 +259,6 @@ def conv2d_transpose(inputs,
       return outputs
 
 
-
 def conv3d(inputs,
            num_output_channels,
            kernel_size,
@@ -266,9 +273,9 @@ def conv3d(inputs,
            bn=False,
            bn_decay=None,
            is_training=None):
-  """ 3D convolution with non-linear operation.
+    """ 3D convolution with non-linear operation.
 
-  Args:
+    Args:
     inputs: 5-D tensor variable BxDxHxWxC
     num_output_channels: int
     kernel_size: a list of 3 ints
@@ -283,36 +290,44 @@ def conv3d(inputs,
     bn_decay: float or float tensor variable in [0,1]
     is_training: bool Tensor variable
 
-  Returns:
+    Returns:
     Variable tensor
-  """
-  with tf.variable_scope(scope) as sc:
-    kernel_d, kernel_h, kernel_w = kernel_size
-    num_in_channels = inputs.get_shape()[-1].value
-    kernel_shape = [kernel_d, kernel_h, kernel_w,
-                    num_in_channels, num_output_channels]
-    kernel = _variable_with_weight_decay('weights',
-                                         shape=kernel_shape,
-                                         use_xavier=use_xavier,
-                                         stddev=stddev,
-                                         wd=weight_decay)
-    stride_d, stride_h, stride_w = stride
-    outputs = tf.nn.conv3d(inputs, kernel,
-                           [1, stride_d, stride_h, stride_w, 1],
-                           padding=padding)
-    biases = _variable_on_cpu('biases', [num_output_channels],
-                              tf.constant_initializer(0.0))
-    outputs = tf.nn.bias_add(outputs, biases)
+    """
+    with tf.variable_scope(scope) as sc:
+        kernel_d, kernel_h, kernel_w = kernel_size
+        num_in_channels = inputs.get_shape()[-1].value
+        kernel_shape = [
+            kernel_d, kernel_h, kernel_w,
+            num_in_channels, num_output_channels]
+        kernel = _variable_with_weight_decay(
+            'weights',
+            shape=kernel_shape,
+            use_xavier=use_xavier,
+            stddev=stddev,
+            wd=weight_decay)
+        stride_d, stride_h, stride_w = stride
+        outputs = tf.nn.conv3d(
+            inputs, kernel,
+            [1, stride_d, stride_h, stride_w, 1],
+            padding=padding)
+        biases = _variable_on_cpu(
+            'biases', [num_output_channels],
+            tf.constant_initializer(0.0))
+        outputs = tf.nn.bias_add(outputs, biases)
 
-    if bn:
-      outputs = batch_norm_for_conv3d(outputs, is_training,
-                                      bn_decay=bn_decay, scope='bn')
+        if bn:
+            outputs = batch_norm_for_conv3d(
+                outputs, is_training,
+                bn_decay=bn_decay, scope='bn')
 
-    if activation_fn is not None:
-      outputs = activation_fn(outputs)
-  shapestr += '\n{}: {} --> {} @ {}'.format(
-    scope, outputs.shape, kernel_size, stride)
-  return outputs, shapestr
+        if activation_fn is not None:
+            outputs = activation_fn(outputs)
+        shapestr += '\n{}: {} = ({}, {}) --> {} @ {}'.format(
+            scope, outputs.shape,
+            outputs.shape[0], reduce(lambda x, y: x * y, outputs.shape[1:]),
+            kernel_size, stride)
+        return outputs, shapestr
+
 
 def fully_connected(inputs,
                     num_outputs,
@@ -381,8 +396,10 @@ def max_pool2d(inputs,
             strides=[1, stride_h, stride_w, 1],
             padding=padding,
             name=sc.name)
-    shapestr += '\n{}: {} --> {} @ {}'.format(
-        scope, outputs.shape, kernel_size, stride)
+    shapestr += '\n{}: {} = ({}, {}) --> {} @ {}'.format(
+        scope, outputs.shape,
+        outputs.shape[0], reduce(lambda x, y: x * y, outputs.shape[1:]),
+        kernel_size, stride)
     return outputs, shapestr
 
 def avg_pool2d(inputs,
@@ -436,8 +453,10 @@ def max_pool3d(inputs,
             strides=[1, stride_d, stride_h, stride_w, 1],
             padding=padding,
             name=sc.name)
-    shapestr += '\n{}: {} --> {} @ {}'.format(
-        scope, outputs.shape, kernel_size, stride)
+    shapestr += '\n{}: {} = ({}, {}) --> {} @ {}'.format(
+        scope, outputs.shape,
+        outputs.shape[0], reduce(lambda x, y: x * y, outputs.shape[1:]),
+        kernel_size, stride)
     return outputs, shapestr
 
 def avg_pool3d(inputs,

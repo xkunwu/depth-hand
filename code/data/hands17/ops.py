@@ -34,25 +34,25 @@ grid_cell = getattr(
 def raw_to_pca(points3, resce=np.array([1, 0, 0, 0, 1, 0, 0, 0])):
     cube = iso_cube()
     cube.load(resce)
-    return cube.transform(points3) / resce[0]
+    return cube.transform(points3)
 
 
 def pca_to_raw(points3, resce=np.array([1, 0, 0, 0, 1, 0, 0, 0])):
     cube = iso_cube()
     cube.load(resce)
-    return cube.transform_inv(points3 * resce[0])
+    return cube.transform_inv(points3)
 
 
 def raw_to_local(points3, resce=np.array([1, 0, 0, 0])):
     aabb = iso_aabb()
     aabb.load(resce)
-    return aabb.transform(points3) / resce[0]
+    return aabb.transform(points3)
 
 
 def local_to_raw(points3, resce=np.array([1, 0, 0, 0])):
     aabb = iso_aabb()
     aabb.load(resce)
-    return aabb.transform_inv(points3 * resce[0])
+    return aabb.transform_inv(points3)
 
 
 def d2z_to_raw(p2z, caminfo, resce=np.array([1, 0, 0])):
@@ -188,16 +188,19 @@ def proj_ortho3(img, pose_raw, caminfo):
     img_l = []
     for spi in range(3):
         coord, depth = cube.project_pca(points3_trans, roll=spi)
-        img_crop = cube.print_image(coord, depth)
+        img_crop = cube.print_image(coord, depth, caminfo.crop_size)
+        # img_l.append(
+        #     cv2resize(img_crop, (caminfo.crop_size, caminfo.crop_size))
+        # )
         img_l.append(
-            cv2resize(img_crop, (caminfo.crop_size, caminfo.crop_size))
+            img_crop
         )
         # pose2d, _ = cube.project_pca(pose_trans, roll=spi, sort=False)
-    resce = np.concatenate((
-        np.array([float(caminfo.crop_size) / cube.get_sidelen()]),
-        np.ones(2) * cube.get_sidelen(),
-        cube.dump()
-    ))
+    # resce = np.concatenate((
+    #     np.array([float(caminfo.crop_size) / cube.get_sidelen()]),
+    #     np.ones(2) * cube.get_sidelen(),
+    #     cube.dump()
+    # ))
     # resce = np.append(
     #     float(caminfo.crop_size) / cube.get_sidelen(),
     #     cube.cen
@@ -206,39 +209,88 @@ def proj_ortho3(img, pose_raw, caminfo):
     #     resce,
     #     cube.evecs.flatten()))
     img_crop_resize = np.stack(img_l, axis=2)
+    resce = cube.dump()
     return img_crop_resize, resce
+
+
+def get_rect3(cube, caminfo):
+    """ return a rectangle with margin that 3d points
+        NOTE: there is still a perspective problem
+    """
+    cen = raw_to_2d(cube.cen.reshape(1, -1), caminfo).flatten()
+    rect = iso_rect(
+        cen - cube.len,
+        cube.get_sidelen()
+    )
+    rect = clip_image_border(rect, caminfo)
+    return rect
 
 
 def crop_resize_pca(img, pose_raw, caminfo):
     cube = iso_cube()
     cube.build(pose_raw)
-    points3, _ = cube.pick(img_to_raw(img, caminfo))
-    points2, pose_z = raw_to_2dz(points3, caminfo)
-    rect = iso_rect()
-    rect.build(points2, 0.5)
-    rect = clip_image_border(rect, caminfo)
-    conds = rect.pick(points2)
-    img_crop = rect.print_image(points2[conds, :], pose_z[conds])
-    img_crop_resize = cv2resize(img_crop, (caminfo.crop_size, caminfo.crop_size))
-    img_crop_resize = (img_crop_resize.astype(float) - np.min(img_crop_resize)) /\
-        (np.max(img_crop_resize) - np.min(img_crop_resize))
-    resce = np.concatenate((
-        np.array([float(caminfo.crop_size) / rect.len]),
-        rect.cll,
-        cube.dump()
-    ))
+    _, points3_trans = cube.pick(img_to_raw(img, caminfo))
+    coord, depth = cube.project_pca(points3_trans)
+    # x = np.arange(-1, 1, 0.5)
+    # y = np.stack([x, x, -x]).T
+    # print(y)
+    # coord, depth = cube.project_pca(y)
+    # print(coord)
+    # print(depth)
+    img_crop_resize = cube.print_image(coord, depth, caminfo.crop_size)
+    # mpplot = import_module('matplotlib.pyplot')
+    # mpplot.imshow(img_crop_resize, cmap='bone')
+    # mpplot.show()
+    # rect = get_rect3(cube, caminfo)
+    # points2, pose_z = raw_to_2dz(points3, caminfo)
+    # rect = iso_rect()
+    # rect.build(points2, 0.5)
+    # rect = clip_image_border(rect, caminfo)
+    # conds = rect.pick(points2)
+    # img_crop = rect.print_image(points2[conds, :], pose_z[conds])
+    # img_crop_resize = cv2resize(img_crop, (caminfo.crop_size, caminfo.crop_size))
+    # img_crop_resize = (img_crop_resize.astype(float) - np.min(img_crop_resize)) /\
+    #     (np.max(img_crop_resize) - np.min(img_crop_resize))
+    # img_crop_resize = img_crop
+    # resce = np.concatenate((
+    #     np.array([float(caminfo.crop_size) / rect.len]),
+    #     rect.cll,
+    #     cube.dump()
+    # ))
+    resce = cube.dump()
     return img_crop_resize, resce
 
 
 def get_rect2(aabb, caminfo, m=0.2):
+    from colour import Color
+    # mpplot = import_module('matplotlib.pyplot')
+    c3a = np.array([
+        aabb.cll,
+        np.append(aabb.cll[:2] + aabb.len, aabb.cll[2])
+    ])  # central z-plane
+    c2a = raw_to_2d(c3a, caminfo)
+    cll = c2a[0, :]
+    ctr = c2a[1, :]
+    rect = iso_rect(cll, np.max(ctr - cll), m)
+    rect.draw(Color('red').rgb)
+    c3a = np.array([
+        np.append(aabb.cll[:2], aabb.cll[2] + aabb.len),
+        np.append(aabb.cll[:2] + aabb.len, aabb.cll[2] + aabb.len)
+    ])  # central z-plane
+    c2a = raw_to_2d(c3a, caminfo)
+    cll = c2a[0, :]
+    ctr = c2a[1, :]
+    rect = iso_rect(cll, np.max(ctr - cll), m)
+    rect.draw(Color('blue').rgb)
+
     cen = aabb.cll + aabb.len / 2
     c3a = np.array([
-        np.append(cen[:2] - aabb.len / 2, aabb.cll[2]),
-        np.append(cen[:2] + aabb.len / 2, aabb.cll[2]),
+        np.append(cen[:2] - aabb.len / 2, cen[2]),
+        np.append(cen[:2] + aabb.len / 2, cen[2]),
         # aabb.cll,
         # np.append(aabb.cll[:2] + aabb.len, aabb.cll[2]),
         # aabb.cll + aabb.len / 2
-    ])
+    ])  # central z-plane
     c2a = raw_to_2d(c3a, caminfo)
     cll = c2a[0, :]
     ctr = c2a[1, :]
@@ -247,25 +299,33 @@ def get_rect2(aabb, caminfo, m=0.2):
     return rect
 
 
+def get_rect(pose2d, caminfo, bm=0.6):
+    """ return a rectangle with margin that contains 2d point set
+    """
+    rect = iso_rect()
+    rect.build(pose2d, bm)
+    rect = clip_image_border(rect, caminfo)
+    return rect
+
+
 def crop_resize(img, pose_raw, caminfo):
     aabb = iso_aabb()
     aabb.build(pose_raw)
-    rect = get_rect2(aabb, caminfo)
+    # rect = get_rect2(aabb, caminfo)
+    # cube = iso_cube()
+    # cube.build(pose_raw)
+    # rect = get_rect3(cube, caminfo)
+    points2 = raw_to_2d(pose_raw, caminfo)
+    rect = get_rect(points2, caminfo)
+    # mpplot.imshow(img, cmap='bone')
+    # rect.draw()
+    # mpplot.show()
     cll_i = np.floor(rect.cll).astype(int)
-    bl_i = np.floor(rect.len).astype(int)
+    sizel = np.floor(rect.len).astype(int)
     img_crop = img[
-        cll_i[1]:cll_i[1] + bl_i,
-        cll_i[0]:cll_i[0] + bl_i,
+        cll_i[1]:cll_i[1] + sizel,
+        cll_i[0]:cll_i[0] + sizel,
     ]
-
-    # points2 = raw_to_2d(pose_raw, caminfo)
-    # rect = get_rect(points2, caminfo)
-    # cll = np.floor(rect.cll).astype(int)
-    # bl = np.floor(rect.len).astype(int)
-    # img_crop = img[
-    #     cll[0]:cll[0] + bl,
-    #     cll[1]:cll[1] + bl,
-    # ]
 
     # rect = get_rect3(
     #     pose_raw, caminfo
@@ -281,32 +341,9 @@ def crop_resize(img, pose_raw, caminfo):
     # cen2, cenz = raw_to_2dz(np.expand_dims(cen, axis=0), caminfo)
     # cen2 = (cll + ctr) / 2
     resce = np.concatenate((
-        np.array([float(caminfo.crop_size) / rect.len]),
-        rect.cll,
+        # np.array([float(caminfo.crop_size) / sizel]),
+        # rect.cll,
+        rect.dump(),
         aabb.dump()
     ))
     return img_crop_resize, resce
-
-
-def get_rect3(points3, caminfo, m=0.6):
-    """ return a rectangle with margin that 3d points
-        NOTE: there is still a perspective problem
-    """
-    cube = iso_cube()
-    cube.build(points3, m)
-    cen = raw_to_2d(cube.cen.reshape(1, -1), caminfo).flatten()
-    rect = iso_rect(
-        cen - cube.len,
-        cube.get_sidelen()
-    )
-    rect = clip_image_border(rect, caminfo)
-    return rect
-
-
-def get_rect(pose2d, caminfo, bm=0.6):
-    """ return a rectangle with margin that contains 2d point set
-    """
-    rect = iso_rect()
-    rect.build(pose2d, bm)
-    rect = clip_image_border(rect, caminfo)
-    return rect

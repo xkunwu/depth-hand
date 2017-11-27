@@ -162,31 +162,36 @@ def test_dataops(args):
 if __name__ == "__main__":
     # python evaluate.py --max_epoch=1 --batch_size=16 --model_name=base_clean
 
-    mpl = import_module('matplotlib')
-    mpl.use('Agg')
-    mpplot = import_module('matplotlib.pyplot')
+    with_train = True
+
+    # mpplot = import_module('matplotlib.pyplot')
     # with args_holder() as argsholder:
     #     argsholder.parse_args()
     #     args = argsholder.args
     #     argsholder.create_instance()
-    #     import shutil
-    #     shutil.rmtree(args.out_dir)
-    #     os.makedirs(args.out_dir)
+    #     # import shutil
+    #     # shutil.rmtree(args.out_dir)
+    #     # os.makedirs(args.out_dir)
     #
     #     test_dataops(args)
     #
-    #     run_one(args, mpplot, False)
+    #     # run_one(args, mpplot, with_train)
     #
-    #     draw_compare(args, mpplot)
+    #     # draw_compare(args, mpplot)
     # sys.exit()
 
+    mpl = import_module('matplotlib')
+    mpl.use('Agg')
+    mpplot = import_module('matplotlib.pyplot')
     methlist = [
-        'direc_tsdf',
-        'trunc_dist',
-        'base_conv3',
-        'ortho3view',
+        # 'direc_tsdf',
+        # 'trunc_dist',
+        # 'base_conv3',
+        # 'ortho3view',
         'base_clean',
         'base_regre',
+        'base_clean_inres',
+        'base_regre_inres'
     ]
     for meth in methlist:
         with args_holder() as argsholder:
@@ -194,7 +199,7 @@ if __name__ == "__main__":
             args = argsholder.args
             args.model_name = meth
             argsholder.create_instance()
-            run_one(args, mpplot, False)
+            run_one(args, mpplot, with_train)
             # test_dataops(args)
     draw_compare(args, mpplot)
     copyfile(

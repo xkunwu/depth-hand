@@ -1,5 +1,8 @@
 # install requirements
 conda install --file requirements.txt
+pip install pyquaternion
+pip install colour
+conda install -c menpo vtk=7 python=3.5
 
 # remote management
 tensorboard --logdir log

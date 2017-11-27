@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as mpplot
-import ops as dataops
-import io as dataio
+from . import ops as dataops
+from . import io as dataio
 
 
 def compare_error(thedata, fname_echt, fname_pred):

@@ -2,7 +2,9 @@ import os
 import sys
 from importlib import import_module
 import logging
+import numpy as np
 import tensorflow as tf
+from functools import reduce
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 BASE_DIR = os.path.abspath(os.path.join(BASE_DIR, os.pardir))
@@ -23,36 +25,58 @@ class train_abc():
         args: holds parameters.
     """
 
+    @staticmethod
+    def transform_image_summary(tensor, ii=0):
+        """ tensor: BxIxIxF """
+        isize = int(tensor.shape[1])
+        fsize = int(tensor.shape[3])
+        num = np.ceil(np.sqrt(int(tensor.shape[-1]))).astype(int)
+        t0 = tf.expand_dims(tf.transpose(tensor[ii, ...], [2, 0, 1]), axis=-1)
+        # return t0
+        pad = tf.zeros([num * num - fsize, isize, isize, 1])
+        t1 = tf.unstack(tf.concat(axis=0, values=[t0, pad]), axis=0)
+        rows = []
+        for ri in range(num):
+            rows.append(tf.concat(
+                axis=0, values=t1[ri * num:(ri + 1) * num]))
+        t2 = tf.concat(axis=1, values=rows)
+        return tf.expand_dims(t2, axis=0)
+
     def train(self):
         self.logger.info('######## Training ########')
         tf.reset_default_graph()
-        with tf.Graph().as_default():
-            with tf.device('/gpu:' + str(self.args.gpu_id)):
-                frames_tf, poses_tf = self.args.model_inst.placeholder_inputs()
-                is_training_tf = tf.placeholder(tf.bool, shape=())
+        with tf.Graph().as_default(), tf.device('/gpu:' + str(self.args.gpu_id)):
+            frames_tf, poses_tf = self.args.model_inst.placeholder_inputs()
+            is_training_tf = tf.placeholder(tf.bool, shape=())
 
-                # Note the global_step=batch parameter to minimize.
-                batch = tf.Variable(0)
-                bn_decay = self.get_bn_decay(batch)
-                tf.summary.scalar('bn_decay', bn_decay)
+            # Note the global_step=batch parameter to minimize.
+            batch = tf.Variable(0)
 
-                # Get model and loss
-                pred, shapestr, end_points = self.args.model_inst.get_model(
-                    frames_tf, is_training_tf, bn_decay=bn_decay)
-                self.args.logger.info('network structure:\n{}'.format(shapestr))
-                loss = self.args.model_inst.get_loss(pred, poses_tf, end_points)
-                regre_error = tf.sqrt(loss * 2)
-                tf.summary.scalar('regression_error', regre_error)
+            # Get model and loss
+            pred, end_points = self.args.model_inst.get_model(
+                frames_tf, is_training_tf)
+            shapestr = 'input: {}'.format(frames_tf.shape)
+            for ends in self.args.model_inst.end_point_list:
+                net = end_points[ends]
+                shapestr += '\n{}: {} = ({}, {})'.format(
+                    ends, net.shape,
+                    net.shape[0], reduce(lambda x, y: x * y, net.shape[1:])
+                )
+                tf.summary.image(ends, self.transform_image_summary(net))
+            self.args.logger.info('network structure:\n{}'.format(shapestr))
+            loss = self.args.model_inst.get_loss(pred, poses_tf, end_points)
+            regre_error = tf.sqrt(loss * 2)
+            tf.summary.scalar('regression_error', regre_error)
 
-                # Get training operator
-                learning_rate = self.get_learning_rate(batch)
-                tf.summary.scalar('learning_rate', learning_rate)
+            # Get training operator
+            learning_rate = self.get_learning_rate(batch)
+            tf.summary.scalar('learning_rate', learning_rate)
 
-                optimizer = tf.train.AdamOptimizer(learning_rate)
-                train_op = optimizer.minimize(loss, global_step=batch)
+            optimizer = tf.train.AdamOptimizer(learning_rate)
+            train_op = optimizer.minimize(loss, global_step=batch)
 
-                # Add ops to save and restore all the variables.
-                saver = tf.train.Saver(max_to_keep=4)
+            # Add ops to save and restore all the variables.
+            saver = tf.train.Saver(max_to_keep=4)
 
             # Create a session
             config = tf.ConfigProto()
@@ -60,14 +84,6 @@ class train_abc():
             config.allow_soft_placement = True
             config.log_device_placement = False
             with tf.Session(config=config) as sess:
-                # Add summary writers
-                merged = tf.summary.merge_all()
-                train_writer = tf.summary.FileWriter(
-                    os.path.join(self.args.log_dir_t, 'train'),
-                    sess.graph)
-                test_writer = tf.summary.FileWriter(
-                    os.path.join(self.args.log_dir_t, 'test'))
-
                 model_path = os.path.join(self.args.log_dir_t, 'model.ckpt')
                 # Init variables
                 if self.args.retrain:
@@ -76,6 +92,14 @@ class train_abc():
                 else:
                     saver.restore(sess, model_path)
                     self.logger.info('Model restored from: {}.'.format(model_path))
+
+                # Add summary writers
+                merged = tf.summary.merge_all()
+                train_writer = tf.summary.FileWriter(
+                    os.path.join(self.args.log_dir_t, 'train'),
+                    sess.graph)
+                test_writer = tf.summary.FileWriter(
+                    os.path.join(self.args.log_dir_t, 'test'))
 
                 ops = {
                     'batch_frame': frames_tf,
@@ -104,7 +128,7 @@ class train_abc():
                         self.logger.info('** Testing **')
                         self.args.model_inst.start_epoch_test(filepack)
                         self.test_one_epoch(sess, ops, test_writer)
-                        time_e = "{:0>8}".format(timedelta(seconds=(timer() - time_s)))
+                        time_e = str(timedelta(seconds=(timer() - time_s)))
                         self.args.logger.info('Epoch #{:03d} processing time: {}'.format(
                             epoch, time_e))
 
@@ -113,13 +137,15 @@ class train_abc():
                             save_path = saver.save(sess, model_path)
                             self.logger.info("Model saved in file: {}".format(save_path))
                     self.args.model_inst.end_train()
-                    time_all_e = "{:0>8}".format(timedelta(seconds=(timer() - time_all_s)))
+                    time_all_e = str(timedelta(seconds=(timer() - time_all_s)))
                     self.args.logger.info('Total training time: {}'.format(
                         time_all_e))
 
     def train_one_epoch(self, sess, ops, train_writer):
         """ ops: dict mapping from string to tf ops """
         is_training = True
+        batch_count = 0
+        loss_sum = 0
         while True:
             batch_data = self.args.model_inst.fetch_batch_train()
             if batch_data is None:
@@ -129,13 +155,20 @@ class train_abc():
                 ops['batch_poses']: batch_data['batch_poses'],
                 ops['is_training']: is_training
             }
-            summary, step, _, loss_val, _ = sess.run(
+            summary, step, _, loss_val, pred_val = sess.run(
                 [ops['merged'], ops['step'], ops['train_op'],
                     ops['loss'], ops['pred']],
                 feed_dict=feed_dict)
-            train_writer.add_summary(summary, step)
-            self.logger.info('batch training loss (half-squared): {}'.format(
-                loss_val))
+            loss_sum += loss_val
+            batch_count += 1
+            if batch_count % 10 == 0:
+                train_writer.add_summary(summary, step)
+                self.logger.info('batch {} training loss (half-squared): {}'.format(
+                    batch_count, loss_val))
+                # print(np.sum((batch_data['batch_poses'] - pred_val) ** 2) / 2)
+        mean_loss = loss_sum / batch_count
+        self.args.logger.info('epoch training mean loss (half-squared): {}'.format(
+            mean_loss))
 
     def test_one_epoch(self, sess, ops, test_writer):
         """ ops: dict mapping from string to tf ops """
@@ -151,18 +184,22 @@ class train_abc():
                 ops['batch_poses']: batch_data['batch_poses'],
                 ops['is_training']: is_training
             }
-            summary, step, loss_val, _ = sess.run(
+            summary, step, loss_val, pred_val = sess.run(
                 [ops['merged'], ops['step'],
                     ops['loss'], ops['pred']],
                 feed_dict=feed_dict)
-            test_writer.add_summary(summary, step)
-            batch_count += 1
             loss_sum += loss_val
-            sys.stdout.write('.')
-            sys.stdout.flush()
+            batch_count += 1
+            self.logger.info('batch {} testing loss (half-squared): {}'.format(
+                batch_count, loss_val))
+            # print(np.sum((batch_data['batch_poses'] - pred_val) ** 2) / 2)
+            if batch_count % 10 == 0:
+                test_writer.add_summary(summary, step)
+                sys.stdout.write('.')
+                sys.stdout.flush()
         print('\n')
         mean_loss = loss_sum / batch_count
-        self.logger.info('epoch testing mean loss (half-squared): {}'.format(
+        self.args.logger.info('epoch testing mean loss (half-squared): {}'.format(
             mean_loss))
 
     def evaluate(self):
@@ -173,7 +210,7 @@ class train_abc():
             is_training_tf = tf.placeholder(tf.bool, shape=())
 
             # Get model and loss
-            pred, _, end_points = self.args.model_inst.get_model(
+            pred, end_points = self.args.model_inst.get_model(
                 frames_tf, is_training_tf)
             loss = self.args.model_inst.get_loss(pred, poses_tf, end_points)
 
@@ -228,13 +265,14 @@ class train_abc():
                 batch_data['batch_resce'],
                 pred_val
             )
-            batch_count += 1
             loss_sum += loss_val
-            sys.stdout.write('.')
-            sys.stdout.flush()
+            batch_count += 1
+            if batch_count % 10 == 0:
+                sys.stdout.write('.')
+                sys.stdout.flush()
         print('\n')
         mean_loss = loss_sum / batch_count
-        self.logger.info('epoch evaluate mean loss (half-squared): {}'.format(
+        self.args.logger.info('epoch evaluate mean loss (half-squared): {}'.format(
             mean_loss))
 
     def get_learning_rate(self, batch):
@@ -247,20 +285,6 @@ class train_abc():
         )
         # learning_rate = tf.maximum(learning_rate, 1e-6)
         return learning_rate
-
-    def get_bn_decay(self, batch):
-        """ Generally a value between .95 and .99.
-            Lower decay factors tend to weight recent data more heavily.
-        """
-        bn_momentum = tf.train.exponential_decay(
-            self.args.bn_momentum,
-            batch * self.args.batch_size,
-            float(self.args.decay_step),
-            self.args.decay_rate,
-            staircase=True
-        )
-        bn_decay = 1 - tf.maximum(1e-2, bn_momentum)
-        return bn_decay
 
     def __init__(self, args, new_log=True):
         self.args = args

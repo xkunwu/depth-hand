@@ -3,7 +3,7 @@ import sys
 from importlib import import_module
 import numpy as np
 import h5py
-from base_regre import base_regre
+from .base_regre import base_regre
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 BASE_DIR = os.path.abspath(os.path.join(BASE_DIR, os.pardir))
@@ -29,7 +29,8 @@ class base_clean(base_regre):
     """
     def __init__(self):
         super(base_clean, self).__init__()
-        self.num_appen = 11
+        # self.num_appen = 11
+        self.num_appen = 8
 
     def receive_data(self, thedata, args):
         """ Receive parameters specific to the data """
@@ -39,6 +40,7 @@ class base_clean(base_regre):
 
     def draw_random(self, thedata, args):
         import matplotlib.pyplot as mpplot
+        from cv2 import resize as cv2resize
 
         # from colour import Color
         # points3 = np.random.rand(1000, 3)
@@ -63,20 +65,27 @@ class base_clean(base_regre):
             frame_h5 = np.squeeze(h5file['frame'][frame_id, ...], -1)
             poses_h5 = h5file['poses'][frame_id, ...].reshape(-1, 3)
             resce_h5 = h5file['resce'][frame_id, ...]
-            # print(np.histogram(frame_h5))
-            # print(poses_h5)
+            print(np.min(frame_h5), np.max(frame_h5))
+            print(np.histogram(frame_h5, range=(1e-4, np.max(frame_h5))))
+            print(np.min(poses_h5, axis=0), np.max(poses_h5, axis=0))
 
         print('[{}] drawing pose #{:d}'.format(self.__class__.__name__, img_id))
-        resce2 = resce_h5[0:3]
-        resce3 = resce_h5[3:11]
+        # resce3 = resce_h5[3:11]
+        resce3 = resce_h5[0:8]
         mpplot.subplots(nrows=2, ncols=2, figsize=(2 * 5, 2 * 5))
 
         mpplot.subplot(2, 2, 3)
-        mpplot.imshow(frame_h5, cmap='bone')
-        pose_raw = args.data_ops.pca_to_raw(poses_h5, resce3)
+        cube = iso_cube()
+        cube.load(resce3)
+        sizel = np.floor(resce3[0]).astype(int)
+        mpplot.imshow(
+            cv2resize(frame_h5, (sizel, sizel)),
+            cmap='bone')
+        pose2d, _ = cube.project_pca(poses_h5, roll=0, sort=False)
+        pose2d *= sizel
         args.data_draw.draw_pose2d(
             thedata,
-            args.data_ops.raw_to_2d(pose_raw, thedata, resce2)
+            pose2d,
         )
 
         mpplot.subplot(2, 2, 4)
@@ -95,8 +104,6 @@ class base_clean(base_regre):
         img_name, pose_raw = args.data_io.parse_line_annot(annot_line)
         img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
         mpplot.imshow(img, cmap='bone')
-        rect = iso_rect(resce_h5[1:3], self.crop_size / resce_h5[0])
-        rect.draw()
         args.data_draw.draw_pose2d(
             thedata,
             args.data_ops.raw_to_2d(pose_raw, thedata))
@@ -113,13 +120,19 @@ class base_clean(base_regre):
             print(np.linalg.norm(frame_h5 - frame))
             print(np.linalg.norm(poses_h5 - poses))
             print('ERROR - h5 storage corrupted!')
-        resce2 = resce[0:3]
-        resce3 = resce[3:11]
-        mpplot.imshow(frame, cmap='bone')
-        pose_raw = args.data_ops.pca_to_raw(poses, resce3)
+        # resce3 = resce[3:11]
+        resce3 = resce[0:8]
+        cube = iso_cube()
+        cube.load(resce3)
+        sizel = np.floor(resce3[0]).astype(int)
+        mpplot.imshow(
+            cv2resize(frame, (sizel, sizel)),
+            cmap='bone')
+        pose2d, _ = cube.project_pca(poses, roll=0, sort=False)
+        pose2d *= sizel
         args.data_draw.draw_pose2d(
             thedata,
-            args.data_ops.raw_to_2d(pose_raw, thedata, resce2)
+            pose2d,
         )
 
         mpplot.savefig(os.path.join(

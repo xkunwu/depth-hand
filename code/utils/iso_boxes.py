@@ -92,12 +92,12 @@ class iso_aabb:
         self.len += m
 
     def transform(self, points3):
-        """ to local coordinates """
-        return points3 - (self.cll + self.len / 2)
+        """ world --> local """
+        return (points3 - (self.cll + self.len / 2)) / self.len
 
     def transform_inv(self, points3):
-        """ to world coordinates """
-        return points3 + (self.cll + self.len / 2)
+        """ local --> world """
+        return points3 * self.len + (self.cll + self.len / 2)
 
 
 class iso_cube:
@@ -128,8 +128,10 @@ class iso_cube:
     def pick(self, points3):
         """ only meaningful when picked in the local coordinates """
         points3_trans = self.transform(points3)
-        cmin = - np.ones(3) * self.len
-        cmax = np.ones(3) * self.len
+        # cmin = - np.ones(3) * self.len
+        # cmax = np.ones(3) * self.len
+        cmin = - np.ones(3)
+        cmax = np.ones(3)
         conds = np.logical_and(
             np.all(cmin < points3_trans, axis=1),
             np.all(cmax > points3_trans, axis=1)
@@ -162,7 +164,8 @@ class iso_cube:
         self.evecs = evecs
         # self.qrot = Quaternion(matrix=evecs)
         self.add_margan(m)
-        return points3_trans
+        # return points3_trans
+        return points3_trans / self.len
 
     def add_margan(self, m=0.1):
         if 1 > m and -1 < m:
@@ -170,32 +173,51 @@ class iso_cube:
         self.len += m
 
     def transform(self, points3):
-        """ to local coordinates """
-        return np.dot(points3 - self.cen, self.evecs)
+        """ world --> local """
+        # return np.dot(points3 - self.cen, self.evecs)
+        return np.dot(points3 - self.cen, self.evecs) / self.len
         # return self.qrot.rotate(points3 - self.cen)
 
     def transform_inv(self, points3):
-        """ to world coordinates """
-        return np.dot(points3, self.evecs.T) + self.cen
+        """ local --> world """
+        # return np.dot(points3, self.evecs.T) + self.cen
+        return np.dot(points3 * self.len, self.evecs.T) + self.cen
         # return self.qrot.inverse.rotate(points3 - self.cen)
+
+    # def trans_scale(self, points3, sizel):
+    #     """ world --> image """
+    #     return np.dot(points3 - self.cen, self.evecs) * sizel / self.len
+    #
+    # def trans_scale_inv(self, points3, sizel):
+    #     """ image --> world """
+    #     return np.dot(points3 * self.len / sizel, self.evecs.T) + self.cen
 
     def project_pca(self, ps3_pca, roll=0, sort=True):
         ar3 = np.roll(np.arange(3), roll)
         cid = ar3[:2]
         did = 2
         if sort is True:
-            idx = np.argsort(ps3_pca[:, did])
-            ps3_pca = ps3_pca[idx, :]
+            idx = np.argsort(ps3_pca[..., did])
+            ps3_pca = ps3_pca[idx, ...]
         coord = ps3_pca[:, cid]
-        cll = np.array([-self.len, -self.len])
-        coord = np.floor(coord - cll + 0.5).astype(int)
-        depth = (ps3_pca[:, did] + self.len) / (2 * self.len)
+        # cll = - np.ones(2) * self.len
+        # coord = np.floor(coord - cll + 0.5).astype(int)
+        # depth = (ps3_pca[:, did] + self.len) / (2 * self.len)
+        cll = - np.ones(2)
+        coord = (coord - cll) / 2
+        depth = (ps3_pca[:, did] + 1) / 2
         return coord, depth
 
-    def print_image(self, coord, depth):
-        sidelen = self.get_sidelen()
-        img = np.zeros((sidelen, sidelen))
-        img[coord[:, 1], coord[:, 0]] = depth  # reverse coordinates!
+    def print_image(self, coord, depth, sizel):
+        # sidelen = self.get_sidelen()
+        # img = np.zeros((sidelen, sidelen))
+        # img[coord[:, 1], coord[:, 0]] = depth  # reverse coordinates!
+        img = np.zeros((sizel, sizel))
+        coord *= 0.999999
+        img[
+            np.floor(coord[:, 1] * sizel).astype(int),
+            np.floor(coord[:, 0] * sizel).astype(int),
+        ] = depth  # reverse coordinates!
         return img
 
     def get_corners(self):
