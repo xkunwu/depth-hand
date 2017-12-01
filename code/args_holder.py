@@ -13,6 +13,7 @@ model_map = {
     'base_regre': 'train.base_regre',
     'base_clean_inres': 'train.base_inres',
     'base_regre_inres': 'train.base_inres',
+    'localizer3': 'train.localizer3',
 }
 
 
@@ -52,6 +53,10 @@ class args_holder:
             help='Model name [default: base_clean], from \
             [base_regre, base_clean, ortho3view, base_conv3, trunc_dist]'
         )
+        self.parser.add_argument(
+            '--localizer_name', default='localizer3',
+            help='localize hand region [default: localizer3]'
+        )
 
         # learning parameters
         self.parser.add_argument(
@@ -70,9 +75,9 @@ class args_holder:
             '--learning_rate', type=float, default=0.001,
             help='Initial learning rate [default: 0.001]')
         self.parser.add_argument(
-            '--decay_step', type=int, default=200000,
-            # twice of 1M dataset
-            help='Decay step for lr decay [default: 200000]')
+            '--decay_step', type=int, default=2e4,
+            # twice of 1M (1e6) dataset / batch size
+            help='Decay step for lr decay [default: 2e4]')
         self.parser.add_argument(
             '--decay_rate', type=float, default=0.9,
             # fast decay, as using adaptive optimizer
@@ -160,13 +165,13 @@ class args_holder:
             'prepared'
         )
         if not os.path.exists(self.args.prepare_dir):
-            os.mkdir(self.args.prepare_dir)
+            os.makedirs(self.args.prepare_dir)
         self.args.predict_dir = os.path.join(
             self.args.out_dir,
             'predict'
         )
         if not os.path.exists(self.args.predict_dir):
-            os.mkdir(self.args.predict_dir)
+            os.makedirs(self.args.predict_dir)
 
     def __enter__(self):
         return self
@@ -199,14 +204,20 @@ class args_holder:
             import_module(model_map[self.args.model_name]),
             self.args.model_name
         )
-        self.args.model_inst = self.args.model_class()
-        self.args.model_inst.tweak_args(self.args)
+        self.args.model_inst = self.args.model_class(self.args)
+        self.args.localizer_class = getattr(
+            import_module(model_map[self.args.localizer_name]),
+            self.args.localizer_name
+        )
+        self.args.localizer = self.args.localizer_class(self.args)
         self.args.data_module = import_module(
             'data.' + self.args.data_name)
         self.args.data_provider = import_module(
             'data.' + self.args.data_name + '.provider')
         self.args.data_draw = import_module(
             'data.' + self.args.data_name + '.draw')
+        self.args.data_eval = import_module(
+            'data.' + self.args.data_name + '.eval')
         self.args.data_ops = import_module(
             'data.' + self.args.data_name + '.ops')
         self.args.data_io = import_module(
@@ -219,6 +230,7 @@ class args_holder:
         self.args.data_inst.init_data()
         self.args.model_inst.receive_data(self.args.data_inst, self.args)
         self.args.model_inst.check_dir(self.args.data_inst, self.args)
+        self.args.localizer.receive_data(self.args.data_inst, self.args)
         self.write_args(self.args)
 
 

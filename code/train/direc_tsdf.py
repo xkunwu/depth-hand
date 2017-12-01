@@ -9,14 +9,12 @@ from base_conv3 import base_conv3
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 BASE_DIR = os.path.abspath(os.path.join(BASE_DIR, os.pardir))
 sys.path.append(BASE_DIR)
-sys.path.append(os.path.join(BASE_DIR, 'utils'))
-tf_util = import_module('tf_util')
 file_pack = getattr(
-    import_module('coder'),
+    import_module('utils.coder'),
     'file_pack'
 )
 iso_cube = getattr(
-    import_module('iso_boxes'),
+    import_module('utils.iso_boxes'),
     'iso_cube'
 )
 
@@ -24,8 +22,8 @@ iso_cube = getattr(
 class direc_tsdf(base_conv3):
     """ This class holds baseline training approach using 3d CNN.
     """
-    def __init__(self):
-        super(direc_tsdf, self).__init__()
+    def __init__(self, args):
+        super(direc_tsdf, self).__init__(args)
         self.num_channel = 3
         self.num_appen = 9
 
@@ -97,5 +95,5 @@ class direc_tsdf(base_conv3):
                 self.crop_size, self.crop_size, self.crop_size,
                 3))
         poses_tf = tf.placeholder(
-            tf.float32, shape=(self.batch_size, self.pose_dim))
+            tf.float32, shape=(self.batch_size, self.out_dim))
         return frames_tf, poses_tf

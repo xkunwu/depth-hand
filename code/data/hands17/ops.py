@@ -6,38 +6,37 @@ import skfmm
 from cv2 import resize as cv2resize
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-BASE_DIR = os.path.abspath(os.path.join(BASE_DIR, os.pardir))
-BASE_DIR = os.path.abspath(os.path.join(BASE_DIR, os.pardir))
-sys.path.append(os.path.join(BASE_DIR, 'utils'))
+BASE_DIR = os.path.abspath(os.path.join(BASE_DIR, os.pardir, os.pardir))
+sys.path.append(BASE_DIR)
 iso_rect = getattr(
-    import_module('iso_boxes'),
+    import_module('utils.iso_boxes'),
     'iso_rect'
 )
 iso_aabb = getattr(
-    import_module('iso_boxes'),
+    import_module('utils.iso_boxes'),
     'iso_aabb'
 )
 iso_cube = getattr(
-    import_module('iso_boxes'),
+    import_module('utils.iso_boxes'),
     'iso_cube'
 )
 regu_grid = getattr(
-    import_module('regu_grid'),
+    import_module('utils.regu_grid'),
     'regu_grid'
 )
 grid_cell = getattr(
-    import_module('regu_grid'),
+    import_module('utils.regu_grid'),
     'grid_cell'
 )
 
 
-def raw_to_pca(points3, resce=np.array([1, 0, 0, 0, 1, 0, 0, 0])):
+def raw_to_pca(points3, resce=np.array([1, 0, 0, 0])):
     cube = iso_cube()
     cube.load(resce)
     return cube.transform(points3)
 
 
-def pca_to_raw(points3, resce=np.array([1, 0, 0, 0, 1, 0, 0, 0])):
+def pca_to_raw(points3, resce=np.array([1, 0, 0, 0])):
     cube = iso_cube()
     cube.load(resce)
     return cube.transform_inv(points3)
@@ -66,11 +65,18 @@ def d2z_to_raw(p2z, caminfo, resce=np.array([1, 0, 0])):
     return np.hstack((pose3d, pose_z))
 
 
-def img_to_raw(img, caminfo):
-    conds = np.logical_and(
-        caminfo.z_far > img,
-        caminfo.z_near < img
-    )
+def img_to_raw(img, caminfo, crop_lim=None):
+    # crop_lim = np.array([[-0.8, -0.8, 0], [0.8, 0.8, 1.6]])
+    if crop_lim is None:
+        conds = np.logical_and(
+            caminfo.z_far > img,
+            caminfo.z_near < img
+        )
+    else:
+        conds = np.logical_and(
+            crop_lim[0, 2] < img,
+            crop_lim[1, 2] > img
+        )
     indx = np.where(conds)[::-1]  # need to reverse image plane coordinates
     zval = np.array(img[conds])
     indz = np.hstack((
@@ -78,7 +84,16 @@ def img_to_raw(img, caminfo):
         zval.reshape(-1, 1))
     )
     points3 = d2z_to_raw(indz, caminfo)
-    return points3
+    if crop_lim is not None:
+        conds = np.logical_and.reduce([
+            crop_lim[0, 0] < points3[:, 0],
+            crop_lim[1, 0] > points3[:, 0],
+            crop_lim[0, 1] < points3[:, 1],
+            crop_lim[1, 1] > points3[:, 1],
+        ])
+        return points3[conds, :]
+    else:
+        return points3
 
 
 def raw_to_2dz(points3, caminfo, resce=np.array([1, 0, 0])):
@@ -117,13 +132,13 @@ def getbm(base_z, caminfo, base_margin=20):
 def clip_image_border(rect, caminfo):
     # clip to image border
     ctl = rect.cll
-    cbr = rect.cll + rect.len
-    cen = rect.cll + rect.len / 2
+    cbr = rect.cll + rect.sidelen
+    cen = rect.cll + rect.sidelen / 2
     obm = np.min([ctl, caminfo.image_size - cbr])
     if 0 > obm:
-        # print(ctl, caminfo.image_size - cbr, obm, rect.len)
-        rect.len += obm * 2
-        rect.cll = cen - rect.len / 2
+        # print(ctl, caminfo.image_size - cbr, obm, rect.sidelen)
+        rect.sidelen += obm * 2
+        rect.cll = cen - rect.sidelen / 2
     return rect
 
 
@@ -134,11 +149,47 @@ def fill_grid(img, pose_raw, step, caminfo):
     grid = regu_grid()
     grid.from_cube(cube, step)
     grid.fill(points3_trans)
-    resce = np.append(
-        cube.dump(),
-        step
-    )
+    # resce = np.append(
+    #     cube.dump(),
+    #     step
+    # )
+    resce = cube.dump()
     return grid.pcnt, resce
+
+
+def voxelize_depth(img, step, caminfo):
+    sidelen = caminfo.crop_range
+    halflen = sidelen / 2
+    crop_lim = np.array(
+        [[-halflen, -halflen, 0], [halflen, halflen, sidelen]])
+    points3 = img_to_raw(img, caminfo, crop_lim)
+    grid = regu_grid(crop_lim[0], step, sidelen / step)
+    grid.fill(points3)
+    # grid.show_dims()
+    # print(np.histogram(grid.pcnt))
+    # cube = iso_cube()
+    # cube.build(pose_raw)
+    # resce = np.concatenate((
+    #     cube.dump(),
+    #     np.array([sidelen, step])
+    # ))
+    # resce = cube.dump()
+    # mpplot = import_module('matplotlib.pyplot')
+    # ax = mpplot.subplot(projection='3d')
+    # numpts = points3.shape[0]
+    # if 1000 < numpts:
+    #     samid = np.random.choice(numpts, 1000, replace=False)
+    #     points3_sam = points3[samid, :]
+    # else:
+    #     points3_sam = points3
+    # ax.scatter(
+    #     points3_sam[:, 0], points3_sam[:, 1], points3_sam[:, 2])
+    # corners = cube.get_corners()
+    # iso_cube.draw_cube_wire(corners)
+    # print(corners)
+    # cube.show_dims()
+    # mpplot.show()
+    return grid.pcnt
 
 
 def direc_belief(pcnt):
@@ -219,7 +270,7 @@ def get_rect3(cube, caminfo):
     """
     cen = raw_to_2d(cube.cen.reshape(1, -1), caminfo).flatten()
     rect = iso_rect(
-        cen - cube.len,
+        cen - cube.sidelen,
         cube.get_sidelen()
     )
     rect = clip_image_border(rect, caminfo)
@@ -253,7 +304,7 @@ def crop_resize_pca(img, pose_raw, caminfo):
     #     (np.max(img_crop_resize) - np.min(img_crop_resize))
     # img_crop_resize = img_crop
     # resce = np.concatenate((
-    #     np.array([float(caminfo.crop_size) / rect.len]),
+    #     np.array([float(caminfo.crop_size) / rect.sidelen]),
     #     rect.cll,
     #     cube.dump()
     # ))
@@ -266,7 +317,7 @@ def get_rect2(aabb, caminfo, m=0.2):
     # mpplot = import_module('matplotlib.pyplot')
     c3a = np.array([
         aabb.cll,
-        np.append(aabb.cll[:2] + aabb.len, aabb.cll[2])
+        np.append(aabb.cll[:2] + aabb.sidelen, aabb.cll[2])
     ])  # central z-plane
     c2a = raw_to_2d(c3a, caminfo)
     cll = c2a[0, :]
@@ -274,8 +325,8 @@ def get_rect2(aabb, caminfo, m=0.2):
     rect = iso_rect(cll, np.max(ctr - cll), m)
     rect.draw(Color('red').rgb)
     c3a = np.array([
-        np.append(aabb.cll[:2], aabb.cll[2] + aabb.len),
-        np.append(aabb.cll[:2] + aabb.len, aabb.cll[2] + aabb.len)
+        np.append(aabb.cll[:2], aabb.cll[2] + aabb.sidelen),
+        np.append(aabb.cll[:2] + aabb.sidelen, aabb.cll[2] + aabb.sidelen)
     ])  # central z-plane
     c2a = raw_to_2d(c3a, caminfo)
     cll = c2a[0, :]
@@ -283,13 +334,13 @@ def get_rect2(aabb, caminfo, m=0.2):
     rect = iso_rect(cll, np.max(ctr - cll), m)
     rect.draw(Color('blue').rgb)
 
-    cen = aabb.cll + aabb.len / 2
+    cen = aabb.cll + aabb.sidelen / 2
     c3a = np.array([
-        np.append(cen[:2] - aabb.len / 2, cen[2]),
-        np.append(cen[:2] + aabb.len / 2, cen[2]),
+        np.append(cen[:2] - aabb.sidelen / 2, cen[2]),
+        np.append(cen[:2] + aabb.sidelen / 2, cen[2]),
         # aabb.cll,
-        # np.append(aabb.cll[:2] + aabb.len, aabb.cll[2]),
-        # aabb.cll + aabb.len / 2
+        # np.append(aabb.cll[:2] + aabb.sidelen, aabb.cll[2]),
+        # aabb.cll + aabb.sidelen / 2
     ])  # central z-plane
     c2a = raw_to_2d(c3a, caminfo)
     cll = c2a[0, :]
@@ -321,7 +372,7 @@ def crop_resize(img, pose_raw, caminfo):
     # rect.draw()
     # mpplot.show()
     cll_i = np.floor(rect.cll).astype(int)
-    sizel = np.floor(rect.len).astype(int)
+    sizel = np.floor(rect.sidelen).astype(int)
     img_crop = img[
         cll_i[1]:cll_i[1] + sizel,
         cll_i[0]:cll_i[0] + sizel,

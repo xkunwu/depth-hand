@@ -2,7 +2,13 @@
 conda install --file requirements.txt
 pip install pyquaternion
 pip install colour
-conda install -c menpo vtk=7 python=3.5
+pip install pycparser
+pip install cython
+pip install pyrealsense
+conda install --channel menpo opencv
+conda install --channel menpo mayavi
+conda install pyside
+pip install mayavi
 
 # remote management
 tensorboard --logdir log

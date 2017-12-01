@@ -33,8 +33,9 @@ class hands17holder:
     # cropped & resized training images
     image_size = [640, 480]
     crop_size = 128
-    z_near = 1.
-    z_far = 3333.
+    crop_range = 1600.
+    z_near = 1e-4
+    z_far = 1600.
     z_max = 9999.  # max distance set to 10m
     # camera info
     focal = (475.065948, 475.065857)
@@ -158,6 +159,7 @@ class hands17holder:
         self.logger = args.logger
         self.predict_dir = args.predict_dir
         self.crop_size = args.crop_size
+        self.crop_range = args.crop_range
         self.training_images = os.path.join(self.data_dir, 'training/images')
         self.frame_images = os.path.join(self.data_dir, 'frame/images')
         self.training_annot_origin = os.path.join(

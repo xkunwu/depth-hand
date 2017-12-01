@@ -13,19 +13,18 @@ from . import ops as dataops
 from . import io as dataio
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-BASE_DIR = os.path.abspath(os.path.join(BASE_DIR, os.pardir))
-BASE_DIR = os.path.abspath(os.path.join(BASE_DIR, os.pardir))
-sys.path.append(os.path.join(BASE_DIR, 'utils'))
+BASE_DIR = os.path.abspath(os.path.join(BASE_DIR, os.pardir, os.pardir))
+sys.path.append(BASE_DIR)
 make_color_range = getattr(
-    import_module('image_ops'),
+    import_module('utils.image_ops'),
     'make_color_range'
 )
 fig2data = getattr(
-    import_module('image_ops'),
+    import_module('utils.image_ops'),
     'fig2data'
 )
 iso_cube = getattr(
-    import_module('iso_boxes'),
+    import_module('utils.iso_boxes'),
     'iso_cube'
 )
 
@@ -119,7 +118,7 @@ def draw_pose_raw(thedata, img, pose_raw, show_margin=False):
     return img_posed
 
 
-def draw_pred_random(thedata, image_dir, annot_echt, annot_pred):
+def draw_prediction_poses(thedata, image_dir, annot_echt, annot_pred):
     img_id = np.random.randint(1, high=sum(1 for _ in open(annot_pred, 'r')))
     line_echt = linecache.getline(annot_echt, img_id)
     line_pred = linecache.getline(annot_pred, img_id)
@@ -129,7 +128,7 @@ def draw_pred_random(thedata, image_dir, annot_echt, annot_pred):
     print('drawing pose #{:d}: {}'.format(img_id, img_path))
     img = dataio.read_image(img_path)
 
-    mpplot.subplots(nrows=1, ncols=2)
+    # mpplot.subplots(nrows=1, ncols=2)
     mpplot.subplot(1, 2, 1)
     mpplot.imshow(img, cmap='bone')
     draw_pose_raw(

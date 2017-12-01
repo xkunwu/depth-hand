@@ -16,74 +16,14 @@ args_holder = getattr(
 
 
 def run_one(args, mpplot, with_train=False):
-    data_inst = args.data_inst
     predict_file = args.model_inst.predict_file
-
     trainer = train_abc(args, False)
     if with_train or (not os.path.exists(os.path.join(
             args.log_dir_t, 'model.ckpt.meta'))):
         trainer.train()
     if with_train or (not os.path.exists(predict_file)):
         trainer.evaluate()
-
-    print('evaluating {} ...'.format(args.model_name))
-
-    datadraw = import_module(
-        'data.' + args.data_name + '.draw')
-    mpplot.figure(figsize=(2 * 5, 1 * 5))
-    datadraw.draw_pred_random(
-        data_inst,
-        data_inst.training_images,
-        data_inst.training_annot_test,
-        predict_file
-    )
-    fname = 'prediction_{}.png'.format(args.model_name)
-    mpplot.savefig(os.path.join(args.predict_dir, fname))
-
-    dataeval = import_module(
-        'data.' + args.data_name + '.eval')
-    errors = dataeval.compare_error(
-        data_inst,
-        data_inst.training_annot_test,
-        predict_file
-    )
-    # import pdb; pdb.set_trace()
-    mpplot.gcf().clear()
-    dataeval.draw_mean_error_distribution(
-        errors, mpplot.gca())
-    fname = '{}_error_dist.png'.format(args.model_name)
-    mpplot.savefig(os.path.join(args.predict_dir, fname))
-    errors = np.expand_dims(errors, axis=0)
-    mpplot.gcf().clear()
-    dataeval.draw_error_percentage_curve(
-        errors, [args.model_name], mpplot.gca())
-    fname = '{}_error_rate.png'.format(args.model_name)
-    mpplot.savefig(os.path.join(args.predict_dir, fname))
-    mpplot.gcf().clear()
-    dataeval.draw_error_per_joint(
-        errors, [args.model_name], mpplot.gca(), data_inst.join_name)
-    fname = '{}_error_bar.png'.format(args.model_name)
-    mpplot.savefig(os.path.join(args.predict_dir, fname))
-
-    args.logger.info('maximal per-joint mean error: {}'.format(
-        np.max(np.mean(errors, axis=1))
-    ))
-    print('figures saved')
-
-    # draw_sum = 3
-    # draw_i = 1
-    # fig_size = (draw_sum * 5, 5)
-    # mpplot.subplots(nrows=1, ncols=draw_sum, figsize=fig_size)
-    # mpplot.subplot(1, draw_sum, draw_i)
-    # draw_i += 1
-    # dataeval.draw_error_percentage_curve(errors, mpplot.gca())
-    # mpplot.subplot(1, draw_sum, draw_i)
-    # dataeval.draw_error_per_joint(errors, mpplot.gca(), data_inst.join_name)
-    # draw_i += 1
-    # mpplot.subplot(1, draw_sum, draw_i)
-    # dataeval.draw_mean_error_distribution(errors, mpplot.gca())
-    # draw_i += 1
-    # mpplot.show()
+    trainer.evaluate()
 
 
 def draw_compare(args, mpplot, predict_dir=None):
@@ -161,24 +101,26 @@ def test_dataops(args):
 
 if __name__ == "__main__":
     # python evaluate.py --max_epoch=1 --batch_size=16 --model_name=base_clean
+    # import pdb; pdb.set_trace()
 
     with_train = True
+    # with_train = False
 
-    # mpplot = import_module('matplotlib.pyplot')
-    # with args_holder() as argsholder:
-    #     argsholder.parse_args()
-    #     args = argsholder.args
-    #     argsholder.create_instance()
-    #     # import shutil
-    #     # shutil.rmtree(args.out_dir)
-    #     # os.makedirs(args.out_dir)
-    #
-    #     test_dataops(args)
-    #
-    #     # run_one(args, mpplot, with_train)
-    #
-    #     # draw_compare(args, mpplot)
-    # sys.exit()
+    mpplot = import_module('matplotlib.pyplot')
+    with args_holder() as argsholder:
+        argsholder.parse_args()
+        args = argsholder.args
+        argsholder.create_instance()
+        # import shutil
+        # shutil.rmtree(args.out_dir)
+        # os.makedirs(args.out_dir)
+
+        # test_dataops(args)
+
+        run_one(args, mpplot, with_train)
+
+        # draw_compare(args, mpplot)
+    sys.exit()
 
     mpl = import_module('matplotlib')
     mpl.use('Agg')

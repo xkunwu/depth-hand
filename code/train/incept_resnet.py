@@ -81,7 +81,7 @@ class incept_resnet:
         return net
 
     @staticmethod
-    def pullout(net, pose_dim, is_training,
+    def pullout(net, out_dim, is_training,
                 activation_fn=tf.nn.relu, scope=None, reuse=None):
         with tf.variable_scope(scope, 'poolout', [net], reuse=reuse):
             sc = 'avgpool4_5x5_3'
@@ -91,7 +91,7 @@ class incept_resnet:
             net = slim.conv2d(net, 256, 1, scope=sc)
             sc = 'fullconn8'
             net = slim.conv2d(
-                net, 128, net.get_shape()[1:3], padding='VALID', scope=sc)
+                net, 256, net.get_shape()[1:3], padding='VALID', scope=sc)
             net = slim.flatten(net)
             # sc = 'fullconn4'
             # net = slim.fully_connected(net, 1024, scope=sc)
@@ -101,17 +101,17 @@ class incept_resnet:
             sc = 'dropout8'
             net = slim.dropout(
                 net, 0.5, is_training=is_training, scope=sc)
-            sc = 'poseout'
+            sc = 'output8'
             net = slim.fully_connected(
-                net, pose_dim, activation_fn=None, scope=sc)
+                net, out_dim, activation_fn=None, scope=sc)
         return net
 
     @staticmethod
     def get_net(
-            input_tensor, pose_dim, is_training, end_point_list,
-            block_rep=[2, 2, 1], scope=None, final_endpoint='poseout'):
+            input_tensor, out_dim, is_training, end_point_list,
+            block_rep=[2, 2, 1], scope=None, final_endpoint='stage_out'):
         """ input_tensor: BxHxWxC
-            pose_dim: BxJ, where J is flattened 3D locations
+            out_dim: BxJ, where J is flattened 3D locations
         """
         end_points = {}
 
@@ -130,8 +130,8 @@ class incept_resnet:
                     stride=1, padding='SAME'), \
                 slim.arg_scope(
                     [slim.conv2d],
-                    stride=1, padding='SAME', activation_fn=tf.nn.relu,
-                    normalizer_fn=slim.batch_norm):
+                    stride=1, padding='SAME',
+                    activation_fn=tf.nn.relu, normalizer_fn=slim.batch_norm):
                 with tf.variable_scope('stage128'):
                     sc = 'stage128_1'
                     net = slim.conv2d(input_tensor, 16, 3, scope='conv128_3x3_1')
@@ -174,9 +174,9 @@ class incept_resnet:
                     end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points
-                    sc = 'poseout'
+                    sc = 'stage_out'
                     net = incept_resnet.pullout(
-                        net, pose_dim, is_training
+                        net, out_dim, is_training
                     )
                     # end_point_list.append(sc)
                     if add_and_check_final(sc, net):

@@ -21,7 +21,7 @@ class base_regre_inres(base_regre):
         self.predict_file = os.path.join(
             self.predict_dir, 'predict_{}'.format(self.__class__.__name__))
         self.batch_size = args.batch_size
-        self.pose_dim = thedata.join_num * 3
+        self.out_dim = thedata.join_num * 3
         self.image_dir = thedata.training_images
         self.caminfo = thedata
         self.provider = args.data_provider
@@ -32,13 +32,13 @@ class base_regre_inres(base_regre):
 
     def get_model(
             self, input_tensor, is_training,
-            scope=None, final_endpoint='poseout'):
+            scope=None, final_endpoint='stage_out'):
         """ input_tensor: BxHxWxC
-            pose_dim: BxJ, where J is flattened 3D locations
+            out_dim: BxJ, where J is flattened 3D locations
         """
         self.end_point_list = []
         return incept_resnet.get_net(
-            input_tensor, self.pose_dim, is_training, self.end_point_list
+            input_tensor, self.out_dim, is_training, self.end_point_list
         )
 
 
@@ -59,7 +59,7 @@ class base_clean_inres(base_clean):
         self.predict_file = os.path.join(
             self.predict_dir, 'predict_{}'.format(self.__class__.__name__))
         self.batch_size = args.batch_size
-        self.pose_dim = thedata.join_num * 3
+        self.out_dim = thedata.join_num * 3
         self.image_dir = thedata.training_images
         self.caminfo = thedata
         self.provider = args.data_provider
@@ -68,11 +68,11 @@ class base_clean_inres(base_clean):
 
     def get_model(
             self, input_tensor, is_training,
-            scope=None, final_endpoint='poseout'):
+            scope=None, final_endpoint='stage_out'):
         """ input_tensor: BxHxWxC
-            pose_dim: BxJ, where J is flattened 3D locations
+            out_dim: BxJ, where J is flattened 3D locations
         """
         self.end_point_list = []
         return incept_resnet.get_net(
-            input_tensor, self.pose_dim, is_training, self.end_point_list
+            input_tensor, self.out_dim, is_training, self.end_point_list
         )

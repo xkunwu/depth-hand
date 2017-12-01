@@ -8,18 +8,16 @@ from .base_regre import base_regre
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 BASE_DIR = os.path.abspath(os.path.join(BASE_DIR, os.pardir))
 sys.path.append(BASE_DIR)
-sys.path.append(os.path.join(BASE_DIR, 'utils'))
-tf_util = import_module('tf_util')
 file_pack = getattr(
-    import_module('coder'),
+    import_module('utils.coder'),
     'file_pack'
 )
 iso_rect = getattr(
-    import_module('iso_boxes'),
+    import_module('utils.iso_boxes'),
     'iso_rect'
 )
 iso_cube = getattr(
-    import_module('iso_boxes'),
+    import_module('utils.iso_boxes'),
     'iso_cube'
 )
 
@@ -27,10 +25,10 @@ iso_cube = getattr(
 class base_clean(base_regre):
     """ This class use cleaned data from 3D PCA bounding cube.
     """
-    def __init__(self):
-        super(base_clean, self).__init__()
+    def __init__(self, args):
+        super(base_clean, self).__init__(args)
         # self.num_appen = 11
-        self.num_appen = 8
+        self.num_appen = 4
 
     def receive_data(self, thedata, args):
         """ Receive parameters specific to the data """
@@ -71,7 +69,7 @@ class base_clean(base_regre):
 
         print('[{}] drawing pose #{:d}'.format(self.__class__.__name__, img_id))
         # resce3 = resce_h5[3:11]
-        resce3 = resce_h5[0:8]
+        resce3 = resce_h5[0:4]
         mpplot.subplots(nrows=2, ncols=2, figsize=(2 * 5, 2 * 5))
 
         mpplot.subplot(2, 2, 3)
@@ -121,7 +119,7 @@ class base_clean(base_regre):
             print(np.linalg.norm(poses_h5 - poses))
             print('ERROR - h5 storage corrupted!')
         # resce3 = resce[3:11]
-        resce3 = resce[0:8]
+        resce3 = resce[0:4]
         cube = iso_cube()
         cube.load(resce3)
         sizel = np.floor(resce3[0]).astype(int)

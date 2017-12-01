@@ -9,21 +9,19 @@ from base_regre import base_regre
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 BASE_DIR = os.path.abspath(os.path.join(BASE_DIR, os.pardir))
 sys.path.append(BASE_DIR)
-sys.path.append(os.path.join(BASE_DIR, 'utils'))
-tf_util = import_module('tf_util')
 file_pack = getattr(
-    import_module('coder'),
+    import_module('utils.coder'),
     'file_pack'
 )
 iso_cube = getattr(
-    import_module('iso_boxes'),
+    import_module('utils.iso_boxes'),
     'iso_cube'
 )
 
 
 class ortho3view(base_regre):
-    def __init__(self):
-        super(ortho3view, self).__init__()
+    def __init__(self, args):
+        super(ortho3view, self).__init__(args)
         self.num_channel = 3
         self.num_appen = 11
 
@@ -134,13 +132,13 @@ class ortho3view(base_regre):
                 self.crop_size, self.crop_size,
                 3))
         poses_tf = tf.placeholder(
-            tf.float32, shape=(self.batch_size, self.pose_dim))
+            tf.float32, shape=(self.batch_size, self.out_dim))
         return frames_tf, poses_tf
 
     def get_model(self, frames_tf, is_training, bn_decay=None):
         """ directly predict all joints' location using regression
             frames_tf: BxHxWx3
-            pose_dim: BxJ, where J is flattened 3D locations
+            out_dim: BxJ, where J is flattened 3D locations
         """
         batch_size = frames_tf.get_shape()[0].value
         end_points = {}
@@ -170,6 +168,6 @@ class ortho3view(base_regre):
         net = tf_util.dropout(
             net, keep_prob=0.5, scope='dropout1', is_training=is_training)
         net = tf_util.fully_connected(
-            net, self.pose_dim, scope='fullconn3', activation_fn=None)
+            net, self.out_dim, scope='fullconn3', activation_fn=None)
 
         return net, end_points

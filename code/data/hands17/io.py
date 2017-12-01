@@ -48,7 +48,7 @@ def parse_line_appen2(line):
 def get_line(filename, img_id):
     img_name_id = index2imagename(img_id)
     with open(filename, 'r') as f:
-        for line_number, line in enumerate(f):
+        for _, line in enumerate(f):
             img_name, _ = parse_line_annot(line)
             if img_name_id == img_name:
                 return line

@@ -4,6 +4,7 @@ from importlib import import_module
 import logging
 import numpy as np
 import tensorflow as tf
+# from tensorflow.contrib import slim
 from functools import reduce
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -15,7 +16,7 @@ args_holder = getattr(
 )
 sys.path.append(os.path.join(BASE_DIR, 'utils'))
 file_pack = getattr(
-    import_module('coder'),
+    import_module('utils.coder'),
     'file_pack'
 )
 
@@ -49,8 +50,9 @@ class train_abc():
             frames_tf, poses_tf = self.args.model_inst.placeholder_inputs()
             is_training_tf = tf.placeholder(tf.bool, shape=())
 
-            # Note the global_step=batch parameter to minimize.
-            batch = tf.Variable(0)
+            # Note global_step is the batch to minimize.
+            # batch = tf.Variable(0)
+            global_step = tf.train.create_global_step()
 
             # Get model and loss
             pred, end_points = self.args.model_inst.get_model(
@@ -62,18 +64,19 @@ class train_abc():
                     ends, net.shape,
                     net.shape[0], reduce(lambda x, y: x * y, net.shape[1:])
                 )
-                tf.summary.image(ends, self.transform_image_summary(net))
+                if 2 == self.args.model_inst.net_rank:
+                    tf.summary.image(ends, self.transform_image_summary(net))
             self.args.logger.info('network structure:\n{}'.format(shapestr))
             loss = self.args.model_inst.get_loss(pred, poses_tf, end_points)
             regre_error = tf.sqrt(loss * 2)
             tf.summary.scalar('regression_error', regre_error)
 
             # Get training operator
-            learning_rate = self.get_learning_rate(batch)
+            learning_rate = self.get_learning_rate(global_step)
             tf.summary.scalar('learning_rate', learning_rate)
 
             optimizer = tf.train.AdamOptimizer(learning_rate)
-            train_op = optimizer.minimize(loss, global_step=batch)
+            train_op = optimizer.minimize(loss, global_step=global_step)
 
             # Add ops to save and restore all the variables.
             saver = tf.train.Saver(max_to_keep=4)
@@ -84,7 +87,7 @@ class train_abc():
             config.allow_soft_placement = True
             config.log_device_placement = False
             with tf.Session(config=config) as sess:
-                model_path = os.path.join(self.args.log_dir_t, 'model.ckpt')
+                model_path = self.args.model_inst.ckpt_path
                 # Init variables
                 if self.args.retrain:
                     init = tf.global_variables_initializer()
@@ -106,7 +109,7 @@ class train_abc():
                     'batch_poses': poses_tf,
                     'is_training': is_training_tf,
                     'merged': merged,
-                    'step': batch,
+                    'step': global_step,
                     'train_op': train_op,
                     'loss': loss,
                     'pred': pred
@@ -167,7 +170,7 @@ class train_abc():
                     batch_count, loss_val))
                 # print(np.sum((batch_data['batch_poses'] - pred_val) ** 2) / 2)
         mean_loss = loss_sum / batch_count
-        self.args.logger.info('epoch training mean loss (half-squared): {}'.format(
+        self.args.logger.info('epoch training mean loss (half-squared): {:.4f}'.format(
             mean_loss))
 
     def test_one_epoch(self, sess, ops, test_writer):
@@ -199,7 +202,7 @@ class train_abc():
                 sys.stdout.flush()
         print('\n')
         mean_loss = loss_sum / batch_count
-        self.args.logger.info('epoch testing mean loss (half-squared): {}'.format(
+        self.args.logger.info('epoch testing mean loss (half-squared): {:.4f}'.format(
             mean_loss))
 
     def evaluate(self):
@@ -224,7 +227,7 @@ class train_abc():
         config.log_device_placement = False
         with tf.Session(config=config) as sess:
             # Restore variables from disk.
-            model_path = os.path.join(self.args.log_dir_t, 'model.ckpt')
+            model_path = self.args.model_inst.ckpt_path
             saver.restore(sess, model_path)
             self.logger.info('Model restored from: {}.'.format(model_path))
 
@@ -240,7 +243,8 @@ class train_abc():
                 writer = self.args.model_inst.start_evaluate(filepack)
                 self.args.model_inst.start_epoch_test(filepack)
                 self.eval_one_epoch_write(sess, ops, writer)
-                self.args.model_inst.end_evaluate()
+            self.args.model_inst.end_evaluate(
+                self.args.data_inst, self.args)
 
     def eval_one_epoch_write(self, sess, ops, writer):
         is_training = False
@@ -258,12 +262,8 @@ class train_abc():
             loss_val, pred_val = sess.run(
                 [ops['loss'], ops['pred']],
                 feed_dict=feed_dict)
-            self.args.data_provider.write2d(
-                writer,
-                self.args.model_inst.yanker,
-                batch_data['batch_index'],
-                batch_data['batch_resce'],
-                pred_val
+            self.args.model_inst.evaluate_batch(
+                writer, batch_data, pred_val
             )
             loss_sum += loss_val
             batch_count += 1
@@ -272,13 +272,13 @@ class train_abc():
                 sys.stdout.flush()
         print('\n')
         mean_loss = loss_sum / batch_count
-        self.args.logger.info('epoch evaluate mean loss (half-squared): {}'.format(
+        self.args.logger.info('epoch evaluate mean loss (half-squared): {:.4f}'.format(
             mean_loss))
 
-    def get_learning_rate(self, batch):
+    def get_learning_rate(self, global_step):
         learning_rate = tf.train.exponential_decay(
             self.args.learning_rate,
-            batch * self.args.batch_size,
+            global_step,
             self.args.decay_step,
             self.args.decay_rate,
             staircase=True

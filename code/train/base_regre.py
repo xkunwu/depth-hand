@@ -7,21 +7,22 @@ import tensorflow as tf
 from tensorflow.contrib import slim
 import progressbar
 import h5py
+import matplotlib.pyplot as mpplot
+from cv2 import resize as cv2resize
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 BASE_DIR = os.path.abspath(os.path.join(BASE_DIR, os.pardir))
 sys.path.append(BASE_DIR)
-sys.path.append(os.path.join(BASE_DIR, 'utils'))
 file_pack = getattr(
-    import_module('coder'),
+    import_module('utils.coder'),
     'file_pack'
 )
 iso_rect = getattr(
-    import_module('iso_boxes'),
+    import_module('utils.iso_boxes'),
     'iso_rect'
 )
 iso_aabb = getattr(
-    import_module('iso_boxes'),
+    import_module('utils.iso_boxes'),
     'iso_aabb'
 )
 
@@ -29,22 +30,36 @@ iso_aabb = getattr(
 class base_regre(object):
     """ This class holds baseline training approach using plain regression.
     """
-    def __init__(self):
+    def __init__(self, args):
+        self.net_rank = 2
         self.crop_size = 128
+        self.crop_range = 1600.
         self.num_channel = 1
         self.num_appen = 7
         self.batchallot = None
-        self.batch_size = 0
-        self.pose_dim = 0
-        self.image_dir = ''
-        self.provider = None
-        self.provider_worker = None
+        # receive arguments
+        self.args = args
+        self.prepare_dir = args.prepare_dir
+        self.appen_train = os.path.join(
+            self.prepare_dir, 'train_{}'.format(self.__class__.__name__))
+        self.appen_test = os.path.join(
+            self.prepare_dir, 'test_{}'.format(self.__class__.__name__))
+        self.predict_dir = args.predict_dir
+        self.predict_file = os.path.join(
+            self.predict_dir, 'predict_{}'.format(self.__class__.__name__))
+        self.batch_size = args.batch_size
+        self.ckpt_path = os.path.join(
+            args.out_dir, 'log', 'blinks',
+            self.__class__.__name__, 'model.ckpt')
+        # tweak arguments
+        args.crop_size = self.crop_size
+        args.crop_range = self.crop_range
 
     class batch_allot:
-        def __init__(self, batch_size, image_size, pose_dim, num_channel, num_appen):
+        def __init__(self, batch_size, image_size, out_dim, num_channel, num_appen):
             self.batch_size = batch_size
             self.image_size = image_size
-            self.pose_dim = pose_dim
+            self.out_dim = out_dim
             self.num_channel = num_channel
             self.num_appen = num_appen
             batch_data = {
@@ -58,7 +73,7 @@ class base_regre(object):
                     # dtype=np.float32),
                     dtype=float),
                 'batch_poses': np.empty(
-                    shape=(batch_size, pose_dim),
+                    shape=(batch_size, out_dim),
                     # dtype=np.float32),
                     dtype=float),
                 'batch_resce': np.empty(
@@ -90,7 +105,7 @@ class base_regre(object):
                 # dtype=np.float32)
                 dtype=float)
             self.batch_poses = np.empty(
-                shape=(self.store_size, self.pose_dim),
+                shape=(self.store_size, self.out_dim),
                 # dtype=np.float32)
                 dtype=float)
             self.batch_resce = np.empty(
@@ -150,7 +165,7 @@ class base_regre(object):
 
     def start_train(self):
         self.batchallot = self.batch_allot(
-            self.batch_size, self.crop_size, self.pose_dim,
+            self.batch_size, self.crop_size, self.out_dim,
             self.num_channel, self.num_appen)
 
     def start_epoch_train(self, filepack):
@@ -174,16 +189,34 @@ class base_regre(object):
 
     def start_evaluate(self, filepack):
         self.batchallot = self.batch_allot(
-            self.batch_size, self.crop_size, self.pose_dim,
+            self.batch_size, self.crop_size, self.out_dim,
             self.num_channel, self.num_appen)
         return filepack.write_file(self.predict_file)
 
-    def end_evaluate(self):
-        self.batchallot = None
+    def evaluate_batch(self, writer, batch_data, pred_val):
+        self.provider.write2d(
+            writer, self.yanker,
+            batch_data['batch_index'], batch_data['batch_resce'],
+            pred_val
+        )
 
-    def tweak_args(self, args):
-        """ Tweak algorithm specific parameters """
-        args.crop_size = self.crop_size
+    def end_evaluate(self, thedata, args):
+        self.batchallot = None
+        mpplot.figure(figsize=(2 * 5, 1 * 5))
+        args.data_draw.draw_prediction_poses(
+            thedata,
+            thedata.training_images,
+            thedata.training_annot_test,
+            self.predict_file
+        )
+        fname = 'detection_{}.png'.format(self.__class__.__name__)
+        mpplot.savefig(os.path.join(self.predict_dir, fname))
+        error_maxj = self.evaluater.evaluate_poses(
+            self.caminfo, self.__class__.__name__,
+            self.predict_dir, self.predict_file)
+        self.logger.info('maximal per-joint mean error: {}'.format(
+            error_maxj
+        ))
 
     def prepare_data(self, thedata, args, batchallot, file_annot, name_appen):
         num_line = int(sum(1 for line in file_annot))
@@ -191,7 +224,7 @@ class base_regre(object):
         batchallot.allot(num_line)
         store_size = batchallot.store_size
         num_stores = int(np.ceil(float(num_line) / store_size))
-        args.logger.debug(
+        self.logger.debug(
             'preparing data [{}]: {:d} lines (producing {:.4f} GB for store size {:d}) ...'.format(
                 self.__class__.__name__, num_line,
                 float(batchallot.store_bytes) / (2 << 30), store_size))
@@ -203,7 +236,7 @@ class base_regre(object):
                 ' ', progressbar.ETA()]
         ).start()
         image_size = self.crop_size
-        pose_dim = batchallot.pose_dim
+        out_dim = batchallot.out_dim
         num_channel = batchallot.num_channel
         num_appen = batchallot.num_appen
         with h5py.File(os.path.join(self.prepare_dir, name_appen), 'w') as h5file:
@@ -226,7 +259,7 @@ class base_regre(object):
                 dtype=float)
             h5file.create_dataset(
                 'poses',
-                (num_line, pose_dim),
+                (num_line, out_dim),
                 compression='lzf',
                 # dtype=np.float32)
                 dtype=float)
@@ -271,7 +304,7 @@ class base_regre(object):
         from datetime import timedelta
         time_s = timer()
         batchallot = self.batch_allot(
-            self.batch_size, self.crop_size, self.pose_dim,
+            self.batch_size, self.crop_size, self.out_dim,
             self.num_channel, self.num_appen)
         with file_pack() as filepack:
             file_annot = filepack.push_file(thedata.training_annot_train)
@@ -280,31 +313,21 @@ class base_regre(object):
             file_annot = filepack.push_file(thedata.training_annot_test)
             self.prepare_data(thedata, args, batchallot, file_annot, self.appen_test)
         time_e = str(timedelta(seconds=timer() - time_s))
-        args.logger.info('data prepared [{}], time: {}'.format(
+        self.logger.info('data prepared [{}], time: {}'.format(
             self.__class__.__name__, time_e))
 
     def receive_data(self, thedata, args):
         """ Receive parameters specific to the data """
-        self.prepare_dir = args.prepare_dir
-        self.appen_train = os.path.join(
-            self.prepare_dir, 'train_{}'.format(self.__class__.__name__))
-        self.appen_test = os.path.join(
-            self.prepare_dir, 'test_{}'.format(self.__class__.__name__))
-        self.predict_dir = args.predict_dir
-        self.predict_file = os.path.join(
-            self.predict_dir, 'predict_{}'.format(self.__class__.__name__))
-        self.batch_size = args.batch_size
-        self.pose_dim = thedata.join_num * 3
+        self.logger = args.logger
+        self.out_dim = thedata.join_num * 3
         self.image_dir = thedata.training_images
         self.caminfo = thedata
         self.provider = args.data_provider
+        self.evaluater = args.data_eval
         self.provider_worker = self.provider.prow_cropped
         self.yanker = self.provider.yank_cropped
 
     def draw_random(self, thedata, args):
-        import matplotlib.pyplot as mpplot
-        from cv2 import resize as cv2resize
-
         with h5py.File(self.appen_train, 'r') as h5file:
             store_size = h5file['index'].shape[0]
             frame_id = np.random.choice(store_size)
@@ -398,14 +421,14 @@ class base_regre(object):
                 self.crop_size, self.crop_size,
                 1))
         poses_tf = tf.placeholder(
-            tf.float32, shape=(self.batch_size, self.pose_dim))
+            tf.float32, shape=(self.batch_size, self.out_dim))
         return frames_tf, poses_tf
 
     def get_model(
             self, input_tensor, is_training,
-            scope=None, final_endpoint='poseout'):
+            scope=None, final_endpoint='stage_out'):
         """ input_tensor: BxHxWxC
-            pose_dim: BxJ, where J is flattened 3D locations
+            out_dim: BxJ, where J is flattened 3D locations
         """
         # batch_size = frames_tf.get_shape()[0].value
         end_points = {}
@@ -454,12 +477,12 @@ class base_regre(object):
                         return net, end_points
                 with tf.variable_scope('stage8'):
                     net = slim.flatten(net)
-                    sc = 'poseout'
+                    sc = 'stage_out'
                     net = slim.fully_connected(net, 768, scope='fullconn8')
                     net = slim.dropout(
                         net, 0.5, is_training=is_training, scope='dropout8')
                     net = slim.fully_connected(
-                        net, self.pose_dim, activation_fn=None, scope='poseout')
+                        net, self.out_dim, activation_fn=None, scope='output8')
                     # self.end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points
@@ -494,15 +517,15 @@ class base_regre(object):
         # net, shapestr = tf_util.dropout(
         #     net, keep_prob=0.5, scope='dropout1', shapestr=shapestr, is_training=is_training)
         # net, shapestr = tf_util.fully_connected(
-        #     net, self.pose_dim, scope='fullconn3', shapestr=shapestr, activation_fn=None)
+        #     net, self.out_dim, scope='fullconn3', shapestr=shapestr, activation_fn=None)
         # # net = tf_util.conv2d(
-        # #     net, self.pose_dim, [1, 1], stride=[1, 1], scope='fullconn3',
+        # #     net, self.out_dim, [1, 1], stride=[1, 1], scope='fullconn3',
         # #     padding='VALID', is_training=is_training, bn=True, bn_decay=bn_decay)
 
         # return net, end_points
 
     @staticmethod
-    def get_loss(pred, anno, end_points):
+    def get_loss(self, pred, anno, end_points):
         """ simple sum-of-squares loss
             pred: BxJ
             anno: BxJ

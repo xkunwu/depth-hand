@@ -1,5 +1,5 @@
 import numpy as np
-from pyquaternion import Quaternion
+# from pyquaternion import Quaternion
 import matplotlib.pyplot as mpplot
 import matplotlib.patches as mppatches
 from mpl_toolkits.mplot3d import Axes3D
@@ -8,24 +8,24 @@ from colour import Color
 
 
 class iso_rect:
-    def __init__(self, cll=np.zeros(2), len=1., m=0.1):
+    def __init__(self, cll=np.zeros(2), sidelen=1., m=0.1):
         self.cll = cll
-        self.len = len
+        self.sidelen = sidelen
         self.add_margan(m)
 
     def dump(self):
-        return np.append(self.len, self.cll)
+        return np.append(self.sidelen, self.cll)
 
     def load(self, args):
         self.cll = args[1:3]
-        self.len = args[0]
+        self.sidelen = args[0]
 
     def show_dims(self):
-        print(self.cll, self.len)
+        print(self.cll, self.sidelen)
 
     def pick(self, points2):
         cmin = self.cll
-        cmax = self.cll + self.len
+        cmax = self.cll + self.sidelen
         conds = np.logical_and(
             np.all(cmin < points2, axis=1),
             np.all(cmax > points2, axis=1)
@@ -36,100 +36,100 @@ class iso_rect:
         pmin = np.min(points2, axis=0)
         pmax = np.max(points2, axis=0)
         cen = (pmin + pmax) / 2
-        self.len = np.max(pmax - pmin)
+        self.sidelen = np.max(pmax - pmin)
         # cen = np.mean(points2, axis=0)
-        # self.len = np.max(np.ptp(points2, axis=0))
+        # self.sidelen = np.max(np.ptp(points2, axis=0))
         self.add_margan(m)
-        self.cll = cen - self.len / 2
+        self.cll = cen - self.sidelen / 2
 
     def add_margan(self, m=0.1):
         if 1 > m and -1 < m:
-            m = self.len * m
-        self.len += m
+            m = self.sidelen * m
+        self.sidelen += m
 
     def print_image(self, coord, value):
         coord = np.floor(coord - self.cll + 0.5).astype(int)
-        sidelen = np.ceil(self.len).astype(int) + 1
+        sidelen = np.ceil(self.sidelen).astype(int) + 1
         img = np.zeros((sidelen, sidelen))
         img[coord[:, 1], coord[:, 0]] = value  # reverse coordinates!
         return img
 
     def draw(self, color=Color('orange').rgb):
         mpplot.gca().add_patch(mppatches.Rectangle(
-            self.cll, self.len, self.len,
+            self.cll, self.sidelen, self.sidelen,
             linewidth=1, facecolor='none',
             edgecolor=color
         ))
 
 
 class iso_aabb:
-    def __init__(self, cll=np.zeros(3), len=1., m=0.1):
+    def __init__(self, cll=np.zeros(3), sidelen=1., m=0.1):
         self.cll = cll
-        self.len = len
+        self.sidelen = sidelen
         self.add_margan(m)
 
     def dump(self):
-        return np.append(self.len, self.cll)
+        return np.append(self.sidelen, self.cll)
 
     def load(self, args):
         self.cll = args[1:4]
-        self.len = args[0]
+        self.sidelen = args[0]
 
     def show_dims(self):
-        print(self.cen, self.len)
+        print(self.cen, self.sidelen)
 
     def build(self, points3, m=0.1):
         pmin = np.min(points3, axis=0)
         pmax = np.max(points3, axis=0)
         cen = (pmin + pmax) / 2
-        self.len = np.max(pmax - pmin)
+        self.sidelen = np.max(pmax - pmin)
         self.add_margan(m)
-        self.cll = cen - self.len / 2
+        self.cll = cen - self.sidelen / 2
 
     def add_margan(self, m=0.1):
         if 1 > m and -1 < m:
-            m = self.len * m
-        self.len += m
+            m = self.sidelen * m
+        self.sidelen += m
 
     def transform(self, points3):
         """ world --> local """
-        return (points3 - (self.cll + self.len / 2)) / self.len
+        return (points3 - (self.cll + self.sidelen / 2)) / self.sidelen
 
     def transform_inv(self, points3):
         """ local --> world """
-        return points3 * self.len + (self.cll + self.len / 2)
+        return points3 * self.sidelen + (self.cll + self.sidelen / 2)
 
 
 class iso_cube:
-    def __init__(self, cen=np.zeros(3), len=1., m=0.):
+    def __init__(self, cen=np.zeros(3), sidelen=1., m=0.):
         self.cen = cen
-        self.len = len  # half side length
-        self.evecs = np.eye(3)
+        self.sidelen = sidelen  # half side length
+        # self.evecs = np.eye(3)
         self.add_margan(m)
 
     def dump(self):
         return np.concatenate((
-            np.array([self.len]), self.cen,
-            Quaternion(matrix=self.evecs).elements
+            np.array([self.sidelen]), self.cen,
+            # Quaternion(matrix=self.evecs).elements
         ))
 
     def load(self, args):
-        self.len = args[0]
+        self.sidelen = args[0]
         self.cen = args[1:4]
-        self.evecs = Quaternion(args[4:8]).rotation_matrix
+        # self.evecs = Quaternion(args[4:8]).rotation_matrix
 
     def show_dims(self):
-        print(self.cen, self.len)
-        print(self.evecs)
+        print(self.cen, self.sidelen)
+        # print(self.evecs)
 
     def get_sidelen(self):
-        return np.ceil(2 * self.len).astype(int) + 1
+        return np.ceil(2 * self.sidelen).astype(int) + 1
 
     def pick(self, points3):
         """ only meaningful when picked in the local coordinates """
         points3_trans = self.transform(points3)
-        # cmin = - np.ones(3) * self.len
-        # cmax = np.ones(3) * self.len
+        # cmin = - np.ones(3) * self.sidelen
+        # cmax = np.ones(3) * self.sidelen
         cmin = - np.ones(3)
         cmax = np.ones(3)
         conds = np.logical_and(
@@ -142,55 +142,57 @@ class iso_cube:
         pmin = np.min(points3, axis=0)
         pmax = np.max(points3, axis=0)
         self.cen = (pmin + pmax) / 2
-        self.len = np.max(pmax - pmin) / 2
-        self.evecs = np.eye(3)
+        self.sidelen = np.max(pmax - pmin) / 2
+        # self.evecs = np.eye(3)
         self.add_margan(m)
         return self.transform(points3)
 
-    def build_pca(self, points3, m=0.6):
-        self.cen = np.mean(points3, axis=0)
-        evals, evecs = np.linalg.eig(np.cov(points3.T))
-        # _, evecs = np.linalg.eig(np.cov(points3.T))
-        idx = np.argsort(evals)[::-1]
-        evecs = evecs[idx, :]
-        # evals = evals[idx]
-        # print(evals)
-        points3_trans = np.dot(points3 - self.cen, evecs)
-        pmin = np.min(points3_trans, axis=0)
-        pmax = np.max(points3_trans, axis=0)
-        self.len = np.max(pmax - pmin) / 2
-        if 0 > np.linalg.det(evecs):
-            evecs[2, :] *= -1
-        self.evecs = evecs
-        # self.qrot = Quaternion(matrix=evecs)
-        self.add_margan(m)
-        # return points3_trans
-        return points3_trans / self.len
+    # def build_pca(self, points3, m=0.6):
+    #     self.cen = np.mean(points3, axis=0)
+    #     evals, evecs = np.linalg.eig(np.cov(points3.T))
+    #     # _, evecs = np.linalg.eig(np.cov(points3.T))
+    #     idx = np.argsort(evals)[::-1]
+    #     evecs = evecs[idx, :]
+    #     # evals = evals[idx]
+    #     # print(evals)
+    #     points3_trans = np.dot(points3 - self.cen, evecs)
+    #     pmin = np.min(points3_trans, axis=0)
+    #     pmax = np.max(points3_trans, axis=0)
+    #     self.sidelen = np.max(pmax - pmin) / 2
+    #     if 0 > np.linalg.det(evecs):
+    #         evecs[2, :] *= -1
+    #     self.evecs = evecs
+    #     # self.qrot = Quaternion(matrix=evecs)
+    #     self.add_margan(m)
+    #     # return points3_trans
+    #     return points3_trans / self.sidelen
 
     def add_margan(self, m=0.1):
         if 1 > m and -1 < m:
-            m = self.len * m
-        self.len += m
+            m = self.sidelen * m
+        self.sidelen += m
 
     def transform(self, points3):
         """ world --> local """
         # return np.dot(points3 - self.cen, self.evecs)
-        return np.dot(points3 - self.cen, self.evecs) / self.len
+        # return np.dot(points3 - self.cen, self.evecs) / self.sidelen
+        return (points3 - self.cen) / self.sidelen
         # return self.qrot.rotate(points3 - self.cen)
 
     def transform_inv(self, points3):
         """ local --> world """
         # return np.dot(points3, self.evecs.T) + self.cen
-        return np.dot(points3 * self.len, self.evecs.T) + self.cen
+        # return np.dot(points3 * self.sidelen, self.evecs.T) + self.cen
+        return (points3 * self.sidelen) + self.cen
         # return self.qrot.inverse.rotate(points3 - self.cen)
 
     # def trans_scale(self, points3, sizel):
     #     """ world --> image """
-    #     return np.dot(points3 - self.cen, self.evecs) * sizel / self.len
+    #     return np.dot(points3 - self.cen, self.evecs) * sizel / self.sidelen
     #
     # def trans_scale_inv(self, points3, sizel):
     #     """ image --> world """
-    #     return np.dot(points3 * self.len / sizel, self.evecs.T) + self.cen
+    #     return np.dot(points3 * self.sidelen / sizel, self.evecs.T) + self.cen
 
     def project_pca(self, ps3_pca, roll=0, sort=True):
         ar3 = np.roll(np.arange(3), roll)
@@ -200,9 +202,9 @@ class iso_cube:
             idx = np.argsort(ps3_pca[..., did])
             ps3_pca = ps3_pca[idx, ...]
         coord = ps3_pca[:, cid]
-        # cll = - np.ones(2) * self.len
+        # cll = - np.ones(2) * self.sidelen
         # coord = np.floor(coord - cll + 0.5).astype(int)
-        # depth = (ps3_pca[:, did] + self.len) / (2 * self.len)
+        # depth = (ps3_pca[:, did] + self.sidelen) / (2 * self.sidelen)
         cll = - np.ones(2)
         coord = (coord - cll) / 2
         depth = (ps3_pca[:, did] + 1) / 2
@@ -220,11 +222,35 @@ class iso_cube:
         ] = depth  # reverse coordinates!
         return img
 
+    def proj_rect(self, dataops, caminfo):
+        c3a_l = []
+        c3a_l.append(np.array([
+            np.append(self.cen[:2] - self.sidelen, self.cen[2]),
+            np.append(self.cen[:2] + self.sidelen, self.cen[2])
+        ]))  # central z-plane
+        c3a_l.append(np.array([
+            np.append(self.cen[:2] - self.sidelen, self.cen[2] - self.sidelen),
+            np.append(self.cen[:2] + self.sidelen, self.cen[2] - self.sidelen)
+        ]))  # near z-plane
+        c3a_l.append(np.array([
+            np.append(self.cen[:2] - self.sidelen, self.cen[2] + self.sidelen),
+            np.append(self.cen[:2] + self.sidelen, self.cen[2] + self.sidelen)
+        ]))  # far z-plane
+
+        def convert(c3a):
+            c2a = dataops.raw_to_2d(c3a, caminfo)
+            cll = c2a[0, :]
+            ctr = c2a[1, :]
+            return iso_rect(cll, np.max(ctr - cll))
+
+        rects = [convert(c3a) for c3a in c3a_l]
+        return rects
+
     def get_corners(self):
-        # cmin = self.cen - self.len
-        # cmax = self.cen + self.len
-        cmin = - np.ones(3) * self.len
-        cmax = np.ones(3) * self.len
+        cmin = self.cen - self.sidelen
+        cmax = self.cen + self.sidelen
+        # cmin = - np.ones(3) * self.sidelen
+        # cmax = np.ones(3) * self.sidelen
         corners = np.array([
             cmin,
             [cmax[0], cmin[1], cmin[2]],

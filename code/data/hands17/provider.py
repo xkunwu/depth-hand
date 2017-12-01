@@ -1,54 +1,97 @@
 import os
+import sys
+from importlib import import_module
 import numpy as np
 from itertools import islice
 from . import ops as dataops
 from . import io as dataio
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.abspath(os.path.join(BASE_DIR, os.pardir))
+sys.path.append(BASE_DIR)
+iso_cube = getattr(
+    import_module('utils.iso_boxes'),
+    'iso_cube'
+)
+
 
 def prow_dirtsdf(line, image_dir, caminfo):
     img_name, pose_raw = dataio.parse_line_annot(line)
     img = dataio.read_image(os.path.join(image_dir, img_name))
-    pcnt, resce = dataops.fill_grid(img, pose_raw, caminfo.crop_size, caminfo)
+    pcnt, resce = dataops.fill_grid(
+        img, pose_raw, caminfo.crop_size, caminfo)
     befs = dataops.trunc_belief(pcnt)
-    resce3 = resce[0:8]
+    resce3 = resce[0:4]
     pose_pca = dataops.raw_to_pca(pose_raw, resce3)
     return (img_name, befs,
             pose_pca.flatten().T, resce)
 
 
 def yank_dirtsdf(pose_local, resce):
-    resce3 = resce[0:8]
+    resce3 = resce[0:4]
     return dataops.pca_to_raw(pose_local, resce3)
 
 
 def prow_truncdf(line, image_dir, caminfo):
     img_name, pose_raw = dataio.parse_line_annot(line)
     img = dataio.read_image(os.path.join(image_dir, img_name))
-    pcnt, resce = dataops.fill_grid(img, pose_raw, caminfo.crop_size, caminfo)
+    pcnt, resce = dataops.fill_grid(
+        img, pose_raw, caminfo.crop_size, caminfo)
     tdf = dataops.prop_dist(pcnt)
-    resce3 = resce[0:8]
+    resce3 = resce[0:4]
     pose_pca = dataops.raw_to_pca(pose_raw, resce3)
     return (img_name, np.expand_dims(tdf, axis=3),
             pose_pca.flatten().T, resce)
 
 
 def yank_truncdf(pose_local, resce):
-    resce3 = resce[0:8]
+    resce3 = resce[0:4]
     return dataops.pca_to_raw(pose_local, resce3)
+
+
+def prow_localizer3(line, image_dir, caminfo):
+    img_name, pose_raw = dataio.parse_line_annot(line)
+    img = dataio.read_image(os.path.join(image_dir, img_name))
+    pcnt = dataops.voxelize_depth(
+        img, caminfo.crop_size, caminfo)
+    cube = iso_cube()
+    cube.build(pose_raw)
+    resce = np.concatenate((
+        cube.dump(),
+        np.array([caminfo.crop_range, caminfo.crop_size])
+    ))
+    centre = resce[1:4]
+    halflen = caminfo.crop_range / 2
+    centre01 = np.append(
+        centre[:2] / halflen,
+        (centre[2] - halflen) / halflen)
+    return (img_name, np.expand_dims(pcnt, axis=3),
+            centre01.T, resce)
+
+
+def yank_localizer3(pose_local, resce):
+    sidelen = resce[4]
+    halflen = sidelen / 2
+    centre = np.append(
+        pose_local[:2] * halflen,
+        pose_local[2] * halflen + halflen,
+    )
+    return centre
 
 
 def prow_conv3d(line, image_dir, caminfo):
     img_name, pose_raw = dataio.parse_line_annot(line)
     img = dataio.read_image(os.path.join(image_dir, img_name))
-    pcnt, resce = dataops.fill_grid(img, pose_raw, caminfo.crop_size, caminfo)
-    resce3 = resce[0:8]
+    pcnt, resce = dataops.fill_grid(
+        img, pose_raw, caminfo.crop_size, caminfo)
+    resce3 = resce[0:4]
     pose_pca = dataops.raw_to_pca(pose_raw, resce3)
     return (img_name, np.expand_dims(pcnt, axis=3),
             pose_pca.flatten().T, resce)
 
 
 def yank_conv3d(pose_local, resce):
-    resce3 = resce[0:8]
+    resce3 = resce[0:4]
     return dataops.pca_to_raw(pose_local, resce3)
 
 
@@ -57,14 +100,14 @@ def prow_ortho3v(line, image_dir, caminfo):
     img = dataio.read_image(os.path.join(image_dir, img_name))
     img_crop_resize, resce = dataops.proj_ortho3(
         img, pose_raw, caminfo)
-    resce3 = resce[0:8]
+    resce3 = resce[0:4]
     pose_pca = dataops.raw_to_pca(pose_raw, resce3)
     return (img_name, img_crop_resize,
             pose_pca.flatten().T, resce)
 
 
 def yank_ortho3v(pose_local, resce):
-    resce3 = resce[0:8]
+    resce3 = resce[0:4]
     return dataops.pca_to_raw(pose_local, resce3)
 
 
@@ -73,14 +116,14 @@ def prow_cleaned(line, image_dir, caminfo):
     img = dataio.read_image(os.path.join(image_dir, img_name))
     img_crop_resize, resce = dataops.crop_resize_pca(
         img, pose_raw, caminfo)
-    resce3 = resce[0:8]
+    resce3 = resce[0:4]
     pose_pca = dataops.raw_to_pca(pose_raw, resce3)
     return (img_name, np.expand_dims(img_crop_resize, axis=2),
             pose_pca.flatten().T, resce)
 
 
 def yank_cleaned(pose_local, resce):
-    resce3 = resce[0:8]
+    resce3 = resce[0:4]
     return dataops.pca_to_raw(pose_local, resce3)
 
 
@@ -127,7 +170,8 @@ def puttensor_mt(fanno, worker, image_dir, caminfo, batchallot):
     # from timeit import default_timer as timer
     # from datetime import timedelta
     # time_s = timer()
-    # test_copy = test_puttensor(next_n_lines, worker, image_dir, caminfo, batchallot)
+    # test_copy = test_puttensor(
+    #     next_n_lines, worker, image_dir, caminfo, batchallot)
     # time_e = str(timedelta(seconds=timer() - time_s))
     # print('single tread time: {}'.format(time_e))
     # return num_line
@@ -140,9 +184,6 @@ def puttensor_mt(fanno, worker, image_dir, caminfo, batchallot):
         partial(put_worker, worker=worker, image_dir=image_dir,
                 caminfo=caminfo, batchallot=batchallot),
         zip(range(num_line), next_n_lines))
-    # thread_pool.map(
-    #     partial(worker, caminfo=caminfo, image_dir=image_dir, batchallot=batchallot),
-    #     zip(range(num_line), next_n_lines))
     thread_pool.close()
     thread_pool.join()
     # time_e = str(timedelta(seconds=timer() - time_s))
@@ -155,6 +196,16 @@ def puttensor_mt(fanno, worker, image_dir, caminfo, batchallot):
     # print(np.linalg.norm(batchallot.batch_resce - test_copy.batch_resce))
 
     return num_line
+
+
+def write_region(fanno, yanker, batch_index, batch_resce, batch_poses):
+    for ii in range(batch_index.shape[0]):
+        img_name = dataio.index2imagename(batch_index[ii, 0])
+        pose_local = batch_poses[ii, :]
+        resce = batch_resce[ii, :]
+        centre_raw = yanker(pose_local, resce)
+        crimg_line = ''.join("%12.4f" % x for x in centre_raw.flatten())
+        fanno.write(img_name + crimg_line + '\n')
 
 
 def write2d(fanno, yanker, batch_index, batch_resce, batch_poses):

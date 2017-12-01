@@ -1,7 +1,11 @@
+import os
+import sys
+from importlib import import_module
 import numpy as np
 import matplotlib.pyplot as mpplot
 from . import ops as dataops
 from . import io as dataio
+from . import draw as datadraw
 
 
 def compare_error(thedata, fname_echt, fname_pred):
@@ -39,6 +43,7 @@ def draw_mean_error_distribution(errors, ax):
     # ax.set_ylim([0, 100])
     ax.set_xlabel('Mean error of single frame (mm)')
     # ax.set_xlim(left=0)
+    mpplot.tight_layout()
 
 
 def draw_error_percentage_curve(errors, methods, ax):
@@ -130,4 +135,54 @@ def draw_error_per_joint(errors, methods, ax, join_name=None, draw_std=False):
     mpplot.margins(0.1)
     mpplot.tight_layout()
     mpplot.legend(methods, loc='upper left')
+    # mpplot.show()
+
+
+def evaluate_detection(thedata, model_name, predict_dir, predict_file):
+    pass
+    # print('evaluating {} ...'.format(model_name))
+    # print('figures saved')
+
+
+def evaluate_poses(thedata, model_name, predict_dir, predict_file):
+    print('evaluating {} ...'.format(model_name))
+
+    errors = compare_error(
+        thedata,
+        thedata.training_annot_test,
+        predict_file
+    )
+    mpplot.gcf().clear()
+    draw_mean_error_distribution(
+        errors, mpplot.gca())
+    fname = '{}_error_dist.png'.format(model_name)
+    mpplot.savefig(os.path.join(predict_dir, fname))
+    errors = np.expand_dims(errors, axis=0)
+    mpplot.gcf().clear()
+    draw_error_percentage_curve(
+        errors, [model_name], mpplot.gca())
+    fname = '{}_error_rate.png'.format(model_name)
+    mpplot.savefig(os.path.join(predict_dir, fname))
+    mpplot.gcf().clear()
+    draw_error_per_joint(
+        errors, [model_name], mpplot.gca(), thedata.join_name)
+    fname = '{}_error_bar.png'.format(model_name)
+    mpplot.savefig(os.path.join(predict_dir, fname))
+
+    print('figures saved')
+    return np.max(np.mean(errors, axis=1))
+
+    # draw_sum = 3
+    # draw_i = 1
+    # fig_size = (draw_sum * 5, 5)
+    # mpplot.subplots(nrows=1, ncols=draw_sum, figsize=fig_size)
+    # mpplot.subplot(1, draw_sum, draw_i)
+    # draw_i += 1
+    # draw_error_percentage_curve(errors, mpplot.gca())
+    # mpplot.subplot(1, draw_sum, draw_i)
+    # draw_error_per_joint(errors, mpplot.gca(), thedata.join_name)
+    # draw_i += 1
+    # mpplot.subplot(1, draw_sum, draw_i)
+    # draw_mean_error_distribution(errors, mpplot.gca())
+    # draw_i += 1
     # mpplot.show()
