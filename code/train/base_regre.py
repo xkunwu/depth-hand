@@ -228,6 +228,7 @@ class base_regre(object):
         with h5py.File(self.appen_train, 'r') as h5file:
             store_size = h5file['index'].shape[0]
             frame_id = np.random.choice(store_size)
+            # frame_id = 0
             img_id = h5file['index'][frame_id, 0]
             frame_h5 = np.squeeze(h5file['frame'][frame_id, ...], -1)
             poses_h5 = h5file['poses'][frame_id, ...].reshape(-1, 3)

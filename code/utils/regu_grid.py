@@ -129,7 +129,9 @@ class latice_image:
         print(self.step, self.cellen)
 
     def putit(self, points2):
-        return np.floor(points2.astype(float) / self.cellen).astype(int)
+        return np.floor(
+            points2.astype(float) / self.cellen - 1e-6
+        ).astype(int)
 
     def fill(self, points2):
         num_p = points2.shape[0]

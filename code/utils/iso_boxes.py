@@ -51,13 +51,12 @@ class iso_rect:
         coord = np.floor(coord - self.cll + 0.5).astype(int)
         sidelen = np.ceil(self.sidelen).astype(int) + 1
         img = np.zeros((sidelen, sidelen))
-        # img[coord[:, 1], coord[:, 0]] = value  # reverse coordinates!
         img[coord[:, 0], coord[:, 1]] = value
         return img
 
     def draw(self, color=Color('orange').rgb):
         mpplot.gca().add_patch(mppatches.Rectangle(
-            self.cll, self.sidelen, self.sidelen,
+            (self.cll[1], self.cll[0]), self.sidelen, self.sidelen,
             linewidth=1, facecolor='none',
             edgecolor=color
         ))
@@ -206,19 +205,15 @@ class iso_cube:
         cll = - np.ones(2)
         coord = (coord - cll) / 2
         depth = (ps3_pca[:, did] + 1) / 2
-        return coord, depth
+        return coord[:, ::-1], depth
 
     def print_image(self, coord, depth, sizel):
         img = np.zeros((sizel, sizel))
         coord *= 0.999999
         img[
-            np.floor(coord[:, 1] * sizel).astype(int),
             np.floor(coord[:, 0] * sizel).astype(int),
-        ] = depth  # reverse coordinates!
-        # img[
-        #     np.floor(coord[:, 0] * sizel).astype(int),
-        #     np.floor(coord[:, 1] * sizel).astype(int),
-        # ] = depth
+            np.floor(coord[:, 1] * sizel).astype(int),
+        ] = depth
         return img
 
     # def proj_rect(self, raw_to_2d_fn, caminfo):

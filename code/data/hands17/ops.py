@@ -65,6 +65,7 @@ def d2z_to_raw(p2z, caminfo, resce=np.array([1, 0, 0])):
     p2z = p2z.astype(float)
     pose2d = p2z[:, 0:2] / resce[0] + resce[1:3]
     pose_z = np.array(p2z[:, 2]).reshape(-1, 1)
+    pose2d = pose2d[:, ::-1]
     pose3d = (pose2d - caminfo.centre) / caminfo.focal * pose_z
     return np.hstack((pose3d, pose_z))
 
@@ -77,6 +78,7 @@ def raw_to_2dz(points3, caminfo, resce=np.array([1, 0, 0])):
     points3 = points3.astype(float)
     pose_z = points3[:, 2]
     pose2d = points3[:, 0:2] / pose_z.reshape(-1, 1) * caminfo.focal + caminfo.centre
+    pose2d = pose2d[:, ::-1]
     return (pose2d - resce[1:3]) * resce[0], pose_z
 
 
@@ -123,8 +125,7 @@ def img_to_raw(img, caminfo, crop_lim=None):
         caminfo.z_range[1] > img,
         caminfo.z_range[0] < img
     )
-    indx = np.where(conds)[::-1]  # reverse coordinates!!!
-    # indx = np.where(conds)
+    indx = np.where(conds)
     zval = np.array(img[conds])
     indz = np.hstack((
         np.asarray(indx).astype(float).T,
@@ -244,8 +245,8 @@ def generate_anchors(img, pose_raw, step, caminfo):
         caminfo.region_size
     )
     cen2d = raw_to_2d(cube.cen.reshape(1, -1), caminfo)
-    pcnt = lattice.fill(cen2d)
     rect = proj_cube_to_rect(cube, caminfo.region_size, caminfo)
+    pcnt = lattice.fill(cen2d)
     anchors = lattice.prow_anchor_single(cen2d, rect.sidelen / 2)
     # print(cen2d, rect.sidelen / 2)
     # print(lattice.yank_anchor_single(
@@ -423,8 +424,8 @@ def crop_resize(img, pose_raw, caminfo):
     cll_i = np.floor(rect.cll).astype(int)
     sizel = np.floor(rect.sidelen).astype(int)
     img_crop = img[
-        cll_i[1]:cll_i[1] + sizel,
         cll_i[0]:cll_i[0] + sizel,
+        cll_i[1]:cll_i[1] + sizel,
     ]
     img_crop_resize = rescale_depth(img_crop, caminfo)
     # img_crop_resize = cv2resize(

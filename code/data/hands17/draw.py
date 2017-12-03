@@ -47,13 +47,13 @@ def draw_pose2d(thedata, pose2d, show_margin=False):
             color_v0, thedata.join_color[fii + 1], len(p2joints) + 1)]
         for jj, joint in enumerate(p2joints):
             mpplot.plot(
-                p2joints[jj, 0], p2joints[jj, 1],
+                p2joints[jj, 1], p2joints[jj, 0],
                 'o',
                 color=color_range[jj + 1]
             )
         p2joints = np.vstack((p2wrist, p2joints))
         mpplot.plot(
-            p2joints[:, 0], p2joints[:, 1],
+            p2joints[:, 1], p2joints[:, 0],
             '-',
             linewidth=2.0,
             color=thedata.join_color[fii + 1].rgb
@@ -71,7 +71,7 @@ def draw_pose2d(thedata, pose2d, show_margin=False):
     #     )
     # )
     mpplot.plot(
-        p2wrist[0, 0], p2wrist[0, 1],
+        p2wrist[0, 1], p2wrist[0, 0],
         'o',
         color=thedata.join_color[0].rgb
     )

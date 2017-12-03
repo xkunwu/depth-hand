@@ -203,7 +203,7 @@ class localizer2(base_regre):
                 frame_h5, self.caminfo)
 
         print('[{}] drawing pose #{:d}'.format(self.__class__.__name__, img_id))
-        colors = [Color('orange').rgb, Color('red').rgb, Color('green').rgb]
+        colors = [Color('orange').rgb, Color('red').rgb, Color('lime').rgb]
         mpplot.subplot(1, 2, 1)
         annot_line = args.data_io.get_line(
             thedata.training_annot_cleaned, img_id)
@@ -302,7 +302,7 @@ class localizer2(base_regre):
         rects = cube.proj_rects_3(
             args.data_ops.raw_to_2d, self.caminfo
         )
-        colors = [Color('orange').rgb, Color('red').rgb, Color('green').rgb]
+        colors = [Color('orange').rgb, Color('red').rgb, Color('lime').rgb]
         for ii, rect in enumerate(rects):
             rect.draw(colors[ii])
 

@@ -31,6 +31,21 @@ class hands17holder:
     range_test = np.zeros(2, dtype=np.int)
 
     # cropped & resized training images
+    # world/image coordinates are reversed!!!
+    # from colour import Color
+    # p3 = np.array([
+    #     [-20, -20, 400],
+    #     [-20, 20, 400],
+    #     [20, 20, 400],
+    # ])
+    # p2 = args.data_ops.raw_to_2d(p3, self.caminfo)
+    # colors = [Color('orange').rgb, Color('red').rgb, Color('lime').rgb]
+    # for ii, p in enumerate(p2):
+    #     mpplot.plot(
+    #         p[0], p[1],
+    #         'o',
+    #         color=colors[ii]
+    #     )
     image_size = [480, 640]
     region_size = 120
     crop_size = 128

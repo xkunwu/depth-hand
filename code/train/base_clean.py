@@ -68,6 +68,8 @@ class base_clean(base_regre):
             print(np.min(poses_h5, axis=0), np.max(poses_h5, axis=0))
 
         print('[{}] drawing pose #{:d}'.format(self.__class__.__name__, img_id))
+        from colour import Color
+        colors = [Color('orange').rgb, Color('red').rgb, Color('lime').rgb]
         # resce3 = resce_h5[3:11]
         resce3 = resce_h5[0:4]
         mpplot.subplots(nrows=2, ncols=2, figsize=(2 * 5, 2 * 5))
@@ -95,6 +97,11 @@ class base_clean(base_regre):
             thedata,
             args.data_ops.raw_to_2d(pose_raw, thedata)
         )
+        rects = cube.proj_rects_3(
+            args.data_ops.raw_to_2d, self.caminfo
+        )
+        for ii, rect in enumerate(rects):
+            rect.draw(colors[ii])
 
         mpplot.subplot(2, 2, 1)
         annot_line = args.data_io.get_line(
@@ -105,6 +112,11 @@ class base_clean(base_regre):
         args.data_draw.draw_pose2d(
             thedata,
             args.data_ops.raw_to_2d(pose_raw, thedata))
+        rects = cube.proj_rects_3(
+            args.data_ops.raw_to_2d, self.caminfo
+        )
+        for ii, rect in enumerate(rects):
+            rect.draw(colors[ii])
 
         mpplot.subplot(2, 2, 2)
         img_name, frame, poses, resce = self.provider_worker(

@@ -49,7 +49,7 @@ def make_cmap_gradient(Color_beg, Color_end, step=10):
         color_value.append(
             zip(np.linspace(0.0, 1.0, step), cri, cri)
         )
-    return dict(red=color_value[0], green=color_value[1], blue=color_value[2])
+    return dict(red=color_value[0], lime=color_value[1], blue=color_value[2])
 
 
 def make_segments(x, y):

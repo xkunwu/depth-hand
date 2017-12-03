@@ -57,7 +57,7 @@ class capture:
         rects = cube.proj_rects_3(
             self.args.data_ops.raw_to_2d, self.caminfo_ir
         )
-        colors = [Color('orange').rgb, Color('red').rgb, Color('green').rgb]
+        colors = [Color('orange').rgb, Color('red').rgb, Color('lime').rgb]
         for ii, rect in enumerate(rects):
             cll = np.floor(rects[ii].cll + 0.5).astype(int)
             ctr = np.floor(rects[ii].cll + rects[ii].sidelen + 0.5).astype(int)
