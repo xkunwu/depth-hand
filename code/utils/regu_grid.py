@@ -1,7 +1,7 @@
 import numpy as np
 
 
-class grid_cell():
+class grid_cell:
     def __init__(self, cll=np.zeros(3), sidelen=1.):
         self.cll = cll
         self.sidelen = sidelen
@@ -52,26 +52,26 @@ class grid_cell():
 
 
 class regu_grid:
-    def __init__(self, cll=np.zeros(3), step=2, sidelen=1.):
+    def __init__(self, cll=np.zeros(3), step=2, cellen=1.):
         self.cll = cll
-        self.sidelen = sidelen  # cell side length
+        self.cellen = cellen  # cell side length
         self.step = step
         self.pcnt = np.zeros(
             shape=(self.step, self.step, self.step))
 
     def dump(self):
         return np.concatenate((
-            np.array([self.sidelen]), self.cen,
+            np.array([self.cellen]), self.cen,
             np.array([self.step])
         ))
 
     def load(self, args):
-        self.sidelen = args[0]
+        self.cellen = args[0]
         self.cen = args[1:4]
         self.step = args[4]
 
     def show_dims(self):
-        print(self.cll, self.sidelen, self.step)
+        print(self.cll, self.cellen, self.step)
 
     def from_cube(self, cube, step, m=0.01):
         if 1 > m and -1 < m:
@@ -79,30 +79,98 @@ class regu_grid:
         cubelen = cube.sidelen + m
         self.cll = np.zeros(3) - cubelen
         self.step = step
-        self.sidelen = cubelen * 2 / step
+        self.cellen = cubelen * 2 / step
         self.pcnt = np.zeros(shape=(self.step, self.step, self.step))
 
-    def subdivide(self, volume, step):
-        self.cll = volume
-        self.sidelen = volume.sidelen
-        self.step = step
-        self.pcnt = np.zeros(shape=(self.step, self.step, self.step))
+    # def subdivide(self, volume, step):
+    #     self.cll = volume
+    #     self.sidelen = volume.sidelen
+    #     self.step = step
+    #     self.pcnt = np.zeros(shape=(self.step, self.step, self.step))
 
     def putit(self, points3):
-        return np.floor((points3 - self.cll) / self.sidelen).astype(int)
+        return np.floor((points3 - self.cll) / self.cellen).astype(int)
 
     def fill(self, points3):
         indices = self.putit(points3)
         for index in indices:
             self.pcnt[index[0], index[1], index[2]] += 1.
-        self.pcnt /= np.max(self.pcnt)
+        self.pcnt /= np.max(self.pcnt)  # normalized density
+        return self.pcnt
 
     def voxen(self, index):
-        return self.cll + self.sidelen * (float(index) + 0.5)
+        return self.cll + self.cellen * (float(index) + 0.5)
 
     def fetch(self, index):
         cen = float(index) - self.cll
-        return grid_cell(cen, self.sidelen)
+        return grid_cell(cen, self.cellen)
 
     def draw(self):
         pass
+
+
+class latice_image:
+    def __init__(self, image_size=np.array((6, 8)), step=2):
+        self.cellen = image_size / step  # cell side length
+        self.step = step
+        self.pcnt = np.zeros(shape=(self.step, self.step))
+
+    def dump(self):
+        return np.concatenate((
+            np.array([self.step]), self.cellen,
+        ))
+
+    def load(self, args):
+        self.step = int(args[0])
+        self.cellen = args[1:3]
+        self.pcnt = np.zeros(shape=(self.step, self.step))
+
+    def show_dims(self):
+        print(self.step, self.cellen)
+
+    def putit(self, points2):
+        return np.floor(points2.astype(float) / self.cellen).astype(int)
+
+    def fill(self, points2):
+        num_p = points2.shape[0]
+        indices = self.putit(points2)
+        for index in indices:
+            self.pcnt[index[0], index[1]] += 1.
+        self.pcnt /= num_p  # probability
+        # p50 = np.where(0.5 < self.pcnt)
+        pmax = np.where(np.max(self.pcnt) == self.pcnt)
+        self.pcnt = np.zeros(shape=(self.step, self.step))
+        self.pcnt[pmax] = 1.
+        return self.pcnt
+
+    def prow_anchor_single(self, points2, wsizes):
+        centre = self.voxen(self.putit(points2))
+        delta = (points2 - centre) / wsizes
+        scale = np.log(wsizes / self.cellen[0])
+        return np.concatenate([delta.flatten(), np.array([scale])])
+
+    def yank_anchor_single(self, seq_n, anchors):
+        index = np.array([
+            seq_n // self.step,
+            seq_n % self.step])
+        centre = self.voxen(index)
+        delta = anchors[0:2]
+        scale = anchors[2]
+        wsizes = np.exp(scale) * self.cellen[0]
+        points2 = (delta * wsizes) + centre
+        return points2, wsizes
+
+    def prow_anchor(self, points2, wsizes):
+        pass
+        # param = np.zeros(shape=(3, self.step, self.step))
+        # num_p = points2.shape[0]
+        # indices = self.putit(points2)
+        # xx = np.repeat(np.arange(self.step), num_p).reshape(num_p, self.step)
+        # xi = np.argmin(np.fabs(xx - indices[:, 0]), axis=0)
+        # # xx = np.min(np.fabs(xx - indices[:, 0]), axis=0)
+        # xx = np.repeat(xx[xi, :], self.step).reshape(self.step, self.step)
+        # xx = np.repeat(np.arange(3), 3).reshape(3, 3)
+        # yy = yy.T
+
+    def voxen(self, index):
+        return self.cellen * (index.astype(float) + 0.5)

@@ -31,15 +31,16 @@ class hands17holder:
     range_test = np.zeros(2, dtype=np.int)
 
     # cropped & resized training images
-    image_size = [640, 480]
+    image_size = [480, 640]
+    region_size = 120
     crop_size = 128
-    crop_range = 1600.
-    z_near = 1e-4
-    z_far = 1600.
+    crop_range = 800.  # +/- limit
+    z_range = (1e-4, 1600.)
     z_max = 9999.  # max distance set to 10m
     # camera info
     focal = (475.065948, 475.065857)
     centre = (315.944855, 245.287079)
+    # centre = (245.287079, 315.944855)
     # fx = 475.065948
     # fy = 475.065857
     # cx = 315.944855

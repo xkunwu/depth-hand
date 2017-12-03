@@ -7,13 +7,11 @@ import numpy as np
 import tensorflow as tf
 # from tensorflow.contrib import slim
 import matplotlib.pyplot as mpplot
-from mpl_toolkits.mplot3d import Axes3D
 from colour import Color
 import cv2
 import pyrealsense as pyrs
-from pyrealsense.constants import rs_option
 import time
-from multiprocessing import Queue, Pool
+# from multiprocessing import Queue, Pool
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 BASE_DIR = os.path.abspath(os.path.join(BASE_DIR, os.pardir))
@@ -30,8 +28,7 @@ iso_cube = getattr(
 
 class capture:
     class caminfo_ir:
-        z_near = 1e-4
-        z_far = 1600.
+        z_range = (1e-4, 1600.)
         # intrinsic paramters of Intel Realsense SR300
         # self.fx, self.fy = 463.889, 463.889
         # self.cx, self.cy = 320, 240
@@ -53,14 +50,14 @@ class capture:
         return depth
 
     def show_results(self, img, cube):
-        img = np.minimum(img, self.args.data_inst.crop_range)
+        img = np.minimum(img, self.args.data_inst.z_range[1])
         img = (img - img.min()) / (img.max() - img.min())
         img = np.uint8(img * 255)
         img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
-        rects = cube.proj_rect(
-            self.args.data_ops, self.caminfo_ir
+        rects = cube.proj_rects_3(
+            self.args.data_ops.raw_to_2d, self.caminfo_ir
         )
-        colors = [Color('orange').rgb, Color('red').rgb, Color('blue').rgb]
+        colors = [Color('orange').rgb, Color('red').rgb, Color('green').rgb]
         for ii, rect in enumerate(rects):
             cll = np.floor(rects[ii].cll + 0.5).astype(int)
             ctr = np.floor(rects[ii].cll + rects[ii].sidelen + 0.5).astype(int)
@@ -149,5 +146,5 @@ if __name__ == '__main__':
         argsholder.parse_args()
         ARGS = argsholder.args
         argsholder.create_instance()
-        cap = capture(ARGS)
-        cap.capture_loop()
+        # cap = capture(ARGS)
+        # cap.capture_loop()

@@ -103,8 +103,8 @@ if __name__ == "__main__":
     # python evaluate.py --max_epoch=1 --batch_size=16 --model_name=base_clean
     # import pdb; pdb.set_trace()
 
-    with_train = True
-    # with_train = False
+    # with_train = True
+    with_train = False
 
     mpplot = import_module('matplotlib.pyplot')
     with args_holder() as argsholder:
@@ -115,9 +115,9 @@ if __name__ == "__main__":
         # shutil.rmtree(args.out_dir)
         # os.makedirs(args.out_dir)
 
-        # test_dataops(args)
-
-        run_one(args, mpplot, with_train)
+        test_dataops(args)
+    
+        # run_one(args, mpplot, with_train)
 
         # draw_compare(args, mpplot)
     sys.exit()

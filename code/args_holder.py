@@ -14,6 +14,7 @@ model_map = {
     'base_clean_inres': 'train.base_inres',
     'base_regre_inres': 'train.base_inres',
     'localizer3': 'train.localizer3',
+    'localizer2': 'train.localizer2',
 }
 
 
@@ -205,6 +206,7 @@ class args_holder:
             self.args.model_name
         )
         self.args.model_inst = self.args.model_class(self.args)
+        self.args.model_inst.tweak_arguments(self.args)
         self.args.localizer_class = getattr(
             import_module(model_map[self.args.localizer_name]),
             self.args.localizer_name

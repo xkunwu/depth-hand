@@ -8,7 +8,7 @@ from colour import Color
 
 
 class iso_rect:
-    def __init__(self, cll=np.zeros(2), sidelen=1., m=0.1):
+    def __init__(self, cll=np.zeros(2), sidelen=1., m=0.):
         self.cll = cll
         self.sidelen = sidelen
         self.add_margan(m)
@@ -32,7 +32,7 @@ class iso_rect:
         )
         return conds
 
-    def build(self, points2, m=0.1):
+    def build(self, points2, m=0.):
         pmin = np.min(points2, axis=0)
         pmax = np.max(points2, axis=0)
         cen = (pmin + pmax) / 2
@@ -42,7 +42,7 @@ class iso_rect:
         self.add_margan(m)
         self.cll = cen - self.sidelen / 2
 
-    def add_margan(self, m=0.1):
+    def add_margan(self, m=0.):
         if 1 > m and -1 < m:
             m = self.sidelen * m
         self.sidelen += m
@@ -51,7 +51,8 @@ class iso_rect:
         coord = np.floor(coord - self.cll + 0.5).astype(int)
         sidelen = np.ceil(self.sidelen).astype(int) + 1
         img = np.zeros((sidelen, sidelen))
-        img[coord[:, 1], coord[:, 0]] = value  # reverse coordinates!
+        # img[coord[:, 1], coord[:, 0]] = value  # reverse coordinates!
+        img[coord[:, 0], coord[:, 1]] = value
         return img
 
     def draw(self, color=Color('orange').rgb):
@@ -63,7 +64,7 @@ class iso_rect:
 
 
 class iso_aabb:
-    def __init__(self, cll=np.zeros(3), sidelen=1., m=0.1):
+    def __init__(self, cll=np.zeros(3), sidelen=1., m=0.):
         self.cll = cll
         self.sidelen = sidelen
         self.add_margan(m)
@@ -78,7 +79,7 @@ class iso_aabb:
     def show_dims(self):
         print(self.cen, self.sidelen)
 
-    def build(self, points3, m=0.1):
+    def build(self, points3, m=0.):
         pmin = np.min(points3, axis=0)
         pmax = np.max(points3, axis=0)
         cen = (pmin + pmax) / 2
@@ -86,7 +87,7 @@ class iso_aabb:
         self.add_margan(m)
         self.cll = cen - self.sidelen / 2
 
-    def add_margan(self, m=0.1):
+    def add_margan(self, m=0.):
         if 1 > m and -1 < m:
             m = self.sidelen * m
         self.sidelen += m
@@ -126,10 +127,8 @@ class iso_cube:
         return np.ceil(2 * self.sidelen).astype(int) + 1
 
     def pick(self, points3):
-        """ only meaningful when picked in the local coordinates """
+        """ only make sense when picked in the local coordinates """
         points3_trans = self.transform(points3)
-        # cmin = - np.ones(3) * self.sidelen
-        # cmax = np.ones(3) * self.sidelen
         cmin = - np.ones(3)
         cmax = np.ones(3)
         conds = np.logical_and(
@@ -138,10 +137,10 @@ class iso_cube:
         )
         return points3[conds, :], points3_trans[conds, :]
 
-    def build(self, points3, m=0.6):
-        pmin = np.min(points3, axis=0)
+    def build(self, points3, m=0.):
         pmax = np.max(points3, axis=0)
-        self.cen = (pmin + pmax) / 2
+        pmin = np.min(points3, axis=0)
+        self.cen = (pmax + pmin) / 2
         self.sidelen = np.max(pmax - pmin) / 2
         # self.evecs = np.eye(3)
         self.add_margan(m)
@@ -167,7 +166,7 @@ class iso_cube:
     #     # return points3_trans
     #     return points3_trans / self.sidelen
 
-    def add_margan(self, m=0.1):
+    def add_margan(self, m=0.):
         if 1 > m and -1 < m:
             m = self.sidelen * m
         self.sidelen += m
@@ -195,34 +194,52 @@ class iso_cube:
     #     return np.dot(points3 * self.sidelen / sizel, self.evecs.T) + self.cen
 
     def project_pca(self, ps3_pca, roll=0, sort=True):
-        ar3 = np.roll(np.arange(3), roll)
+        ar3 = np.arange(3)
+        if 0 < roll:
+            ar3 = np.roll(ar3, roll)
         cid = ar3[:2]
         did = 2
         if sort is True:
             idx = np.argsort(ps3_pca[..., did])
             ps3_pca = ps3_pca[idx, ...]
         coord = ps3_pca[:, cid]
-        # cll = - np.ones(2) * self.sidelen
-        # coord = np.floor(coord - cll + 0.5).astype(int)
-        # depth = (ps3_pca[:, did] + self.sidelen) / (2 * self.sidelen)
         cll = - np.ones(2)
         coord = (coord - cll) / 2
         depth = (ps3_pca[:, did] + 1) / 2
         return coord, depth
 
     def print_image(self, coord, depth, sizel):
-        # sidelen = self.get_sidelen()
-        # img = np.zeros((sidelen, sidelen))
-        # img[coord[:, 1], coord[:, 0]] = depth  # reverse coordinates!
         img = np.zeros((sizel, sizel))
         coord *= 0.999999
         img[
             np.floor(coord[:, 1] * sizel).astype(int),
             np.floor(coord[:, 0] * sizel).astype(int),
         ] = depth  # reverse coordinates!
+        # img[
+        #     np.floor(coord[:, 0] * sizel).astype(int),
+        #     np.floor(coord[:, 1] * sizel).astype(int),
+        # ] = depth
         return img
 
-    def proj_rect(self, dataops, caminfo):
+    # def proj_rect(self, raw_to_2d_fn, caminfo):
+    #     # c3a = np.array([
+    #     #     np.append(
+    #     #         self.cen[:2] - self.sidelen,
+    #     #         self.cen[2] - self.sidelen),
+    #     #     np.append(
+    #     #         self.cen[:2] + self.sidelen,
+    #     #         self.cen[2] - self.sidelen)
+    #     # ])  # near z-plane
+    #     c3a = np.array([
+    #         np.append(self.cen[:2] - self.sidelen, self.cen[2]),
+    #         np.append(self.cen[:2] + self.sidelen, self.cen[2])
+    #     ])  # central z-plane
+    #     c2a = raw_to_2d_fn(c3a, caminfo)
+    #     cll = c2a[0, :]
+    #     ctr = c2a[1, :]
+    #     return iso_rect(cll, np.max(ctr - cll))
+
+    def proj_rects_3(self, raw_to_2d_fn, caminfo):
         c3a_l = []
         c3a_l.append(np.array([
             np.append(self.cen[:2] - self.sidelen, self.cen[2]),
@@ -238,7 +255,7 @@ class iso_cube:
         ]))  # far z-plane
 
         def convert(c3a):
-            c2a = dataops.raw_to_2d(c3a, caminfo)
+            c2a = raw_to_2d_fn(c3a, caminfo)
             cll = c2a[0, :]
             ctr = c2a[1, :]
             return iso_rect(cll, np.max(ctr - cll))

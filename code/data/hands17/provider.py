@@ -13,6 +13,10 @@ iso_cube = getattr(
     import_module('utils.iso_boxes'),
     'iso_cube'
 )
+latice_image = getattr(
+    import_module('utils.regu_grid'),
+    'latice_image'
+)
 
 
 def prow_dirtsdf(line, image_dir, caminfo):
@@ -40,13 +44,47 @@ def prow_truncdf(line, image_dir, caminfo):
     tdf = dataops.prop_dist(pcnt)
     resce3 = resce[0:4]
     pose_pca = dataops.raw_to_pca(pose_raw, resce3)
-    return (img_name, np.expand_dims(tdf, axis=3),
+    return (img_name, np.expand_dims(tdf, axis=-1),
             pose_pca.flatten().T, resce)
 
 
 def yank_truncdf(pose_local, resce):
     resce3 = resce[0:4]
     return dataops.pca_to_raw(pose_local, resce3)
+
+
+def prow_localizer2(line, image_dir, caminfo):
+    img_name, pose_raw = dataio.parse_line_annot(line)
+    img = dataio.read_image(os.path.join(image_dir, img_name))
+    anchors, resce = dataops.generate_anchors(
+        img, pose_raw, caminfo.crop_size, caminfo)
+    return (img_name, np.expand_dims(img, axis=-1),
+            anchors.T, resce)
+
+
+def yank_localizer2_rect(pose_local, resce):
+    lattice = latice_image()
+    lattice.load(resce)
+    pcnt = pose_local[0:256]
+    anchors = pose_local[256:259]
+    points2, wsizes = lattice.yank_anchor_single(
+        np.argmax(pcnt),
+        anchors
+    )
+    return points2, wsizes
+
+
+def yank_localizer2(pose_local, resce):
+    points2, wsizes = yank_localizer2_rect(pose_local, resce)
+    region_size = resce[-2]
+    focal = resce[-1]
+    z_cen = dataops.estimate_z(region_size, wsizes, focal)
+    # centre = dataops.d2z_to_raw(
+    #     np.append(points2, z_cen).reshape(1, -1),
+    #     focal
+    # )
+    # return centre
+    return np.append(points2, z_cen).reshape(1, -1)
 
 
 def prow_localizer3(line, image_dir, caminfo):
@@ -56,22 +94,21 @@ def prow_localizer3(line, image_dir, caminfo):
         img, caminfo.crop_size, caminfo)
     cube = iso_cube()
     cube.build(pose_raw)
+    halflen = caminfo.crop_range
     resce = np.concatenate((
         cube.dump(),
-        np.array([caminfo.crop_range, caminfo.crop_size])
+        np.array([halflen, caminfo.crop_size])
     ))
     centre = resce[1:4]
-    halflen = caminfo.crop_range / 2
     centre01 = np.append(
         centre[:2] / halflen,
         (centre[2] - halflen) / halflen)
-    return (img_name, np.expand_dims(pcnt, axis=3),
+    return (img_name, np.expand_dims(pcnt, axis=-1),
             centre01.T, resce)
 
 
 def yank_localizer3(pose_local, resce):
-    sidelen = resce[4]
-    halflen = sidelen / 2
+    halflen = resce[4]
     centre = np.append(
         pose_local[:2] * halflen,
         pose_local[2] * halflen + halflen,
@@ -86,7 +123,7 @@ def prow_conv3d(line, image_dir, caminfo):
         img, pose_raw, caminfo.crop_size, caminfo)
     resce3 = resce[0:4]
     pose_pca = dataops.raw_to_pca(pose_raw, resce3)
-    return (img_name, np.expand_dims(pcnt, axis=3),
+    return (img_name, np.expand_dims(pcnt, axis=-1),
             pose_pca.flatten().T, resce)
 
 
@@ -118,7 +155,7 @@ def prow_cleaned(line, image_dir, caminfo):
         img, pose_raw, caminfo)
     resce3 = resce[0:4]
     pose_pca = dataops.raw_to_pca(pose_raw, resce3)
-    return (img_name, np.expand_dims(img_crop_resize, axis=2),
+    return (img_name, np.expand_dims(img_crop_resize, axis=-1),
             pose_pca.flatten().T, resce)
 
 
@@ -134,7 +171,7 @@ def prow_cropped(line, image_dir, caminfo):
         img, pose_raw, caminfo)
     resce3 = resce[3:7]
     pose_local = dataops.raw_to_local(pose_raw, resce3)
-    return (img_name, np.expand_dims(img_crop_resize, axis=2),
+    return (img_name, np.expand_dims(img_crop_resize, axis=-1),
             pose_local.flatten().T, resce)
 
 

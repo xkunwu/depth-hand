@@ -32,7 +32,6 @@ class localizer3(base_conv3):
     def __init__(self, args):
         super(localizer3, self).__init__(args)
         self.crop_size = 32
-        self.region_size = 150
         self.num_appen = 6
 
     def receive_data(self, thedata, args):
@@ -66,7 +65,7 @@ class localizer3(base_conv3):
 
     def convert_output(self, pred_val):
         pred_val = pred_val.flatten()
-        halflen = self.crop_range / 2
+        halflen = self.crop_range
         centre = np.append(
             pred_val[:2] * halflen,
             pred_val[2] * halflen + halflen,
@@ -326,7 +325,6 @@ class localizer3(base_conv3):
             pred: BxO
             echt: BxO
         """
-        # self.crop_range / self.crop_size
-        scale = self.crop_range / 2 / self.region_size
+        scale = self.crop_range / self.region_size
         loss = tf.nn.l2_loss((pred - echt) * scale)
         return loss
