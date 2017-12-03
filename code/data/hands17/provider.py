@@ -56,9 +56,11 @@ def yank_truncdf(pose_local, resce):
 def prow_localizer2(line, image_dir, caminfo):
     img_name, pose_raw = dataio.parse_line_annot(line)
     img = dataio.read_image(os.path.join(image_dir, img_name))
+    img_rescale = dataops.rescale_depth(img, caminfo)
     anchors, resce = dataops.generate_anchors(
         img, pose_raw, caminfo.crop_size, caminfo)
-    return (img_name, np.expand_dims(img, axis=-1),
+    return (img_name,
+            np.expand_dims(img_rescale, axis=-1),
             anchors.T, resce)
 
 
@@ -81,7 +83,7 @@ def yank_localizer2(pose_local, resce):
     z_cen = dataops.estimate_z(region_size, wsizes, focal)
     # centre = dataops.d2z_to_raw(
     #     np.append(points2, z_cen).reshape(1, -1),
-    #     focal
+    #     caminfo
     # )
     # return centre
     return np.append(points2, z_cen).reshape(1, -1)
@@ -233,6 +235,17 @@ def puttensor_mt(fanno, worker, image_dir, caminfo, batchallot):
     # print(np.linalg.norm(batchallot.batch_resce - test_copy.batch_resce))
 
     return num_line
+
+
+def write_region2(fanno, yanker, caminfo, batch_index, batch_resce, batch_poses):
+    for ii in range(batch_index.shape[0]):
+        img_name = dataio.index2imagename(batch_index[ii, 0])
+        pose_local = batch_poses[ii, :]
+        resce = batch_resce[ii, :]
+        centre_2dz = yanker(pose_local, resce)
+        centre_raw = dataops.d2z_to_raw(centre_2dz, caminfo)
+        crimg_line = ''.join("%12.4f" % x for x in centre_raw.flatten())
+        fanno.write(img_name + crimg_line + '\n')
 
 
 def write_region(fanno, yanker, batch_index, batch_resce, batch_poses):

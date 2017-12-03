@@ -148,6 +148,20 @@ def normalize_depth(img, caminfo):
     )
 
 
+def rescale_depth(img, caminfo):
+    img_rescale = cv2resize(
+        img, (caminfo.crop_size, caminfo.crop_size))
+    img_rescale = normalize_depth(img_rescale, caminfo)
+    return img_rescale
+
+
+def rescale_depth_inv(img, caminfo):
+    img_rescale = img * (caminfo.z_range[1] - caminfo.z_range[0]) + caminfo.z_range[0]
+    img_rescale = cv2resize(
+        img_rescale, (caminfo.image_size[1], caminfo.image_size[0]))
+    return img_rescale
+
+
 def getbm(base_z, caminfo, base_margin=20):
     """ return margin (x, y) accroding to projective-z of MMCP.
         Args:
@@ -223,7 +237,7 @@ def voxelize_depth(img, step, caminfo):
 
 def generate_anchors(img, pose_raw, step, caminfo):
     lattice = latice_image(
-        np.array(img.shape).astype(float), caminfo.crop_size)
+        np.array(img.shape).astype(float), caminfo.anchor_num)
     # points2, _ = raw_to_2dz(pose_raw, caminfo)
     cube = iso_cube(
         (np.max(pose_raw, axis=0) + np.min(pose_raw, axis=0)) / 2,
@@ -381,13 +395,6 @@ def get_rect2(cube, caminfo):
     return rect
 
 
-# def rescale_depth(img, caminfo):
-#     img_resize = cv2resize(
-#         img, (caminfo.crop_size, caminfo.crop_size))
-#     img_resize = normalize_depth(img_resize, caminfo)
-#     return img_resize
-
-
 # def get_rect(pose2d, caminfo, bm=0.6):
 #     """ return a rectangle with margin that contains 2d point set
 #     """
@@ -419,9 +426,10 @@ def crop_resize(img, pose_raw, caminfo):
         cll_i[1]:cll_i[1] + sizel,
         cll_i[0]:cll_i[0] + sizel,
     ]
-    img_crop_resize = cv2resize(
-        img_crop, (caminfo.crop_size, caminfo.crop_size))
-    img_crop_resize = normalize_depth(img_crop_resize, caminfo)
+    img_crop_resize = rescale_depth(img_crop, caminfo)
+    # img_crop_resize = cv2resize(
+    #     img_crop, (caminfo.crop_size, caminfo.crop_size))
+    # img_crop_resize = normalize_depth(img_crop_resize, caminfo)
     resce = np.concatenate((
         rect.dump(),
         cube.dump()

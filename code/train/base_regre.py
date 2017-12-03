@@ -33,6 +33,7 @@ class base_regre(object):
     def __init__(self, args):
         self.net_rank = 2
         self.crop_size = 128
+        self.anchor_num = 16
         self.crop_range = 800.
         self.num_channel = 1
         self.num_appen = 7
@@ -55,6 +56,7 @@ class base_regre(object):
 
     def tweak_arguments(self, args):
         args.crop_size = self.crop_size
+        args.anchor_num = self.anchor_num
         args.crop_range = self.crop_range
 
     def start_train(self):

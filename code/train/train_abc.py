@@ -166,8 +166,17 @@ class train_abc():
             batch_count += 1
             if batch_count % 10 == 0:
                 train_writer.add_summary(summary, step)
-                self.logger.info('batch {} training loss (half-squared): {}'.format(
-                    batch_count, loss_val))
+                # np.set_printoptions(
+                #     threshold=np.nan,
+                #     formatter={'float_kind': lambda x: "%.2f" % x})
+                # to_show = batch_data['batch_poses'][0, :256]
+                # self.logger.info([np.argmax(to_show), np.max(to_show), np.sum(to_show)])
+                # self.logger.info(batch_data['batch_poses'][0, ...])
+                # to_show = pred_val[0, :256]
+                # self.logger.info([np.argmax(to_show), np.max(to_show), np.sum(to_show)])
+                # self.logger.info(pred_val[0, ...])
+                # self.logger.info('batch {} training loss (half-squared): {}'.format(
+                #     batch_count, loss_val))
                 # print(np.sum((batch_data['batch_poses'] - pred_val) ** 2) / 2)
         mean_loss = loss_sum / batch_count
         self.args.logger.info('epoch training mean loss (half-squared): {:.4f}'.format(

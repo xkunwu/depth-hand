@@ -226,7 +226,7 @@ class batch_allot_loc2(batch_allot):
             'batch_frame': np.empty(
                 shape=(
                     batch_size,
-                    image_size[0], image_size[1],
+                    image_size, image_size,
                     num_channel),
                 # dtype=np.float32),
                 dtype=float),
@@ -258,7 +258,7 @@ class batch_allot_loc2(batch_allot):
         self.batch_frame = np.empty(
             shape=(
                 self.store_size,
-                self.image_size[0], self.image_size[1],
+                self.image_size, self.image_size,
                 self.num_channel),
             # dtype=np.float32)
             dtype=float)

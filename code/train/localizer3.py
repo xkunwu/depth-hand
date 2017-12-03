@@ -309,7 +309,7 @@ class localizer3(base_conv3):
         raise ValueError('final_endpoint (%s) not recognized', final_endpoint)
 
     def placeholder_inputs(self, n_frame=None):
-        if 1 > n_frame:
+        if n_frame is None:
             n_frame = self.batch_size
         frames_tf = tf.placeholder(
             tf.float32, shape=(

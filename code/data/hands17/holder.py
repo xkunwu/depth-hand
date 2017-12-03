@@ -34,6 +34,7 @@ class hands17holder:
     image_size = [480, 640]
     region_size = 120
     crop_size = 128
+    anchor_num = 16
     crop_range = 800.  # +/- limit
     z_range = (1e-4, 1600.)
     z_max = 9999.  # max distance set to 10m
@@ -160,6 +161,7 @@ class hands17holder:
         self.logger = args.logger
         self.predict_dir = args.predict_dir
         self.crop_size = args.crop_size
+        self.anchor_num = args.anchor_num
         self.crop_range = args.crop_range
         self.training_images = os.path.join(self.data_dir, 'training/images')
         self.frame_images = os.path.join(self.data_dir, 'frame/images')
