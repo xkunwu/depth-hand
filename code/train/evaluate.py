@@ -115,7 +115,7 @@ if __name__ == "__main__":
         # shutil.rmtree(args.out_dir)
         # os.makedirs(args.out_dir)
 
-        test_dataops(args)
+        # test_dataops(args)
 
         run_one(args, mpplot, with_train)
 

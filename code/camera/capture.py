@@ -28,12 +28,15 @@ iso_cube = getattr(
 
 class capture:
     class caminfo_ir:
+        image_size = [480, 640]
         z_range = (1e-4, 1600.)
         # intrinsic paramters of Intel Realsense SR300
         # self.fx, self.fy = 463.889, 463.889
         # self.cx, self.cy = 320, 240
         focal = (463.889, 463.889)
         centre = (320, 240)
+        region_size = 150
+        anchor_num = 16
 
         def __init__():
             pass
@@ -49,13 +52,15 @@ class capture:
         depth = dev.depth * dev.depth_scale * 1000
         return depth
 
-    def show_results(self, img, cube):
+    def show_results_stream(self, img, cube):
         img = np.minimum(img, self.args.data_inst.z_range[1])
         img = (img - img.min()) / (img.max() - img.min())
         img = np.uint8(img * 255)
-        img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+        img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
         rects = cube.proj_rects_3(
-            self.args.data_ops.raw_to_2d, self.caminfo_ir
+            self.args.data_ops.raw_to_2d,
+            # self.args.data_inst
+            self.caminfo_ir
         )
         colors = [Color('orange').rgb, Color('red').rgb, Color('lime').rgb]
         for ii, rect in enumerate(rects):
@@ -63,14 +68,13 @@ class capture:
             ctr = np.floor(rects[ii].cll + rects[ii].sidelen + 0.5).astype(int)
             cv2.rectangle(
                 img,
-                (cll[0], cll[1]),
-                (ctr[0], ctr[1]),
-                tuple(c * 255 for c in colors[ii]), 2)
-        cv2.imshow('result', img)
+                (cll[1], cll[0]),
+                (ctr[1], ctr[0]),
+                tuple(c * 255 for c in colors[ii][::-1]), 2)
+        cv2.imshow('ouput', img)
 
-    def show_results_3d(self, img, cube):
+    def show_results(self, img, cube):
         mpplot.clf()
-        # mpplot.gcf().clear()
         ax = mpplot.subplot(1, 2, 1, projection='3d')
         points3 = self.args.data_ops.img_to_raw(img, self.caminfo_ir)
         numpts = points3.shape[0]
@@ -88,14 +92,44 @@ class capture:
         iso_cube.draw_cube_wire(corners)
         mpplot.subplot(1, 2, 2)
         mpplot.imshow(img, cmap='bone')
+        rects = cube.proj_rects_3(
+            self.args.data_ops.raw_to_2d,
+            # self.args.data_inst
+            self.caminfo_ir
+        )
+        colors = [Color('orange').rgb, Color('red').rgb, Color('lime').rgb]
+        for ii, rect in enumerate(rects):
+            rect.draw(colors[ii])
+            rect.show_dims()
+        mpplot.tight_layout()
         mpplot.show()
+
+    def preprocess_input(self, depth):
+        # depth = depth[:, ::-1]  # flip
+        return depth
+
+    def detect_region(self, depth, sess, ops):
+        depth_rescale = self.args.data_ops.rescale_depth(
+            depth, self.args.data_inst)
+        feed_dict = {
+            ops['batch_frame']: self.args.model_inst.convert_input(
+                depth_rescale, self.args, self.args.data_inst
+            ),
+            ops['is_training']: False
+        }
+        pred_val = sess.run(
+            ops['pred'],
+            feed_dict=feed_dict)
+        cube = self.args.model_inst.convert_output(
+            pred_val, self.args, self.caminfo_ir)
+        return cube
 
     def capture_detect(self, serv, dev):
         tf.reset_default_graph()
         with tf.device('/gpu:' + str(self.args.gpu_id)):
-            frames_tf, _ = self.args.localizer.placeholder_inputs(1)
+            frames_tf, _ = self.args.model_inst.placeholder_inputs(1)
             is_training_tf = tf.placeholder(tf.bool, shape=())
-            pred, end_points = self.args.localizer.get_model(
+            pred, end_points = self.args.model_inst.get_model(
                 frames_tf, is_training_tf)
             saver = tf.train.Saver()
         config = tf.ConfigProto()
@@ -103,28 +137,23 @@ class capture:
         config.allow_soft_placement = True
         config.log_device_placement = False
         with tf.Session(config=config) as sess:
-            model_path = self.args.localizer.ckpt_path
+            model_path = self.args.model_inst.ckpt_path
             saver.restore(sess, model_path)
 
             mpplot.subplots(nrows=1, ncols=2, figsize=(6 * 2, 6))
-            # realtime hand pose estimation loop
             while True:
                 depth = self.read_frame_from_device(dev)
-                # preprocessing depth
-                depth = depth[:, ::-1]  # flip
-                feed_dict = {
-                    frames_tf: self.args.localizer.convert_input(
-                        depth, self.args, self.args.data_inst
-                    ),
-                    is_training_tf: False
+                depth = self.preprocess_input(depth)
+                ops = {
+                    'batch_frame': frames_tf,
+                    'is_training': is_training_tf,
+                    'pred': pred
                 }
-                pred_val = sess.run(
-                    pred,
-                    feed_dict=feed_dict)
-                cube = self.args.localizer.convert_output(pred_val)
+                cube = self.detect_region(depth, sess, ops)
+                # cube = iso_cube(np.array([-200, 20, 400]), 120)
                 # show results
+                self.show_results_stream(depth, cube)
                 # self.show_results(depth, cube)
-                self.show_results_3d(depth, cube)
                 # sys.stdout.write('.')
                 # sys.stdout.flush()
                 if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -145,6 +174,7 @@ if __name__ == '__main__':
     with args_holder() as argsholder:
         argsholder.parse_args()
         ARGS = argsholder.args
+        ARGS.mode = 'detect'
         argsholder.create_instance()
-        # cap = capture(ARGS)
-        # cap.capture_loop()
+        cap = capture(ARGS)
+        cap.capture_loop()

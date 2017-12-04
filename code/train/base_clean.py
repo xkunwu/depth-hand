@@ -92,7 +92,7 @@ class base_clean(base_regre):
         img_name = args.data_io.index2imagename(img_id)
         img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
         mpplot.imshow(img, cmap='bone')
-        pose_raw = self.yanker(poses_h5, resce_h5)
+        pose_raw = self.yanker(poses_h5, resce_h5, self.caminfo)
         args.data_draw.draw_pose2d(
             thedata,
             args.data_ops.raw_to_2d(pose_raw, thedata)

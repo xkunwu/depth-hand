@@ -247,10 +247,11 @@ def generate_anchors(img, pose_raw, step, caminfo):
     cen2d = raw_to_2d(cube.cen.reshape(1, -1), caminfo)
     rect = proj_cube_to_rect(cube, caminfo.region_size, caminfo)
     pcnt = lattice.fill(cen2d)
+    label = np.argmax(pcnt)
     anchors = lattice.prow_anchor_single(cen2d, rect.sidelen / 2)
     # print(cen2d, rect.sidelen / 2)
     # print(lattice.yank_anchor_single(
-    #     np.argmax(pcnt),
+    #     label,
     #     anchors
     # ))
     # import matplotlib.pyplot as mpplot
@@ -258,12 +259,13 @@ def generate_anchors(img, pose_raw, step, caminfo):
     # rect.show_dims()
     # rect.draw()
     # mpplot.show()
-    resce = np.concatenate((
-        lattice.dump(),
-        cube.dump(),
-        np.array([caminfo.region_size, caminfo.focal[0]])
-    ))
-    return np.append(pcnt.flatten(), anchors), resce
+    resce = cube.dump()
+    # resce = np.concatenate((
+    #     lattice.dump(),
+    #     cube.dump(),
+    #     np.array([caminfo.region_size, caminfo.focal[0]])
+    # ))
+    return np.append(label, anchors), resce
 
 
 def direc_belief(pcnt):

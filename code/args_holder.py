@@ -39,9 +39,10 @@ class args_holder:
         self.parser.add_argument(
             '--retrain', default=False,
             help='retrain the model [default: False]')
-        # self.parser.add_argument(
-        #     '--model_ckpt', default='model.ckpt',
-        #     help='Model checkpoint name [default: model.ckpt]')
+        self.parser.add_argument(
+            '--mode', default='train',
+            help='programm mode [default: train], from \
+            [train, detect]')
 
         # system parameters
         self.parser.add_argument(
@@ -52,11 +53,10 @@ class args_holder:
             # '--model_name', default='ortho3view',
             '--model_name', default='base_clean',
             help='Model name [default: base_clean], from \
-            [base_regre, base_clean, ortho3view, base_conv3, trunc_dist]'
-        )
+            [base_regre, base_clean, ortho3view, base_conv3, trunc_dist]')
         self.parser.add_argument(
-            '--localizer_name', default='localizer3',
-            help='localize hand region [default: localizer3]'
+            '--localizer_name', default='localizer2',
+            help='localize hand region [default: localizer2]'
         )
 
         # learning parameters
@@ -201,17 +201,26 @@ class args_holder:
         self.make_logging()
         self.args.logger.info('######## {} [{}] ########'.format(
             self.args.data_name, self.args.model_name))
-        self.args.model_class = getattr(
-            import_module(model_map[self.args.model_name]),
-            self.args.model_name
-        )
-        self.args.model_inst = self.args.model_class(self.args)
+        if 'train' == self.args.mode:
+            self.args.model_class = getattr(
+                import_module(model_map[self.args.model_name]),
+                self.args.model_name
+            )
+            self.args.model_inst = self.args.model_class(self.args)
+        elif 'detect' == self.args.mode:
+            self.args.model_class = getattr(
+                import_module(model_map[self.args.localizer_name]),
+                self.args.localizer_name
+            )
+            self.args.model_inst = self.args.model_class(self.args)
+        else:
+            raise ValueError('mode (%s) not recognized', self.args.mode)
+        # self.args.localizer_class = getattr(
+        #     import_module(model_map[self.args.localizer_name]),
+        #     self.args.localizer_name
+        # )
+        # self.args.localizer = self.args.localizer_class(self.args)
         self.args.model_inst.tweak_arguments(self.args)
-        self.args.localizer_class = getattr(
-            import_module(model_map[self.args.localizer_name]),
-            self.args.localizer_name
-        )
-        self.args.localizer = self.args.localizer_class(self.args)
         self.args.data_module = import_module(
             'data.' + self.args.data_name)
         self.args.data_provider = import_module(
@@ -232,7 +241,6 @@ class args_holder:
         self.args.data_inst.init_data()
         self.args.model_inst.receive_data(self.args.data_inst, self.args)
         self.args.model_inst.check_dir(self.args.data_inst, self.args)
-        self.args.localizer.receive_data(self.args.data_inst, self.args)
         self.write_args(self.args)
 
 

@@ -8,7 +8,7 @@ import progressbar
 import h5py
 import matplotlib.pyplot as mpplot
 from cv2 import resize as cv2resize
-from batch_allot import batch_allot
+from train.batch_allot import batch_allot
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 BASE_DIR = os.path.abspath(os.path.join(BASE_DIR, os.pardir))
@@ -91,7 +91,7 @@ class base_regre(object):
 
     def evaluate_batch(self, writer, batch_data, pred_val):
         self.provider.write2d(
-            writer, self.yanker,
+            writer, self.yanker, self.caminfo,
             batch_data['batch_index'], batch_data['batch_resce'],
             pred_val
         )
@@ -263,7 +263,7 @@ class base_regre(object):
         img_name = args.data_io.index2imagename(img_id)
         img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
         mpplot.imshow(img, cmap='bone')
-        pose_raw = self.yanker(poses_h5, resce_h5)
+        pose_raw = self.yanker(poses_h5, resce_h5, self.caminfo)
         args.data_draw.draw_pose2d(
             thedata,
             args.data_ops.raw_to_2d(pose_raw, thedata)

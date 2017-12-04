@@ -7,10 +7,10 @@ import tensorflow as tf
 from tensorflow.contrib import slim
 import progressbar
 import h5py
-from base_regre import base_regre
+from train.base_regre import base_regre
 import matplotlib.pyplot as mpplot
 from colour import Color
-from batch_allot import batch_allot_loc2
+from train.batch_allot import batch_allot_loc2
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 BASE_DIR = os.path.abspath(os.path.join(BASE_DIR, os.pardir))
@@ -38,8 +38,8 @@ class localizer2(base_regre):
         super(localizer2, self).__init__(args)
         self.batch_allot = batch_allot_loc2
         self.crop_size = 256
-        self.num_appen = 9
-        self.loss_lambda = 10.
+        self.num_appen = 4
+        self.loss_lambda = 0.1
 
     def start_train(self):
         self.batchallot = self.batch_allot(
@@ -153,7 +153,8 @@ class localizer2(base_regre):
     def receive_data(self, thedata, args):
         """ Receive parameters specific to the data """
         super(localizer2, self).receive_data(thedata, args)
-        self.out_dim = 3 + self.anchor_num ** 2
+        # self.out_dim = 3 + self.anchor_num ** 2
+        self.out_dim = 4
         self.predict_file = os.path.join(
             self.predict_dir, 'detection_{}'.format(self.__class__.__name__))
         self.provider_worker = self.provider.prow_localizer2
@@ -178,15 +179,10 @@ class localizer2(base_regre):
     def convert_input(self, img, args, caminfo):
         return np.expand_dims(np.expand_dims(img, axis=0), axis=-1)
 
-    def convert_output(self, pred_val):
-        centre = self.yanker()
-        pred_val = pred_val.flatten()
-        halflen = self.crop_range
-        centre = np.append(
-            pred_val[:2] * halflen,
-            pred_val[2] * halflen + halflen,
-        )
-        cube = iso_cube(centre, self.region_size)
+    def convert_output(self, pred_val, args, caminfo):
+        centre_2dz = self.yanker(pred_val.flatten(), np.zeros(3), caminfo)
+        centre_raw = args.data_ops.d2z_to_raw(centre_2dz, caminfo)
+        cube = iso_cube(centre_raw.flatten(), self.region_size)
         return cube
 
     def draw_prediction(self, thedata, args):
@@ -210,7 +206,7 @@ class localizer2(base_regre):
         img_name, _ = args.data_io.parse_line_annot(annot_line)
         img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
         mpplot.imshow(img, cmap='bone')
-        resce3 = resce_h5[3:7]
+        resce3 = resce_h5[0:4]
         cube = iso_cube()
         cube.load(resce3)
         cube.show_dims()
@@ -250,6 +246,7 @@ class localizer2(base_regre):
                 frame_h5, self.caminfo)
 
         print('[{}] drawing pose #{:d}'.format(self.__class__.__name__, img_id))
+        colors = [Color('orange').rgb, Color('red').rgb, Color('lime').rgb]
         mpplot.subplots(nrows=2, ncols=2, figsize=(2 * 5, 2 * 5))
         mpplot.subplot(2, 2, 1)
         annot_line = args.data_io.get_line(
@@ -260,17 +257,26 @@ class localizer2(base_regre):
         args.data_draw.draw_pose2d(
             thedata,
             args.data_ops.raw_to_2d(pose_raw, thedata))
+        resce3 = resce_h5[0:4]
+        cube = iso_cube()
+        cube.load(resce3)
+        cube.show_dims()
+        rects = cube.proj_rects_3(
+            args.data_ops.raw_to_2d, self.caminfo
+        )
+        for ii, rect in enumerate(rects):
+            rect.draw(colors[ii])
 
         mpplot.subplot(2, 2, 2)
         img = frame_h5
         mpplot.imshow(img, cmap='bone')
         points2, wsizes = self.provider.yank_localizer2_rect(
-            poses_h5, resce_h5)
+            poses_h5, self.caminfo)
         rect = iso_rect(points2 - wsizes, wsizes * 2)
         rect.draw()
 
         ax = mpplot.subplot(2, 2, 3, projection='3d')
-        p2z = self.yanker(poses_h5, resce_h5)
+        p2z = self.yanker(poses_h5, resce_h5, self.caminfo)
         centre = args.data_ops.d2z_to_raw(p2z, self.caminfo).flatten()
         cube = iso_cube(centre, self.region_size)
         cube.show_dims()
@@ -295,14 +301,13 @@ class localizer2(base_regre):
         mpplot.imshow(img, cmap='bone')
         anchors, resce = args.data_ops.generate_anchors(
             img, pose_raw, self.caminfo.anchor_num, self.caminfo)
-        resce3 = resce[3:7]
+        resce3 = resce[0:4]
         cube = iso_cube()
         cube.load(resce3)
         cube.show_dims()
         rects = cube.proj_rects_3(
             args.data_ops.raw_to_2d, self.caminfo
         )
-        colors = [Color('orange').rgb, Color('red').rgb, Color('lime').rgb]
         for ii, rect in enumerate(rects):
             rect.draw(colors[ii])
 
@@ -415,9 +420,11 @@ class localizer2(base_regre):
 
     @staticmethod
     def smooth_l1(xa):
-        x1 = xa - 0.5
-        x2 = 0.5 * (xa ** 2)
-        return tf.minimum(x1, x2)
+        return tf.where(
+            1 < xa,
+            0.5 * (xa ** 2),
+            xa - 0.5
+        )
 
     def get_loss(self, pred, echt, end_points):
         """ simple sum-of-squares loss
@@ -425,12 +432,13 @@ class localizer2(base_regre):
             echt: BxO
         """
         loss_cls = tf.nn.sparse_softmax_cross_entropy_with_logits(
-            labels=tf.argmax(echt[:, :256], axis=1),
+            labels=tf.cast(echt[:, 0], tf.int32),
             logits=pred[:, :256]
         ) / 256
         loss_reg = tf.reduce_sum(
-            self.smooth_l1(tf.abs(pred[:, 256:] - echt[:, 256:])),
+            self.smooth_l1(tf.abs(pred[:, 256:259] - echt[:, 1:4])),
             axis=1)
-        loss = tf.reduce_sum(
-            loss_cls + self.loss_lambda * loss_reg)
+        loss = tf.reduce_sum(loss_cls + self.loss_lambda * loss_reg)
+        # loss = tf.reduce_sum(loss_cls)
+        # loss = tf.reduce_sum(loss_reg)
         return loss

@@ -46,7 +46,7 @@ class hands17holder:
     #         'o',
     #         color=colors[ii]
     #     )
-    image_size = [480, 640]
+    image_size = (480, 640)
     region_size = 120
     crop_size = 128
     anchor_num = 16

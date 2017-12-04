@@ -31,7 +31,7 @@ def prow_dirtsdf(line, image_dir, caminfo):
             pose_pca.flatten().T, resce)
 
 
-def yank_dirtsdf(pose_local, resce):
+def yank_dirtsdf(pose_local, resce, caminfo):
     resce3 = resce[0:4]
     return dataops.pca_to_raw(pose_local, resce3)
 
@@ -48,7 +48,7 @@ def prow_truncdf(line, image_dir, caminfo):
             pose_pca.flatten().T, resce)
 
 
-def yank_truncdf(pose_local, resce):
+def yank_truncdf(pose_local, resce, caminfo):
     resce3 = resce[0:4]
     return dataops.pca_to_raw(pose_local, resce3)
 
@@ -64,23 +64,24 @@ def prow_localizer2(line, image_dir, caminfo):
             anchors.T, resce)
 
 
-def yank_localizer2_rect(pose_local, resce):
-    lattice = latice_image()
-    lattice.load(resce)
-    pcnt = pose_local[0:256]
-    anchors = pose_local[256:259]
+def yank_localizer2_rect(pose_local, caminfo):
+    lattice = latice_image(
+        np.array(caminfo.image_size).astype(float),
+        caminfo.anchor_num)
+    label = pose_local[0]
+    anchors = pose_local[1:4]
     points2, wsizes = lattice.yank_anchor_single(
-        np.argmax(pcnt),
+        label,
         anchors
     )
     return points2, wsizes
 
 
-def yank_localizer2(pose_local, resce):
-    points2, wsizes = yank_localizer2_rect(pose_local, resce)
-    region_size = resce[-2]
-    focal = resce[-1]
-    z_cen = dataops.estimate_z(region_size, wsizes, focal)
+def yank_localizer2(pose_local, resce, caminfo):
+    points2, wsizes = yank_localizer2_rect(
+        pose_local, caminfo)
+    z_cen = dataops.estimate_z(
+        caminfo.region_size, wsizes, caminfo.focal[0])
     # centre = dataops.d2z_to_raw(
     #     np.append(points2, z_cen).reshape(1, -1),
     #     caminfo
@@ -109,7 +110,7 @@ def prow_localizer3(line, image_dir, caminfo):
             centre01.T, resce)
 
 
-def yank_localizer3(pose_local, resce):
+def yank_localizer3(pose_local, resce, caminfo):
     halflen = resce[4]
     centre = np.append(
         pose_local[:2] * halflen,
@@ -129,7 +130,7 @@ def prow_conv3d(line, image_dir, caminfo):
             pose_pca.flatten().T, resce)
 
 
-def yank_conv3d(pose_local, resce):
+def yank_conv3d(pose_local, resce, caminfo):
     resce3 = resce[0:4]
     return dataops.pca_to_raw(pose_local, resce3)
 
@@ -145,7 +146,7 @@ def prow_ortho3v(line, image_dir, caminfo):
             pose_pca.flatten().T, resce)
 
 
-def yank_ortho3v(pose_local, resce):
+def yank_ortho3v(pose_local, resce, caminfo):
     resce3 = resce[0:4]
     return dataops.pca_to_raw(pose_local, resce3)
 
@@ -161,7 +162,7 @@ def prow_cleaned(line, image_dir, caminfo):
             pose_pca.flatten().T, resce)
 
 
-def yank_cleaned(pose_local, resce):
+def yank_cleaned(pose_local, resce, caminfo):
     resce3 = resce[0:4]
     return dataops.pca_to_raw(pose_local, resce3)
 
@@ -177,7 +178,7 @@ def prow_cropped(line, image_dir, caminfo):
             pose_local.flatten().T, resce)
 
 
-def yank_cropped(pose_local, resce):
+def yank_cropped(pose_local, resce, caminfo):
     resce3 = resce[3:7]
     return dataops.local_to_raw(pose_local, resce3)
 
@@ -242,27 +243,27 @@ def write_region2(fanno, yanker, caminfo, batch_index, batch_resce, batch_poses)
         img_name = dataio.index2imagename(batch_index[ii, 0])
         pose_local = batch_poses[ii, :]
         resce = batch_resce[ii, :]
-        centre_2dz = yanker(pose_local, resce)
+        centre_2dz = yanker(pose_local, resce, caminfo)
         centre_raw = dataops.d2z_to_raw(centre_2dz, caminfo)
         crimg_line = ''.join("%12.4f" % x for x in centre_raw.flatten())
         fanno.write(img_name + crimg_line + '\n')
 
 
-def write_region(fanno, yanker, batch_index, batch_resce, batch_poses):
+def write_region(fanno, yanker, caminfo, batch_index, batch_resce, batch_poses):
     for ii in range(batch_index.shape[0]):
         img_name = dataio.index2imagename(batch_index[ii, 0])
         pose_local = batch_poses[ii, :]
         resce = batch_resce[ii, :]
-        centre_raw = yanker(pose_local, resce)
+        centre_raw = yanker(pose_local, resce, caminfo)
         crimg_line = ''.join("%12.4f" % x for x in centre_raw.flatten())
         fanno.write(img_name + crimg_line + '\n')
 
 
-def write2d(fanno, yanker, batch_index, batch_resce, batch_poses):
+def write2d(fanno, yanker, caminfo, batch_index, batch_resce, batch_poses):
     for ii in range(batch_index.shape[0]):
         img_name = dataio.index2imagename(batch_index[ii, 0])
         pose_local = batch_poses[ii, :].reshape(-1, 3)
         resce = batch_resce[ii, :]
-        pose_raw = yanker(pose_local, resce)
+        pose_raw = yanker(pose_local, resce, caminfo)
         crimg_line = ''.join("%12.4f" % x for x in pose_raw.flatten())
         fanno.write(img_name + crimg_line + '\n')

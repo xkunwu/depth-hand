@@ -7,7 +7,7 @@ import tensorflow as tf
 from tensorflow.contrib import slim
 # import progressbar
 import h5py
-from base_conv3 import base_conv3
+from train.base_conv3 import base_conv3
 import matplotlib.pyplot as mpplot
 from colour import Color
 
@@ -45,7 +45,7 @@ class localizer3(base_conv3):
 
     def evaluate_batch(self, writer, batch_data, pred_val):
         self.provider.write_region(
-            writer, self.yanker,
+            writer, self.yanker, self.caminfo,
             batch_data['batch_index'], batch_data['batch_resce'],
             pred_val
         )
@@ -63,7 +63,7 @@ class localizer3(base_conv3):
         pcnt = args.data_ops.voxelize_depth(img, self.crop_size, caminfo)
         return np.expand_dims(np.expand_dims(pcnt, axis=0), axis=-1)
 
-    def convert_output(self, pred_val):
+    def convert_output(self, pred_val, args, caminfo):
         pred_val = pred_val.flatten()
         halflen = self.crop_range
         centre = np.append(
