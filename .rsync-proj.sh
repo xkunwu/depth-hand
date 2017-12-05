@@ -11,18 +11,18 @@ rsync -auvh -e ssh \
     ${PWD} \
     ${SERVER}:projects/
 ## download predictions
-mkdir -p ${HOME}/${OUT_DIR}/predict_${SERVER}
+mkdir -p ${HOME}/${OUT_DIR}/${SERVER}/predict
 echo downloading \
     from: [${SERVER}:${OUT_DIR}/predict] \
-    to: [${HOME}/${OUT_DIR}/predict_${SERVER}]
+    to: [${HOME}/${OUT_DIR}/${SERVER}/predict]
 rsync -auvh -e ssh \
     ${SERVER}:${OUT_DIR}/predict/* \
-    ${HOME}/${OUT_DIR}/predict_${SERVER}
+    ${HOME}/${OUT_DIR}/${SERVER}/predict
 ## download model checkpoint
-mkdir -p ${HOME}/${OUT_DIR}/predict_${SERVER}/${MODEL}
+mkdir -p ${HOME}/${OUT_DIR}/${SERVER}/log/${MODEL}
 echo downloading \
     from: [${SERVER}:${OUT_DIR}/log/blinks/${MODEL}] \
-    to: [${HOME}/${OUT_DIR}/predict_${SERVER}/${MODEL}]
+    to: [${HOME}/${OUT_DIR}/${SERVER}/log/${MODEL}]
 rsync -auvh -e ssh \
     ${SERVER}:${OUT_DIR}/log/blinks/${MODEL}/* \
-    ${HOME}/${OUT_DIR}/predict_${SERVER}/${MODEL}
+    ${HOME}/${OUT_DIR}/${SERVER}/log/${MODEL}

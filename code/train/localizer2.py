@@ -38,8 +38,9 @@ class localizer2(base_regre):
         super(localizer2, self).__init__(args)
         self.batch_allot = batch_allot_loc2
         self.crop_size = 256
+        self.anchor_num = 8
         self.num_appen = 4
-        self.loss_lambda = 0.1
+        self.loss_lambda = 1.
 
     def start_train(self):
         self.batchallot = self.batch_allot(
@@ -153,8 +154,7 @@ class localizer2(base_regre):
     def receive_data(self, thedata, args):
         """ Receive parameters specific to the data """
         super(localizer2, self).receive_data(thedata, args)
-        # self.out_dim = 3 + self.anchor_num ** 2
-        self.out_dim = 4
+        self.out_dim = self.anchor_num ** 2 * 4
         self.predict_file = os.path.join(
             self.predict_dir, 'detection_{}'.format(self.__class__.__name__))
         self.provider_worker = self.provider.prow_localizer2
@@ -174,14 +174,14 @@ class localizer2(base_regre):
         mpplot.tight_layout()
         fname = 'detection_{}.png'.format(self.__class__.__name__)
         mpplot.savefig(os.path.join(self.predict_dir, fname))
-        print('figures saved')
+        print('figures saved: {}'.format(fname))
 
     def convert_input(self, img, args, caminfo):
         return np.expand_dims(np.expand_dims(img, axis=0), axis=-1)
 
     def convert_output(self, pred_val, args, caminfo):
-        centre_2dz = self.yanker(pred_val.flatten(), np.zeros(3), caminfo)
-        centre_raw = args.data_ops.d2z_to_raw(centre_2dz, caminfo)
+        centre_raw, _ = self.yanker(
+            pred_val.flatten(), np.zeros(3), caminfo)
         cube = iso_cube(centre_raw.flatten(), self.region_size)
         return cube
 
@@ -198,7 +198,7 @@ class localizer2(base_regre):
             frame_h5 = args.data_ops.rescale_depth_inv(
                 frame_h5, self.caminfo)
 
-        print('[{}] drawing pose #{:d}'.format(self.__class__.__name__, img_id))
+        print('[{}] drawing image #{:d}'.format(self.__class__.__name__, img_id))
         colors = [Color('orange').rgb, Color('red').rgb, Color('lime').rgb]
         mpplot.subplot(1, 2, 1)
         annot_line = args.data_io.get_line(
@@ -245,10 +245,11 @@ class localizer2(base_regre):
             frame_h5 = args.data_ops.rescale_depth_inv(
                 frame_h5, self.caminfo)
 
-        print('[{}] drawing pose #{:d}'.format(self.__class__.__name__, img_id))
+        print('[{}] drawing image #{:d}'.format(self.__class__.__name__, img_id))
         colors = [Color('orange').rgb, Color('red').rgb, Color('lime').rgb]
         mpplot.subplots(nrows=2, ncols=2, figsize=(2 * 5, 2 * 5))
         mpplot.subplot(2, 2, 1)
+        mpplot.gcf().gca().set_title('test input')
         annot_line = args.data_io.get_line(
             thedata.training_annot_cleaned, img_id)
         img_name, pose_raw = args.data_io.parse_line_annot(annot_line)
@@ -257,30 +258,14 @@ class localizer2(base_regre):
         args.data_draw.draw_pose2d(
             thedata,
             args.data_ops.raw_to_2d(pose_raw, thedata))
+
+        ax = mpplot.subplot(2, 2, 3, projection='3d')
+        mpplot.gcf().gca().set_title('test storage read')
         resce3 = resce_h5[0:4]
         cube = iso_cube()
         cube.load(resce3)
         cube.show_dims()
-        rects = cube.proj_rects_3(
-            args.data_ops.raw_to_2d, self.caminfo
-        )
-        for ii, rect in enumerate(rects):
-            rect.draw(colors[ii])
-
-        mpplot.subplot(2, 2, 2)
-        img = frame_h5
-        mpplot.imshow(img, cmap='bone')
-        points2, wsizes = self.provider.yank_localizer2_rect(
-            poses_h5, self.caminfo)
-        rect = iso_rect(points2 - wsizes, wsizes * 2)
-        rect.draw()
-
-        ax = mpplot.subplot(2, 2, 3, projection='3d')
-        p2z = self.yanker(poses_h5, resce_h5, self.caminfo)
-        centre = args.data_ops.d2z_to_raw(p2z, self.caminfo).flatten()
-        cube = iso_cube(centre, self.region_size)
-        cube.show_dims()
-        points3 = args.data_ops.img_to_raw(img, thedata)
+        points3 = args.data_ops.img_to_raw(frame_h5, thedata)
         numpts = points3.shape[0]
         if 1000 < numpts:
             samid = np.random.choice(numpts, 1000, replace=False)
@@ -297,10 +282,45 @@ class localizer2(base_regre):
         iso_cube.draw_cube_wire(corners)
 
         mpplot.subplot(2, 2, 4)
-        img = frame_h5
+        mpplot.gcf().gca().set_title('test output')
+        img_name = args.data_io.index2imagename(img_id)
+        img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
         mpplot.imshow(img, cmap='bone')
-        anchors, resce = args.data_ops.generate_anchors(
-            img, pose_raw, self.caminfo.anchor_num, self.caminfo)
+        anchor_num = self.anchor_num ** 2
+        pcnt = poses_h5[:anchor_num].reshape(
+            (self.anchor_num, self.anchor_num))
+        print(pcnt)
+        index = np.array(np.unravel_index(
+            np.argmax(pcnt), pcnt.shape))
+        anchors = poses_h5[anchor_num:]
+        print(index)
+        points2, wsizes, centre = self.provider.yank_localizer2_rect(
+            index, anchors, self.caminfo)
+        print(np.append(points2, wsizes).reshape(1, -1))
+        rect = iso_rect(points2 - wsizes, wsizes * 2)
+        rect.draw()
+        cube = iso_cube(centre.flatten(), self.region_size)
+        cube.show_dims()
+        rects = cube.proj_rects_3(
+            args.data_ops.raw_to_2d, self.caminfo
+        )
+        for ii, rect in enumerate(rects):
+            rect.draw(colors[ii])
+
+        mpplot.subplot(2, 2, 2)
+        mpplot.gcf().gca().set_title('test storage write')
+        img_name, frame, poses, resce = self.provider_worker(
+            annot_line, self.image_dir, thedata)
+        frame = args.data_ops.rescale_depth_inv(
+            frame, self.caminfo)
+        if (
+                (1e-4 < np.linalg.norm(frame_h5 - frame)) or
+                (1e-4 < np.linalg.norm(poses_h5 - poses))
+        ):
+            print(np.linalg.norm(frame_h5 - frame))
+            print(np.linalg.norm(poses_h5 - poses))
+            print('ERROR - h5 storage corrupted!')
+        mpplot.imshow(frame, cmap='bone')
         resce3 = resce[0:4]
         cube = iso_cube()
         cube.load(resce3)
@@ -335,16 +355,17 @@ class localizer2(base_regre):
                     [slim.batch_norm, slim.dropout], is_training=is_training), \
                 slim.arg_scope(
                     [slim.fully_connected],
-                    activation_fn=tf.nn.relu, normalizer_fn=slim.batch_norm), \
+                    # activation_fn=tf.nn.relu, normalizer_fn=slim.batch_norm), \
+                    activation_fn=None, normalizer_fn=None), \
                 slim.arg_scope(
-                    [slim.max_pool2d, slim.avg_pool3d],
+                    [slim.max_pool2d, slim.avg_pool2d],
                     stride=1, padding='SAME'), \
                 slim.arg_scope(
                     [slim.conv2d],
                     stride=1, padding='SAME', activation_fn=tf.nn.relu,
                     normalizer_fn=slim.batch_norm):
                 with tf.variable_scope('stage0'):
-                    sc = 'stage0'
+                    sc = 'stage0_image'
                     net = slim.conv2d(input_tensor, 8, 3, scope='conv0a_3x3_1')
                     net = slim.conv2d(net, 8, 3, stride=2, scope='conv0a_3x3_2')
                     net = slim.max_pool2d(net, 3, scope='maxpool0a_3x3_1')
@@ -352,7 +373,7 @@ class localizer2(base_regre):
                     if add_and_check_final(sc, net):
                         return net, end_points
                 with tf.variable_scope('stage1'):
-                    sc = 'stage1'
+                    sc = 'stage1_image'
                     net = slim.conv2d(net, 16, 3, stride=2, scope='conv1a_3x3_2')
                     net = slim.max_pool2d(net, 3, scope='maxpool1a_3x3_1')
                     net = slim.conv2d(net, 32, 3, stride=2, scope='conv1b_3x3_2')
@@ -363,44 +384,60 @@ class localizer2(base_regre):
                     if add_and_check_final(sc, net):
                         return net, end_points
                 with tf.variable_scope('stage16'):
-                    sc = 'stage16'
-                    net = slim.conv2d(net, 128, 3, scope='conv16_3x3_1')
-                    net = slim.max_pool2d(
-                        net, 3, stride=2, scope='maxpool16_3x3_2')
+                    sc = 'stage16_image'
+                    net = slim.conv2d(net, 128, 3, stride=2, scope='conv16_3x3_1')
+                    net = slim.max_pool2d(net, 3, scope='maxpool16_3x3_2')
                     self.end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points
                 with tf.variable_scope('stage8'):
                     sc = 'stage_out'
+                    fshape = net.get_shape()[1:3]
+                    anchor_num = self.anchor_num ** 2
                     with tf.variable_scope('branch_cls'):
-                        out_cls = slim.max_pool2d(
-                            net, 5, stride=3, padding='VALID',
-                            scope='maxpool8a_5x5_3')
-                        out_cls = slim.flatten(out_cls)
+                        out_cls = slim.conv2d(net, 16, 1, scope='reduce_cls_a')
+                        out_cls = slim.conv2d(
+                            out_cls, 16, fshape,
+                            scope='fullconn_cls_a')
                         out_cls = slim.dropout(
-                            out_cls, 0.5,
-                            is_training=is_training, scope='dropout8a')
+                            out_cls, 0.5, scope='dropout_cls')
+                        # out_cls = slim.conv2d(out_cls, 1, 1, scope='reduce_cls_b')
+                        # out_cls = slim.conv2d(
+                        #     out_cls, 1, fshape, activation_fn=None,
+                        #     scope='fullconn_cls_b')
+                        out_cls = slim.flatten(out_cls)
                         out_cls = slim.fully_connected(
-                            out_cls, self.anchor_num ** 2,
-                            activation_fn=None, scope='Logits')
-                        out_cls = tf.nn.softmax(out_cls, name='Predictions')
+                            out_cls, anchor_num,
+                            activation_fn=None, scope='fullconn_cls_b')
+                        self.end_point_list.append('branch_cls')
+                        if add_and_check_final('branch_cls', out_cls):
+                            return net, end_points
                     with tf.variable_scope('branch_reg'):
-                        out_reg = slim.max_pool2d(
-                            net, 5, stride=3, padding='VALID',
-                            scope='maxpool8b_5x5_3')
-                        out_reg = slim.conv2d(out_reg, 128, 1, scope='reduce8')
+                        out_reg = slim.conv2d(net, 16, 1, scope='reduce_reg_a')
                         out_reg = slim.conv2d(
-                            out_reg, 256, out_reg.get_shape()[1:3],
-                            padding='VALID', scope='fullconn8')
-                        out_reg = slim.flatten(out_reg)
+                            out_reg, 16, fshape,
+                            scope='fullconn_reg_a')
+                        # self.end_point_list.append('fullconn_reg_a')
+                        # if add_and_check_final('fullconn_reg_a', out_reg):
+                        #     return net, end_points
                         out_reg = slim.dropout(
-                            out_reg, 0.5,
-                            is_training=is_training, scope='dropout8b')
+                            out_reg, 0.5, scope='dropout_reg')
+                        # self.end_point_list.append('dropout_reg')
+                        # if add_and_check_final('dropout_reg', out_reg):
+                        #     return net, end_points
+                        # out_reg = slim.conv2d(out_reg, 3, 1, scope='reduce_reg_b')
+                        # out_reg = slim.conv2d(
+                        #     out_reg, 3, fshape, activation_fn=None,
+                        #     scope='fullconn_reg_b')
+                        out_reg = slim.flatten(out_reg)
                         out_reg = slim.fully_connected(
-                            out_reg, 3,
-                            activation_fn=None, scope='output8')
+                            out_reg, anchor_num * 3,
+                            activation_fn=None, scope='fullconn_cls_b')
+                        self.end_point_list.append('branch_reg')
+                        if add_and_check_final('branch_reg', out_reg):
+                            return net, end_points
                     net = tf.concat(axis=1, values=[out_cls, out_reg])
-                    # self.end_point_list.append(sc)
+                    self.end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points
 
@@ -422,8 +459,8 @@ class localizer2(base_regre):
     def smooth_l1(xa):
         return tf.where(
             1 < xa,
-            0.5 * (xa ** 2),
-            xa - 0.5
+            xa - 0.5,
+            0.5 * (xa ** 2)
         )
 
     def get_loss(self, pred, echt, end_points):
@@ -431,14 +468,19 @@ class localizer2(base_regre):
             pred: BxO
             echt: BxO
         """
-        loss_cls = tf.nn.sparse_softmax_cross_entropy_with_logits(
-            labels=tf.cast(echt[:, 0], tf.int32),
-            logits=pred[:, :256]
-        ) / 256
+        anchor_num = self.anchor_num ** 2
+        loss_cls = tf.reduce_sum(
+            tf.nn.weighted_cross_entropy_with_logits(
+                targets=echt[:, :anchor_num],
+                logits=pred[:, :anchor_num],
+                pos_weight=10))
         loss_reg = tf.reduce_sum(
-            self.smooth_l1(tf.abs(pred[:, 256:259] - echt[:, 1:4])),
-            axis=1)
-        loss = tf.reduce_sum(loss_cls + self.loss_lambda * loss_reg)
-        # loss = tf.reduce_sum(loss_cls)
-        # loss = tf.reduce_sum(loss_reg)
+            self.smooth_l1(tf.abs(
+                pred[:, anchor_num:] - echt[:, anchor_num:]))
+        )
+        # loss_reg = tf.reduce_sum(
+        #     (pred[:, anchor_num:] - echt[:, anchor_num:]) ** 2)
+        loss = loss_cls + self.loss_lambda * loss_reg
+        # loss = loss_cls
+        # loss = loss_reg
         return loss

@@ -125,7 +125,7 @@ def draw_prediction_poses(thedata, image_dir, annot_echt, annot_pred):
     img_name, pose_echt = dataio.parse_line_annot(line_echt)
     _, pose_pred = dataio.parse_line_annot(line_pred)
     img_path = os.path.join(image_dir, img_name)
-    print('drawing pose #{:d}: {}'.format(img_id, img_path))
+    print('drawing image #{:d}: {}'.format(img_id, img_path))
     img = dataio.read_image(img_path)
 
     # mpplot.subplots(nrows=1, ncols=2)
@@ -173,7 +173,7 @@ def draw_pose_raw_random(thedata, image_dir, annot_txt, img_id=-1):
         annot_line = dataio.get_line(annot_txt, img_id)
         img_name, pose_raw = dataio.parse_line_annot(annot_line)
     img_path = os.path.join(image_dir, img_name)
-    print('drawing pose #{:d}: {}'.format(img_id, img_path))
+    print('drawing image #{:d}: {}'.format(img_id, img_path))
     img = dataio.read_image(img_path)
 
     mpplot.imshow(img, cmap='bone')
@@ -304,7 +304,7 @@ def draw_raw3d_random(thedata, image_dir, annot_txt, img_id=-1):
 
     img_name, pose_raw = dataio.parse_line_annot(annot_line)
     img_path = os.path.join(image_dir, img_name)
-    print('drawing pose #{:d}: {}'.format(img_id, img_path))
+    print('drawing image #{:d}: {}'.format(img_id, img_path))
     img = dataio.read_image(img_path)
 
     draw_raw3d(thedata, img, pose_raw)

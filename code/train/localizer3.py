@@ -57,7 +57,7 @@ class localizer3(base_conv3):
         mpplot.tight_layout()
         fname = 'detection_{}.png'.format(self.__class__.__name__)
         mpplot.savefig(os.path.join(self.predict_dir, fname))
-        print('figures saved')
+        print('figures saved: {}'.format(fname))
 
     def convert_input(self, img, args, caminfo):
         pcnt = args.data_ops.voxelize_depth(img, self.crop_size, caminfo)
@@ -84,7 +84,7 @@ class localizer3(base_conv3):
             # poses_h5 = h5file['poses'][frame_id, ...].reshape(-1, 3)
             resce_h5 = h5file['resce'][frame_id, ...]
 
-        print('[{}] drawing pose #{:d}'.format(self.__class__.__name__, img_id))
+        print('[{}] drawing image #{:d}'.format(self.__class__.__name__, img_id))
         resce3 = resce_h5[0:4]
         cube = iso_cube()
         cube.load(resce3)
@@ -139,7 +139,7 @@ class localizer3(base_conv3):
             poses_h5 = h5file['poses'][frame_id, ...].reshape(-1, 3)
             resce_h5 = h5file['resce'][frame_id, ...]
 
-        print('[{}] drawing pose #{:d}'.format(self.__class__.__name__, img_id))
+        print('[{}] drawing image #{:d}'.format(self.__class__.__name__, img_id))
         resce3 = resce_h5[0:4]
         cube = iso_cube()
         cube.load(resce3)

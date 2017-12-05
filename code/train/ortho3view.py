@@ -42,7 +42,7 @@ class ortho3view(base_regre):
             poses_h5 = h5file['poses'][frame_id, ...].reshape(-1, 3)
             resce_h5 = h5file['resce'][frame_id, ...]
 
-        print('[{}] drawing pose #{:d}'.format(self.__class__.__name__, img_id))
+        print('[{}] drawing image #{:d}'.format(self.__class__.__name__, img_id))
         mpplot.subplots(nrows=2, ncols=2, figsize=(3 * 5, 3 * 5))
         resce2 = resce_h5[0:3]
         resce3 = resce_h5[3:11]

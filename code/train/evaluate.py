@@ -62,7 +62,7 @@ def draw_compare(args, mpplot, predict_dir=None):
     for ii in idx:
         restr += ' {}({:.2f})'.format(methods[ii], maxmean[ii])
     args.logger.info(restr)
-    print('figures saved')
+    print('figures saved: error summary')
 
 
 def test_dataops(args):
@@ -106,6 +106,8 @@ if __name__ == "__main__":
     with_train = True
     # with_train = False
 
+    mpl = import_module('matplotlib')
+    mpl.use('Agg')
     mpplot = import_module('matplotlib.pyplot')
     with args_holder() as argsholder:
         argsholder.parse_args()
@@ -115,7 +117,7 @@ if __name__ == "__main__":
         # shutil.rmtree(args.out_dir)
         # os.makedirs(args.out_dir)
 
-        # test_dataops(args)
+        test_dataops(args)
 
         run_one(args, mpplot, with_train)
 

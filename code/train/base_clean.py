@@ -67,14 +67,14 @@ class base_clean(base_regre):
             print(np.histogram(frame_h5, range=(1e-4, np.max(frame_h5))))
             print(np.min(poses_h5, axis=0), np.max(poses_h5, axis=0))
 
-        print('[{}] drawing pose #{:d}'.format(self.__class__.__name__, img_id))
+        print('[{}] drawing image #{:d}'.format(self.__class__.__name__, img_id))
         from colour import Color
         colors = [Color('orange').rgb, Color('red').rgb, Color('lime').rgb]
-        # resce3 = resce_h5[3:11]
-        resce3 = resce_h5[0:4]
         mpplot.subplots(nrows=2, ncols=2, figsize=(2 * 5, 2 * 5))
 
         mpplot.subplot(2, 2, 3)
+        mpplot.gcf().gca().set_title('test storage read')
+        resce3 = resce_h5[0:4]
         cube = iso_cube()
         cube.load(resce3)
         sizel = np.floor(resce3[0]).astype(int)
@@ -89,6 +89,7 @@ class base_clean(base_regre):
         )
 
         mpplot.subplot(2, 2, 4)
+        mpplot.gcf().gca().set_title('test output')
         img_name = args.data_io.index2imagename(img_id)
         img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
         mpplot.imshow(img, cmap='bone')
@@ -104,6 +105,7 @@ class base_clean(base_regre):
             rect.draw(colors[ii])
 
         mpplot.subplot(2, 2, 1)
+        mpplot.gcf().gca().set_title('test input')
         annot_line = args.data_io.get_line(
             thedata.training_annot_cleaned, img_id)
         img_name, pose_raw = args.data_io.parse_line_annot(annot_line)
@@ -112,13 +114,9 @@ class base_clean(base_regre):
         args.data_draw.draw_pose2d(
             thedata,
             args.data_ops.raw_to_2d(pose_raw, thedata))
-        rects = cube.proj_rects_3(
-            args.data_ops.raw_to_2d, self.caminfo
-        )
-        for ii, rect in enumerate(rects):
-            rect.draw(colors[ii])
 
         mpplot.subplot(2, 2, 2)
+        mpplot.gcf().gca().set_title('test storage write')
         img_name, frame, poses, resce = self.provider_worker(
             annot_line, self.image_dir, thedata)
         frame = np.squeeze(frame, axis=-1)
@@ -130,7 +128,6 @@ class base_clean(base_regre):
             print(np.linalg.norm(frame_h5 - frame))
             print(np.linalg.norm(poses_h5 - poses))
             print('ERROR - h5 storage corrupted!')
-        # resce3 = resce[3:11]
         resce3 = resce[0:4]
         cube = iso_cube()
         cube.load(resce3)

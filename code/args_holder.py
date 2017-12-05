@@ -73,14 +73,14 @@ class args_holder:
             '--bn_momentum', type=float, default=0.8,
             help='Initial batch normalization momentum [default: 0.8]')
         self.parser.add_argument(
-            '--learning_rate', type=float, default=0.001,
+            '--learning_rate', type=float, default=0.01,
             help='Initial learning rate [default: 0.001]')
         self.parser.add_argument(
-            '--decay_step', type=int, default=2e4,
+            '--decay_step', type=int, default=2e6,
             # twice of 1M (1e6) dataset / batch size
-            help='Decay step for lr decay [default: 2e4]')
+            help='Decay step for lr decay [default: 2e6]')
         self.parser.add_argument(
-            '--decay_rate', type=float, default=0.9,
+            '--decay_rate', type=float, default=0.94,
             # fast decay, as using adaptive optimizer
             help='Decay rate for lr decay [default: 0.9]')
 
@@ -221,6 +221,7 @@ class args_holder:
         # )
         # self.args.localizer = self.args.localizer_class(self.args)
         self.args.model_inst.tweak_arguments(self.args)
+        self.args.decay_step //= self.args.batch_size
         self.args.data_module = import_module(
             'data.' + self.args.data_name)
         self.args.data_provider = import_module(

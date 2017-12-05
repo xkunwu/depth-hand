@@ -64,30 +64,34 @@ def prow_localizer2(line, image_dir, caminfo):
             anchors.T, resce)
 
 
-def yank_localizer2_rect(pose_local, caminfo):
+def yank_localizer2_rect(index, anchors, caminfo):
     lattice = latice_image(
         np.array(caminfo.image_size).astype(float),
         caminfo.anchor_num)
-    label = pose_local[0]
-    anchors = pose_local[1:4]
     points2, wsizes = lattice.yank_anchor_single(
-        label,
+        index,
         anchors
     )
-    return points2, wsizes
+    z_cen = dataops.estimate_z(
+        caminfo.region_size, wsizes, caminfo.focal[0])
+    # print(np.append(points2, [wsizes, z_cen]).reshape(1, -1))
+    centre = dataops.d2z_to_raw(
+        np.append(points2, z_cen).reshape(1, -1),
+        caminfo
+    )
+    return points2, wsizes, centre.flatten()
 
 
 def yank_localizer2(pose_local, resce, caminfo):
-    points2, wsizes = yank_localizer2_rect(
-        pose_local, caminfo)
-    z_cen = dataops.estimate_z(
-        caminfo.region_size, wsizes, caminfo.focal[0])
-    # centre = dataops.d2z_to_raw(
-    #     np.append(points2, z_cen).reshape(1, -1),
-    #     caminfo
-    # )
-    # return centre
-    return np.append(points2, z_cen).reshape(1, -1)
+    anchor_num = caminfo.anchor_num ** 2
+    # label = np.argmax(pose_local[:anchor_num]).astype(int)
+    pcnt = pose_local[:anchor_num].reshape(
+        caminfo.anchor_num, caminfo.anchor_num)
+    index = np.array(np.unravel_index(np.argmax(pcnt), pcnt.shape))
+    anchors = pose_local[anchor_num:]
+    points2, wsizes, centre = yank_localizer2_rect(
+        index, anchors, caminfo)
+    return centre, index
 
 
 def prow_localizer3(line, image_dir, caminfo):
@@ -243,10 +247,13 @@ def write_region2(fanno, yanker, caminfo, batch_index, batch_resce, batch_poses)
         img_name = dataio.index2imagename(batch_index[ii, 0])
         pose_local = batch_poses[ii, :]
         resce = batch_resce[ii, :]
-        centre_2dz = yanker(pose_local, resce, caminfo)
-        centre_raw = dataops.d2z_to_raw(centre_2dz, caminfo)
-        crimg_line = ''.join("%12.4f" % x for x in centre_raw.flatten())
-        fanno.write(img_name + crimg_line + '\n')
+        centre, index = yanker(pose_local, resce, caminfo)
+        # crimg_line = ''.join("%12.4f" % x for x in centre.flatten())
+        fanno.write(
+            img_name +
+            '\t' + '\t'.join("%.4f" % x for x in centre.flatten()) +
+            '\t' + '\t'.join("%.4f" % x for x in index.flatten()) +
+            '\n')
 
 
 def write_region(fanno, yanker, caminfo, batch_index, batch_resce, batch_poses):
@@ -254,8 +261,8 @@ def write_region(fanno, yanker, caminfo, batch_index, batch_resce, batch_poses):
         img_name = dataio.index2imagename(batch_index[ii, 0])
         pose_local = batch_poses[ii, :]
         resce = batch_resce[ii, :]
-        centre_raw = yanker(pose_local, resce, caminfo)
-        crimg_line = ''.join("%12.4f" % x for x in centre_raw.flatten())
+        centre = yanker(pose_local, resce, caminfo)
+        crimg_line = ''.join("%12.4f" % x for x in centre.flatten())
         fanno.write(img_name + crimg_line + '\n')
 
 

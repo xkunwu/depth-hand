@@ -238,15 +238,13 @@ class base_regre(object):
             print(np.min(poses_h5, axis=0), np.max(poses_h5, axis=0))
             print(resce_h5)
 
-        print('[{}] drawing pose #{:d}'.format(self.__class__.__name__, img_id))
-        # aabb = iso_aabb(resce_h5[2:5], resce_h5[1])
-        # rect = args.data_ops.get_rect2(aabb, thedata)
-        # resce2 = np.append(resce_h5[0], rect.cll)
+        print('[{}] drawing image #{:d}'.format(self.__class__.__name__, img_id))
         resce2 = resce_h5[0:3]
         resce3 = resce_h5[3:7]
         mpplot.subplots(nrows=2, ncols=2, figsize=(2 * 5, 2 * 5))
 
         mpplot.subplot(2, 2, 3)
+        mpplot.gcf().gca().set_title('test storage read')
         sizel = np.floor(resce2[0]).astype(int)
         resce_cp = np.copy(resce2)
         resce_cp[0] = 1
@@ -260,6 +258,7 @@ class base_regre(object):
         )
 
         mpplot.subplot(2, 2, 4)
+        mpplot.gcf().gca().set_title('test output')
         img_name = args.data_io.index2imagename(img_id)
         img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
         mpplot.imshow(img, cmap='bone')
@@ -268,22 +267,23 @@ class base_regre(object):
             thedata,
             args.data_ops.raw_to_2d(pose_raw, thedata)
         )
+        rect = iso_rect()
+        rect.load(resce2)
+        rect.draw()
 
         mpplot.subplot(2, 2, 1)
+        mpplot.gcf().gca().set_title('test input')
         annot_line = args.data_io.get_line(
             thedata.training_annot_cleaned, img_id)
         img_name, pose_raw = args.data_io.parse_line_annot(annot_line)
         img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
         mpplot.imshow(img, cmap='bone')
-        # rect = iso_rect(resce_h5[1:3], self.crop_size / resce_h5[0])
-        rect = iso_rect()
-        rect.load(resce2)
-        rect.draw()
         args.data_draw.draw_pose2d(
             thedata,
             args.data_ops.raw_to_2d(pose_raw, thedata))
 
         mpplot.subplot(2, 2, 2)
+        mpplot.gcf().gca().set_title('test storage write')
         img_name, frame, poses, resce = self.provider_worker(
             annot_line, self.image_dir, thedata)
         frame = np.squeeze(frame, axis=-1)
@@ -351,7 +351,7 @@ class base_regre(object):
                     stride=1, padding='SAME', activation_fn=tf.nn.relu,
                     normalizer_fn=slim.batch_norm):
                 with tf.variable_scope('stage128'):
-                    sc = 'stage128'
+                    sc = 'stage128_image'
                     net = slim.conv2d(input_tensor, 16, 3, scope='conv128_3x3_1')
                     net = slim.conv2d(net, 16, 3, stride=2, scope='conv128_3x3_2')
                     net = slim.max_pool2d(net, 3, scope='maxpool128_3x3_1')
@@ -361,14 +361,14 @@ class base_regre(object):
                     if add_and_check_final(sc, net):
                         return net, end_points
                 with tf.variable_scope('stage32'):
-                    sc = 'stage32'
+                    sc = 'stage32_image'
                     net = slim.conv2d(net, 64, 3, scope='conv32_3x3_1')
                     net = slim.max_pool2d(net, 3, stride=2, scope='maxpool32_3x3_2')
                     self.end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points
                 with tf.variable_scope('stage16'):
-                    sc = 'stage16'
+                    sc = 'stage16_image'
                     net = slim.conv2d(net, 128, 3, scope='conv16_3x3_1')
                     net = slim.max_pool2d(net, 3, stride=2, scope='maxpool16_3x3_2')
                     self.end_point_list.append(sc)
@@ -382,7 +382,7 @@ class base_regre(object):
                         net, 0.5, is_training=is_training, scope='dropout8')
                     net = slim.fully_connected(
                         net, self.out_dim, activation_fn=None, scope='output8')
-                    # self.end_point_list.append(sc)
+                    self.end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points
 

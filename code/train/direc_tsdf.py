@@ -74,7 +74,7 @@ class direc_tsdf(base_conv3):
             print(np.linalg.norm(frame_h5 - frame))
             print(np.linalg.norm(poses_h5 - poses))
             print('ERROR - h5 storage corrupted!')
-        print('[{}] drawing pose #{:d}'.format(self.__class__.__name__, img_id))
+        print('[{}] drawing image #{:d}'.format(self.__class__.__name__, img_id))
         for spi in range(3):
             mlab.figure(size=(800, 800))
             volume3 = frame_h5[..., spi]

@@ -64,7 +64,8 @@ class train_abc():
                     ends, net.shape,
                     net.shape[0], reduce(lambda x, y: x * y, net.shape[1:])
                 )
-                if 2 == self.args.model_inst.net_rank:
+                if (2 == self.args.model_inst.net_rank and
+                        'image' in ends):
                     tf.summary.image(ends, self.transform_image_summary(net))
             self.args.logger.info('network structure:\n{}'.format(shapestr))
             loss = self.args.model_inst.get_loss(pred, poses_tf, end_points)
@@ -145,6 +146,46 @@ class train_abc():
                     self.args.logger.info('Total training time: {}'.format(
                         time_all_e))
 
+    def debut_pred(self, batch_echt, batch_pred):
+        np.set_printoptions(
+            threshold=np.nan,
+            formatter={'float_kind': lambda x: "%.2f" % x})
+        anchor_num_sub = self.args.model_inst.anchor_num
+        anchor_num = anchor_num_sub ** 2
+        pcnt_echt = batch_echt[0, :anchor_num]
+        pcnt_echt = pcnt_echt.reshape(
+            anchor_num_sub, anchor_num_sub)
+        index_echt = np.array(np.unravel_index(
+            np.argmax(pcnt_echt), pcnt_echt.shape))
+        pcnt_pred = batch_pred[0, :anchor_num].reshape(
+            anchor_num_sub, anchor_num_sub)
+        index_pred = np.array(np.unravel_index(
+            np.argmax(pcnt_pred), pcnt_pred.shape))
+        self.logger.info(
+            [index_echt, np.max(pcnt_echt), np.sum(pcnt_echt)])
+        self.logger.info(
+            [index_pred, np.max(pcnt_pred), np.sum(pcnt_pred)])
+        anchors_echt = batch_echt[0, anchor_num:]
+        anchors_echt = anchors_echt.reshape(
+            anchor_num_sub, anchor_num_sub, 3)
+        anchors_pred = batch_pred[0, anchor_num:].reshape(
+            anchor_num_sub, anchor_num_sub, 3)
+        self.logger.info([
+            anchors_echt[index_echt[0], index_echt[1], :],
+            # anchors_echt[index_pred[0], index_pred[1], :],
+        ])
+        self.logger.info([
+            # anchors_pred[index_echt[0], index_echt[1], :],
+            anchors_pred[index_pred[0], index_pred[1], :],
+        ])
+        self.logger.info('\n{}'.format(pcnt_pred))
+        self.logger.info('\n{}'.format(
+            np.fabs(anchors_echt[:, :, 0] - anchors_pred[:, :, 0])))
+        self.logger.info('\n{}'.format(
+            np.fabs(anchors_echt[:, :, 1] - anchors_pred[:, :, 1])))
+        self.logger.info('\n{}'.format(
+            np.fabs(anchors_echt[:, :, 2] - anchors_pred[:, :, 2])))
+
     def train_one_epoch(self, sess, ops, train_writer):
         """ ops: dict mapping from string to tf ops """
         is_training = True
@@ -164,22 +205,14 @@ class train_abc():
                     ops['loss'], ops['pred']],
                 feed_dict=feed_dict)
             loss_sum += loss_val
-            batch_count += 1
             if batch_count % 10 == 0:
-                np.set_printoptions(
-                    threshold=np.nan,
-                    formatter={'float_kind': lambda x: "%.2f" % x})
-                self.logger.info([batch_data['batch_poses'][0, 0]])
-                to_show = pred_val[0, :256]
-                self.logger.info([np.argmax(to_show), np.max(to_show), np.sum(to_show)])
-                self.logger.info(batch_data['batch_poses'][0, 1:])
-                self.logger.info(pred_val[0, 256:])
-                self.logger.info(pred_val[0, :256])
+                self.debut_pred(batch_data['batch_poses'], pred_val)
                 train_writer.add_summary(summary, step)
-                self.logger.info('batch {} training loss (half-squared): {}'.format(
+                self.logger.info('batch {} training loss: {}'.format(
                     batch_count, loss_val))
+            batch_count += 1
         mean_loss = loss_sum / batch_count
-        self.args.logger.info('epoch training mean loss (half-squared): {:.4f}'.format(
+        self.args.logger.info('epoch training mean loss: {:.4f}'.format(
             mean_loss))
 
     def test_one_epoch(self, sess, ops, test_writer):
@@ -201,17 +234,18 @@ class train_abc():
                     ops['loss'], ops['pred']],
                 feed_dict=feed_dict)
             loss_sum += loss_val
-            batch_count += 1
-            self.logger.info('batch {} testing loss (half-squared): {}'.format(
-                batch_count, loss_val))
             # print(np.sum((batch_data['batch_poses'] - pred_val) ** 2) / 2)
             if batch_count % 10 == 0:
+                self.debut_pred(batch_data['batch_poses'], pred_val)
                 test_writer.add_summary(summary, step)
+                self.logger.info('batch {} testing loss: {}'.format(
+                    batch_count, loss_val))
                 sys.stdout.write('.')
                 sys.stdout.flush()
+            batch_count += 1
         print('\n')
         mean_loss = loss_sum / batch_count
-        self.args.logger.info('epoch testing mean loss (half-squared): {:.4f}'.format(
+        self.args.logger.info('epoch testing mean loss: {:.4f}'.format(
             mean_loss))
 
     def evaluate(self):
@@ -281,7 +315,7 @@ class train_abc():
                 sys.stdout.flush()
         print('\n')
         mean_loss = loss_sum / batch_count
-        self.args.logger.info('epoch evaluate mean loss (half-squared): {:.4f}'.format(
+        self.args.logger.info('epoch evaluate mean loss: {:.4f}'.format(
             mean_loss))
 
     def get_learning_rate(self, global_step):

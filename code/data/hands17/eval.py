@@ -169,7 +169,7 @@ def evaluate_poses(thedata, model_name, predict_dir, predict_file):
     fname = '{}_error_bar.png'.format(model_name)
     mpplot.savefig(os.path.join(predict_dir, fname))
 
-    print('figures saved')
+    print('figures saved: {}'.format(fname))
     return np.max(np.mean(errors, axis=1))
 
     # draw_sum = 3

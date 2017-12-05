@@ -239,7 +239,6 @@ def voxelize_depth(img, step, caminfo):
 def generate_anchors(img, pose_raw, step, caminfo):
     lattice = latice_image(
         np.array(img.shape).astype(float), caminfo.anchor_num)
-    # points2, _ = raw_to_2dz(pose_raw, caminfo)
     cube = iso_cube(
         (np.max(pose_raw, axis=0) + np.min(pose_raw, axis=0)) / 2,
         caminfo.region_size
@@ -247,25 +246,20 @@ def generate_anchors(img, pose_raw, step, caminfo):
     cen2d = raw_to_2d(cube.cen.reshape(1, -1), caminfo)
     rect = proj_cube_to_rect(cube, caminfo.region_size, caminfo)
     pcnt = lattice.fill(cen2d)
-    label = np.argmax(pcnt)
     anchors = lattice.prow_anchor_single(cen2d, rect.sidelen / 2)
+    # import matplotlib.pyplot as mpplot
     # print(cen2d, rect.sidelen / 2)
+    # index = np.array(np.unravel_index(np.argmax(pcnt), pcnt.shape))
     # print(lattice.yank_anchor_single(
-    #     label,
+    #     index,
     #     anchors
     # ))
-    # import matplotlib.pyplot as mpplot
     # mpplot.imshow(img, cmap='bone')
     # rect.show_dims()
     # rect.draw()
     # mpplot.show()
     resce = cube.dump()
-    # resce = np.concatenate((
-    #     lattice.dump(),
-    #     cube.dump(),
-    #     np.array([caminfo.region_size, caminfo.focal[0]])
-    # ))
-    return np.append(label, anchors), resce
+    return np.append(pcnt.flatten(), anchors), resce
 
 
 def direc_belief(pcnt):

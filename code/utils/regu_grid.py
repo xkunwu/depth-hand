@@ -146,20 +146,30 @@ class latice_image:
         return self.pcnt
 
     def prow_anchor_single(self, points2, wsizes):
-        centre = self.voxen(self.putit(points2))
-        delta = (points2 - centre) / wsizes
-        scale = np.log(wsizes / self.cellen[0])
-        return np.concatenate([delta.flatten(), np.array([scale])])
+        # centre = self.voxen(self.putit(points2))
+        # scale_base = np.max(self.cellen)
+        # delta = (points2 - centre) / scale_base
+        # scale = np.log(wsizes / scale_base)
+        # return np.concatenate([delta.flatten(), np.array([scale])])
+        scale_base = np.max(self.cellen) * self.step
+        anchors = np.empty((self.step, self.step, 3))
+        for rr in np.arange(self.step):
+            for cc in np.arange(self.step):
+                cen = self.voxen(np.array((rr, cc)))
+                anchors[rr, cc, 0:2] = (points2 - cen) / scale_base
+                anchors[rr, cc, 2] = np.log(wsizes / scale_base)
+        return anchors.flatten()
 
-    def yank_anchor_single(self, seq_n, anchors):
-        index = np.array([
-            seq_n // self.step,
-            seq_n % self.step])
+    def yank_anchor_single(self, index, anchors):
+        anchors_res = anchors.reshape(self.step, self.step, 3)
+        anchors = anchors_res[index[0], index[1], :]
         centre = self.voxen(index)
         delta = anchors[0:2]
         scale = anchors[2]
-        wsizes = np.exp(scale) * self.cellen[0]
-        points2 = (delta * wsizes) + centre
+        scale_base = np.max(self.cellen) * self.step
+        # scale_base = np.max(self.cellen)
+        points2 = (delta * scale_base) + centre
+        wsizes = np.exp(scale) * scale_base
         return points2, wsizes
 
     def prow_anchor(self, points2, wsizes):
