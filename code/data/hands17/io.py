@@ -34,7 +34,8 @@ def parse_line_annot(line):
             (21, 3)
         )
     else:
-        print('error - wrong pose annotation: {}'.format(annot_list))
+        print('error - wrong pose annotation: {} --> {}'.format(
+            line, annot_list))
         print(annot_list)
     return annot_list[0], pose_raw
 

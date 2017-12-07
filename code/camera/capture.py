@@ -36,7 +36,7 @@ class capture:
         focal = (463.889, 463.889)
         centre = (320, 240)
         region_size = 150
-        anchor_num = 16
+        anchor_num = 8
 
         def __init__():
             pass
@@ -52,25 +52,30 @@ class capture:
         depth = dev.depth * dev.depth_scale * 1000
         return depth
 
-    def show_results_stream(self, img, cube):
+    def show_results_stream(self, img, cube, index, confidence):
         img = np.minimum(img, self.args.data_inst.z_range[1])
         img = (img - img.min()) / (img.max() - img.min())
         img = np.uint8(img * 255)
         img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
-        rects = cube.proj_rects_3(
-            self.args.data_ops.raw_to_2d,
-            # self.args.data_inst
-            self.caminfo_ir
-        )
-        colors = [Color('orange').rgb, Color('red').rgb, Color('lime').rgb]
-        for ii, rect in enumerate(rects):
-            cll = np.floor(rects[ii].cll + 0.5).astype(int)
-            ctr = np.floor(rects[ii].cll + rects[ii].sidelen + 0.5).astype(int)
-            cv2.rectangle(
-                img,
-                (cll[1], cll[0]),
-                (ctr[1], ctr[0]),
-                tuple(c * 255 for c in colors[ii][::-1]), 2)
+        print('hand at: ({:d}, {:d}), confidence: {:.4f}'.format(
+            index[0], index[1], confidence
+        ))
+        if 0.9 < confidence:
+            rects = cube.proj_rects_3(
+                self.args.data_ops.raw_to_2d,
+                # self.args.data_inst
+                self.caminfo_ir
+            )
+            colors = [Color('orange').rgb, Color('red').rgb, Color('lime').rgb]
+            for ii, rect in enumerate(rects):
+                cll = np.floor(rects[ii].cll + 0.5).astype(int)
+                ctr = np.floor(rects[ii].cll + rects[ii].sidelen + 0.5).astype(int)
+                cv2.rectangle(
+                    img,
+                    (cll[1], cll[0]),
+                    (ctr[1], ctr[0]),
+                    tuple(c * 255 for c in colors[ii][::-1]), 2)
+        img = np.flip(img, axis=1)
         cv2.imshow('ouput', img)
 
     def show_results(self, img, cube):
@@ -115,14 +120,14 @@ class capture:
             ops['batch_frame']: self.args.model_inst.convert_input(
                 depth_rescale, self.args, self.args.data_inst
             ),
-            ops['is_training']: False
+            ops['is_training']: True
         }
         pred_val = sess.run(
             ops['pred'],
             feed_dict=feed_dict)
-        cube = self.args.model_inst.convert_output(
+        cube, index, confidence = self.args.model_inst.convert_output(
             pred_val, self.args, self.caminfo_ir)
-        return cube
+        return cube, index, confidence
 
     def capture_detect(self, serv, dev):
         tf.reset_default_graph()
@@ -149,10 +154,12 @@ class capture:
                     'is_training': is_training_tf,
                     'pred': pred
                 }
-                cube = self.detect_region(depth, sess, ops)
+                cube, index, confidence = self.detect_region(
+                    depth, sess, ops)
                 # cube = iso_cube(np.array([-200, 20, 400]), 120)
                 # show results
-                self.show_results_stream(depth, cube)
+                self.show_results_stream(
+                    depth, cube, index, confidence)
                 # self.show_results(depth, cube)
                 # sys.stdout.write('.')
                 # sys.stdout.flush()

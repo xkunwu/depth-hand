@@ -5,6 +5,7 @@ import logging
 import numpy as np
 import tensorflow as tf
 # from tensorflow.contrib import slim
+import progressbar
 from functools import reduce
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -32,10 +33,11 @@ class train_abc():
         isize = int(tensor.shape[1])
         fsize = int(tensor.shape[3])
         num = np.ceil(np.sqrt(int(tensor.shape[-1]))).astype(int)
-        t0 = tf.expand_dims(tf.transpose(tensor[ii, ...], [2, 0, 1]), axis=-1)
-        # return t0
+        t0 = tf.expand_dims(
+            tf.transpose(tensor[ii, ...], [2, 0, 1]), axis=-1)
         pad = tf.zeros([num * num - fsize, isize, isize, 1])
-        t1 = tf.unstack(tf.concat(axis=0, values=[t0, pad]), axis=0)
+        t1 = tf.unstack(
+            tf.concat(axis=0, values=[t0, pad]), axis=0)
         rows = []
         for ri in range(num):
             rows.append(tf.concat(
@@ -43,18 +45,67 @@ class train_abc():
         t2 = tf.concat(axis=1, values=rows)
         return tf.expand_dims(t2, axis=0)
 
+    def _train_iter(self, sess, ops, saver,
+                    model_path, train_writer, valid_writer):
+        valid_loss = np.inf
+        from timeit import default_timer as timer
+        from datetime import timedelta
+        with file_pack() as filepack:
+            time_all_s = timer()
+            self.args.model_inst.start_train(filepack)
+            for epoch in range(self.args.max_epoch):
+                self.logger.info(
+                    '**** Epoch #{:03d} ****'.format(epoch))
+                sys.stdout.flush()
+
+                split_beg, split_end = \
+                    self.args.data_inst.next_split_range()
+                # print(split_beg, split_end, split_all)
+                # continue
+
+                time_s = timer()
+                self.logger.info('** Training **')
+                self.args.model_inst.start_epoch_train(
+                    split_beg, split_end)
+                self.train_one_epoch(sess, ops, train_writer)
+                self.logger.info('** Validating **')
+                self.args.model_inst.start_epoch_valid(
+                    split_beg, split_end)
+                mean_loss = self.valid_one_epoch(
+                    sess, ops, valid_writer)
+                time_e = str(timedelta(
+                    seconds=(timer() - time_s)))
+                self.args.logger.info(
+                    'Epoch #{:03d} processing time: {}'.format(
+                        epoch, time_e))
+                save_path = saver.save(sess, model_path)
+                self.logger.info(
+                    'Model saved in file: {}'.format(save_path))
+                if mean_loss > valid_loss:
+                    self.args.logger.info(
+                        'Break due to validation loss starts to grow: {} --> {}'.format(
+                            valid_loss, mean_loss))
+                    break
+                valid_loss = mean_loss
+            self.args.model_inst.end_train()
+            time_all_e = str(timedelta(
+                seconds=(timer() - time_all_s)))
+            self.args.logger.info(
+                'Total training time: {}'.format(
+                    time_all_e))
+
     def train(self):
         self.logger.info('######## Training ########')
         tf.reset_default_graph()
-        with tf.Graph().as_default(), tf.device('/gpu:' + str(self.args.gpu_id)):
-            frames_tf, poses_tf = self.args.model_inst.placeholder_inputs()
-            is_training_tf = tf.placeholder(tf.bool, shape=())
+        with tf.Graph().as_default(), \
+                tf.device('/gpu:' + str(self.args.gpu_id)):
+            frames_tf, poses_tf = \
+                self.args.model_inst.placeholder_inputs()
+            is_training_tf = tf.placeholder(
+                tf.bool, name='is_training')
 
-            # Note global_step is the batch to minimize.
-            # batch = tf.Variable(0)
             global_step = tf.train.create_global_step()
 
-            # Get model and loss
             pred, end_points = self.args.model_inst.get_model(
                 frames_tf, is_training_tf)
             shapestr = 'input: {}'.format(frames_tf.shape)
@@ -62,49 +113,51 @@ class train_abc():
                 net = end_points[ends]
                 shapestr += '\n{}: {} = ({}, {})'.format(
                     ends, net.shape,
-                    net.shape[0], reduce(lambda x, y: x * y, net.shape[1:])
+                    net.shape[0],
+                    reduce(lambda x, y: x * y, net.shape[1:])
                 )
                 if (2 == self.args.model_inst.net_rank and
                         'image' in ends):
-                    tf.summary.image(ends, self.transform_image_summary(net))
-            self.args.logger.info('network structure:\n{}'.format(shapestr))
-            loss = self.args.model_inst.get_loss(pred, poses_tf, end_points)
+                    tf.summary.image(
+                        ends, self.transform_image_summary(net))
+            self.args.logger.info(
+                'network structure:\n{}'.format(shapestr))
+            loss = self.args.model_inst.get_loss(
+                pred, poses_tf, end_points)
             # regre_error = tf.sqrt(loss * 2)
             regre_error = loss
             tf.summary.scalar('regression_error', regre_error)
 
-            # Get training operator
             learning_rate = self.get_learning_rate(global_step)
             tf.summary.scalar('learning_rate', learning_rate)
 
             optimizer = tf.train.AdamOptimizer(learning_rate)
-            train_op = optimizer.minimize(loss, global_step=global_step)
+            train_op = optimizer.minimize(
+                loss, global_step=global_step)
 
-            # Add ops to save and restore all the variables.
             saver = tf.train.Saver(max_to_keep=4)
 
-            # Create a session
             config = tf.ConfigProto()
             config.gpu_options.allow_growth = True
             config.allow_soft_placement = True
             config.log_device_placement = False
             with tf.Session(config=config) as sess:
                 model_path = self.args.model_inst.ckpt_path
-                # Init variables
                 if self.args.retrain:
                     init = tf.global_variables_initializer()
                     sess.run(init)
                 else:
                     saver.restore(sess, model_path)
-                    self.logger.info('Model restored from: {}.'.format(model_path))
+                    self.logger.info(
+                        'Model restored from: {}.'.format(
+                            model_path))
 
-                # Add summary writers
                 merged = tf.summary.merge_all()
                 train_writer = tf.summary.FileWriter(
                     os.path.join(self.args.log_dir_t, 'train'),
                     sess.graph)
-                test_writer = tf.summary.FileWriter(
-                    os.path.join(self.args.log_dir_t, 'test'))
+                valid_writer = tf.summary.FileWriter(
+                    os.path.join(self.args.log_dir_t, 'valid'))
 
                 ops = {
                     'batch_frame': frames_tf,
@@ -116,35 +169,9 @@ class train_abc():
                     'loss': loss,
                     'pred': pred
                 }
-
-                from timeit import default_timer as timer
-                from datetime import timedelta
-                with file_pack() as filepack:
-                    time_all_s = timer()
-                    self.args.model_inst.start_train()
-                    for epoch in range(self.args.max_epoch):
-                        self.logger.info('**** Epoch #{:03d} ****'.format(epoch))
-                        sys.stdout.flush()
-
-                        time_s = timer()
-                        self.logger.info('** Training **')
-                        self.args.model_inst.start_epoch_train(filepack)
-                        self.train_one_epoch(sess, ops, train_writer)
-                        self.logger.info('** Testing **')
-                        self.args.model_inst.start_epoch_test(filepack)
-                        self.test_one_epoch(sess, ops, test_writer)
-                        time_e = str(timedelta(seconds=(timer() - time_s)))
-                        self.args.logger.info('Epoch #{:03d} processing time: {}'.format(
-                            epoch, time_e))
-
-                        # Save the variables to disk.
-                        if epoch % 10 == 0:
-                            save_path = saver.save(sess, model_path)
-                            self.logger.info("Model saved in file: {}".format(save_path))
-                    self.args.model_inst.end_train()
-                    time_all_e = str(timedelta(seconds=(timer() - time_all_s)))
-                    self.args.logger.info('Total training time: {}'.format(
-                        time_all_e))
+                self._train_iter(
+                    sess, ops, saver,
+                    model_path, train_writer, valid_writer)
 
     def debut_pred(self, batch_echt, batch_pred):
         np.set_printoptions(
@@ -180,25 +207,35 @@ class train_abc():
         ])
         self.logger.info('\n{}'.format(pcnt_pred))
         self.logger.info('\n{}'.format(
-            np.fabs(anchors_echt[:, :, 0] - anchors_pred[:, :, 0])))
+            np.fabs(anchors_echt[..., 0] - anchors_pred[..., 0])))
         self.logger.info('\n{}'.format(
-            np.fabs(anchors_echt[:, :, 1] - anchors_pred[:, :, 1])))
+            np.fabs(anchors_echt[..., 1] - anchors_pred[..., 1])))
         self.logger.info('\n{}'.format(
-            np.fabs(anchors_echt[:, :, 2] - anchors_pred[:, :, 2])))
+            np.fabs(anchors_echt[..., 2] - anchors_pred[..., 2])))
+
+    def debug_prediction(self, frame_h5, resce_h5, pred_val):
+        import matplotlib.pyplot as mpplot
+        mpplot.figure(figsize=(2 * 5, 1 * 5))
+        self.args.model_inst._draw_prediction(
+            frame_h5, resce_h5, pred_val)
+        mpplot.tight_layout()
+        fname = 'debug_train_{}.png'.format(
+            self.args.model_inst.__class__.__name__)
+        mpplot.savefig(os.path.join(
+            self.args.model_inst.predict_dir, fname))
 
     def train_one_epoch(self, sess, ops, train_writer):
         """ ops: dict mapping from string to tf ops """
-        is_training = True
         batch_count = 0
         loss_sum = 0
         while True:
-            batch_data = self.args.model_inst.fetch_batch_train()
+            batch_data = self.args.model_inst.fetch_batch()
             if batch_data is None:
                 break
             feed_dict = {
                 ops['batch_frame']: batch_data['batch_frame'],
                 ops['batch_poses']: batch_data['batch_poses'],
-                ops['is_training']: is_training
+                ops['is_training']: True
             }
             summary, step, _, loss_val, pred_val = sess.run(
                 [ops['merged'], ops['step'], ops['train_op'],
@@ -206,73 +243,85 @@ class train_abc():
                 feed_dict=feed_dict)
             loss_sum += loss_val
             if batch_count % 10 == 0:
-                self.debut_pred(batch_data['batch_poses'], pred_val)
+                if 'locor' == self.args.model_inst.net_type:
+                    self.debut_pred(
+                        batch_data['batch_poses'], pred_val)
+                    did = np.random.randint(
+                        0, self.args.batch_size)
+                    self.debug_prediction(
+                        np.squeeze(batch_data['batch_frame'][did, ...], -1),
+                        batch_data['batch_resce'][did, ...],
+                        pred_val[did, ...]
+                    )
                 train_writer.add_summary(summary, step)
-                self.logger.info('batch {} training loss: {}'.format(
-                    batch_count, loss_val))
+                self.logger.info(
+                    'batch {} training loss: {}'.format(
+                        batch_count, loss_val))
             batch_count += 1
-        mean_loss = loss_sum / batch_count
-        self.args.logger.info('epoch training mean loss: {:.4f}'.format(
-            mean_loss))
+        mean_loss = loss_sum / batch_count / self.args.batch_size
+        self.args.logger.info(
+            'epoch training mean loss: {:.4f}'.format(
+                mean_loss))
+        return mean_loss
 
-    def test_one_epoch(self, sess, ops, test_writer):
+    def valid_one_epoch(self, sess, ops, valid_writer):
         """ ops: dict mapping from string to tf ops """
-        is_training = False
         batch_count = 0
         loss_sum = 0
         while True:
-            batch_data = self.args.model_inst.fetch_batch_test()
+            batch_data = self.args.model_inst.fetch_batch()
             if batch_data is None:
                 break
             feed_dict = {
                 ops['batch_frame']: batch_data['batch_frame'],
                 ops['batch_poses']: batch_data['batch_poses'],
-                ops['is_training']: is_training
+                # HACK: somehow TF use different strategy
+                ops['is_training']: True
             }
             summary, step, loss_val, pred_val = sess.run(
                 [ops['merged'], ops['step'],
                     ops['loss'], ops['pred']],
                 feed_dict=feed_dict)
             loss_sum += loss_val
-            # print(np.sum((batch_data['batch_poses'] - pred_val) ** 2) / 2)
             if batch_count % 10 == 0:
-                self.debut_pred(batch_data['batch_poses'], pred_val)
-                test_writer.add_summary(summary, step)
-                self.logger.info('batch {} testing loss: {}'.format(
-                    batch_count, loss_val))
-                sys.stdout.write('.')
-                sys.stdout.flush()
+                if 'locor' == self.args.model_inst.net_type:
+                    self.debut_pred(
+                        batch_data['batch_poses'], pred_val)
+                valid_writer.add_summary(summary, step)
+                self.logger.info(
+                    'batch {} validate loss: {}'.format(
+                        batch_count, loss_val))
             batch_count += 1
-        print('\n')
-        mean_loss = loss_sum / batch_count
-        self.args.logger.info('epoch testing mean loss: {:.4f}'.format(
-            mean_loss))
+        mean_loss = loss_sum / batch_count / self.args.batch_size
+        self.args.logger.info(
+            'epoch validate mean loss: {:.4f}'.format(
+                mean_loss))
+        return mean_loss
 
     def evaluate(self):
         self.logger.info('######## Evaluating ########')
         tf.reset_default_graph()
         with tf.device('/gpu:' + str(self.args.gpu_id)):
-            frames_tf, poses_tf = self.args.model_inst.placeholder_inputs()
-            is_training_tf = tf.placeholder(tf.bool, shape=())
+            frames_tf, poses_tf = self.args.model_inst.placeholder_inputs(1)
+            is_training_tf = tf.placeholder(
+                tf.bool, name='is_training')
 
-            # Get model and loss
             pred, end_points = self.args.model_inst.get_model(
                 frames_tf, is_training_tf)
-            loss = self.args.model_inst.get_loss(pred, poses_tf, end_points)
+            loss = self.args.model_inst.get_loss(
+                pred, poses_tf, end_points)
 
-            # Add ops to save and restore all the variables.
             saver = tf.train.Saver()
 
-        # Create a session
         config = tf.ConfigProto()
         config.gpu_options.allow_growth = True
         config.allow_soft_placement = True
         config.log_device_placement = False
         with tf.Session(config=config) as sess:
-            # Restore variables from disk.
             model_path = self.args.model_inst.ckpt_path
             saver.restore(sess, model_path)
-            self.logger.info('Model restored from: {}.'.format(model_path))
+            self.logger.info(
+                'Model restored from: {}.'.format(model_path))
 
             ops = {
                 'batch_frame': frames_tf,
@@ -283,24 +332,32 @@ class train_abc():
             }
 
             with file_pack() as filepack:
-                writer = self.args.model_inst.start_evaluate(filepack)
-                self.args.model_inst.start_epoch_test(filepack)
+                writer = self.args.model_inst.start_evaluate(
+                    filepack)
                 self.eval_one_epoch_write(sess, ops, writer)
             self.args.model_inst.end_evaluate(
                 self.args.data_inst, self.args)
 
     def eval_one_epoch_write(self, sess, ops, writer):
-        is_training = False
         batch_count = 0
         loss_sum = 0
+        num_stores = self.args.model_inst.store_size
+        timerbar = progressbar.ProgressBar(
+            maxval=num_stores,
+            widgets=[
+                progressbar.Percentage(),
+                ' ', progressbar.Bar('=', '[', ']'),
+                ' ', progressbar.ETA()]
+        ).start()
         while True:
-            batch_data = self.args.model_inst.fetch_batch_test()
+            batch_data = self.args.model_inst.fetch_batch(1)
             if batch_data is None:
                 break
             feed_dict = {
                 ops['batch_frame']: batch_data['batch_frame'],
                 ops['batch_poses']: batch_data['batch_poses'],
-                ops['is_training']: is_training
+                # HACK: somehow TF use different strategy
+                ops['is_training']: True
             }
             loss_val, pred_val = sess.run(
                 [ops['loss'], ops['pred']],
@@ -309,14 +366,14 @@ class train_abc():
                 writer, batch_data, pred_val
             )
             loss_sum += loss_val
+            timerbar.update(batch_count)
             batch_count += 1
-            if batch_count % 10 == 0:
-                sys.stdout.write('.')
-                sys.stdout.flush()
-        print('\n')
+        timerbar.finish()
         mean_loss = loss_sum / batch_count
-        self.args.logger.info('epoch evaluate mean loss: {:.4f}'.format(
-            mean_loss))
+        self.args.logger.info(
+            'epoch evaluate mean loss: {:.4f}'.format(
+                mean_loss))
+        return mean_loss
 
     def get_learning_rate(self, global_step):
         learning_rate = tf.train.exponential_decay(

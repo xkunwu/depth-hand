@@ -114,7 +114,6 @@ def conv2d(inputs,
            num_output_channels,
            kernel_size,
            scope,
-           shapestr,
            stride=[1, 1],
            padding='SAME',
            use_xavier=True,
@@ -173,11 +172,7 @@ def conv2d(inputs,
 
         if activation_fn is not None:
             outputs = activation_fn(outputs)
-        shapestr += '\n{}: {} = ({}, {}) --> {} @ {}'.format(
-            scope, outputs.shape,
-            outputs.shape[0], reduce(lambda x, y: x * y, outputs.shape[1:]),
-            kernel_size, stride)
-        return outputs, shapestr
+        return outputs
 
 
 def conv2d_transpose(inputs,
@@ -263,7 +258,6 @@ def conv3d(inputs,
            num_output_channels,
            kernel_size,
            scope,
-           shapestr,
            stride=[1, 1, 1],
            padding='SAME',
            use_xavier=True,
@@ -322,17 +316,12 @@ def conv3d(inputs,
 
         if activation_fn is not None:
             outputs = activation_fn(outputs)
-        shapestr += '\n{}: {} = ({}, {}) --> {} @ {}'.format(
-            scope, outputs.shape,
-            outputs.shape[0], reduce(lambda x, y: x * y, outputs.shape[1:]),
-            kernel_size, stride)
-        return outputs, shapestr
+        return outputs
 
 
 def fully_connected(inputs,
                     num_outputs,
                     scope,
-                    shapestr,
                     use_xavier=True,
                     stddev=1e-3,
                     weight_decay=0.0,
@@ -367,14 +356,12 @@ def fully_connected(inputs,
 
     if activation_fn is not None:
       outputs = activation_fn(outputs)
-  shapestr += '\n{}: {}'.format(scope, outputs.shape)
-  return outputs, shapestr
+  return outputs
 
 
 def max_pool2d(inputs,
                kernel_size,
                scope,
-               shapestr,
                stride=[2, 2],
                padding='VALID'):
     """ 2D max pooling.
@@ -396,11 +383,7 @@ def max_pool2d(inputs,
             strides=[1, stride_h, stride_w, 1],
             padding=padding,
             name=sc.name)
-    shapestr += '\n{}: {} = ({}, {}) --> {} @ {}'.format(
-        scope, outputs.shape,
-        outputs.shape[0], reduce(lambda x, y: x * y, outputs.shape[1:]),
-        kernel_size, stride)
-    return outputs, shapestr
+    return outputs
 
 def avg_pool2d(inputs,
                kernel_size,
@@ -431,7 +414,6 @@ def avg_pool2d(inputs,
 def max_pool3d(inputs,
                kernel_size,
                scope,
-               shapestr,
                stride=[2, 2, 2],
                padding='VALID'):
     """ 3D max pooling.
@@ -453,11 +435,7 @@ def max_pool3d(inputs,
             strides=[1, stride_d, stride_h, stride_w, 1],
             padding=padding,
             name=sc.name)
-    shapestr += '\n{}: {} = ({}, {}) --> {} @ {}'.format(
-        scope, outputs.shape,
-        outputs.shape[0], reduce(lambda x, y: x * y, outputs.shape[1:]),
-        kernel_size, stride)
-    return outputs, shapestr
+    return outputs
 
 def avg_pool3d(inputs,
                kernel_size,
@@ -590,7 +568,6 @@ def batch_norm_for_conv3d(inputs, is_training, bn_decay, scope):
 def dropout(inputs,
             is_training,
             scope,
-            shapestr,
             keep_prob=0.5,
             noise_shape=None):
   """ Dropout layer.
@@ -609,5 +586,4 @@ def dropout(inputs,
     outputs = tf.cond(is_training,
                       lambda: tf.nn.dropout(inputs, keep_prob, noise_shape),
                       lambda: inputs)
-  shapestr += '\n{}: {}'.format(scope, outputs.shape)
-  return outputs, shapestr
+  return outputs

@@ -201,6 +201,11 @@ class args_holder:
         self.make_logging()
         self.args.logger.info('######## {} [{}] ########'.format(
             self.args.data_name, self.args.model_name))
+        # self.args.localizer_class = getattr(
+        #     import_module(model_map[self.args.localizer_name]),
+        #     self.args.localizer_name
+        # )
+        # self.args.localizer = self.args.localizer_class(self.args)
         if 'train' == self.args.mode:
             self.args.model_class = getattr(
                 import_module(model_map[self.args.model_name]),
@@ -215,11 +220,6 @@ class args_holder:
             self.args.model_inst = self.args.model_class(self.args)
         else:
             raise ValueError('mode (%s) not recognized', self.args.mode)
-        # self.args.localizer_class = getattr(
-        #     import_module(model_map[self.args.localizer_name]),
-        #     self.args.localizer_name
-        # )
-        # self.args.localizer = self.args.localizer_class(self.args)
         self.args.model_inst.tweak_arguments(self.args)
         self.args.decay_step //= self.args.batch_size
         self.args.data_module = import_module(

@@ -186,3 +186,10 @@ def evaluate_poses(thedata, model_name, predict_dir, predict_file):
     # draw_mean_error_distribution(errors, mpplot.gca())
     # draw_i += 1
     # mpplot.show()
+
+
+def evaluate_hands(thedata, model_name, predict_dir, predict_file):
+    print('evaluating {} ...'.format(model_name))
+
+    from sklearn.metrics import precision_recall_curve
+    pass

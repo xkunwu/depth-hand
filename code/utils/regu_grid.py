@@ -169,6 +169,9 @@ class latice_image:
         scale_base = np.max(self.cellen) * self.step
         # scale_base = np.max(self.cellen)
         points2 = (delta * scale_base) + centre
+        if 1. < scale or -10. > scale:
+            print('Warning - localizer window looks bad: {}'.format(scale))
+            scale = 0.
         wsizes = np.exp(scale) * scale_base
         return points2, wsizes
 

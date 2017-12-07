@@ -32,13 +32,13 @@ class base_regre(object):
     """
     def __init__(self, args):
         self.net_rank = 2
+        self.net_type = 'poser'
         self.crop_size = 128
         self.anchor_num = 16
         self.crop_range = 800.
         self.num_channel = 1
         self.num_appen = 7
         self.batch_allot = batch_allot
-        self.batchallot = None
         # receive arguments
         self.args = args
         self.prepare_dir = args.prepare_dir
@@ -59,34 +59,48 @@ class base_regre(object):
         args.anchor_num = self.anchor_num
         args.crop_range = self.crop_range
 
-    def start_train(self):
-        self.batchallot = self.batch_allot(
-            self.batch_size, self.crop_size, self.out_dim,
-            self.num_channel, self.num_appen)
+    def start_train(self, filepack):
+        self.store_file = filepack.push_h5(self.appen_train)
+        self.store_size = self.store_file['index'].shape[0]
 
-    def start_epoch_train(self, filepack):
-        self.batchallot.assign(
-            filepack.push_h5(self.appen_train)
-        )
+    def start_epoch_train(self, split_beg, split_end):
+        self.batch_beg = split_end
+        self.split_end = split_beg + self.store_size
 
-    def start_epoch_test(self, filepack):
-        self.batchallot.assign(
-            filepack.push_h5(self.appen_test)
-        )
+    def start_epoch_valid(self, split_beg, split_end):
+        self.batch_beg = split_beg
+        self.split_end = split_end \
+            if 0 != split_end \
+            else self.store_size
 
-    def fetch_batch_train(self):
-        return self.batchallot.fetch_batch()
-
-    def fetch_batch_test(self):
-        return self.batchallot.fetch_batch()
+    def fetch_batch(self, fetch_size=None):
+        if fetch_size is None:
+            fetch_size = self.batch_size
+        batch_end = self.batch_beg + fetch_size
+        if batch_end >= self.store_size:
+            self.batch_beg = batch_end
+            batch_end = self.batch_beg + fetch_size
+            self.split_end -= self.store_size
+        # print(self.batch_beg, batch_end, self.split_end)
+        if batch_end >= self.split_end:
+            return None
+        batch_data = {
+            'batch_index': self.store_file['index'][self.batch_beg:batch_end, ...],
+            'batch_frame': self.store_file['frame'][self.batch_beg:batch_end, ...],
+            'batch_poses': self.store_file['poses'][self.batch_beg:batch_end, ...],
+            'batch_resce': self.store_file['resce'][self.batch_beg:batch_end, ...]
+        }
+        self.batch_beg = batch_end
+        return batch_data
 
     def end_train(self):
-        self.batchallot = None
+        pass
 
     def start_evaluate(self, filepack):
-        self.batchallot = self.batch_allot(
-            self.batch_size, self.crop_size, self.out_dim,
-            self.num_channel, self.num_appen)
+        self.store_file = filepack.push_h5(self.appen_test)
+        self.store_size = self.store_file['index'].shape[0]
+        self.batch_beg = 0
+        self.split_end = self.store_size
         return filepack.write_file(self.predict_file)
 
     def evaluate_batch(self, writer, batch_data, pred_val):
@@ -97,7 +111,6 @@ class base_regre(object):
         )
 
     def end_evaluate(self, thedata, args):
-        self.batchallot = None
         mpplot.figure(figsize=(2 * 5, 1 * 5))
         args.data_draw.draw_prediction_poses(
             thedata,
@@ -132,9 +145,9 @@ class base_regre(object):
                 ' ', progressbar.ETA()]
         ).start()
         image_size = self.crop_size
-        out_dim = batchallot.out_dim
-        num_channel = batchallot.num_channel
-        num_appen = batchallot.num_appen
+        out_dim = self.out_dim
+        num_channel = self.num_channel
+        num_appen = self.num_appen
         with h5py.File(os.path.join(self.prepare_dir, name_appen), 'w') as h5file:
             h5file.create_dataset(
                 'index',
@@ -313,16 +326,6 @@ class base_regre(object):
             'draw_{}.png'.format(self.__class__.__name__)))
         mpplot.show()
 
-    def placeholder_inputs(self):
-        frames_tf = tf.placeholder(
-            tf.float32, shape=(
-                self.batch_size,
-                self.crop_size, self.crop_size,
-                1))
-        poses_tf = tf.placeholder(
-            tf.float32, shape=(self.batch_size, self.out_dim))
-        return frames_tf, poses_tf
-
     def get_model(
             self, input_tensor, is_training,
             scope=None, final_endpoint='stage_out'):
@@ -337,91 +340,129 @@ class base_regre(object):
             end_points[name] = net
             return name == final_endpoint
 
-        with tf.variable_scope(scope, self.__class__.__name__, [input_tensor]):
+        with tf.variable_scope(
+                scope, self.__class__.__name__, [input_tensor]):
             with slim.arg_scope(
-                    [slim.batch_norm, slim.dropout], is_training=is_training), \
+                    [slim.batch_norm, slim.dropout],
+                    is_training=is_training), \
                 slim.arg_scope(
                     [slim.fully_connected],
-                    activation_fn=tf.nn.relu, normalizer_fn=slim.batch_norm), \
+                    weights_regularizer=slim.l2_regularizer(0.00004),
+                    biases_regularizer=slim.l2_regularizer(0.00004),
+                    activation_fn=None, normalizer_fn=None), \
                 slim.arg_scope(
                     [slim.max_pool2d, slim.avg_pool2d],
                     stride=1, padding='SAME'), \
                 slim.arg_scope(
                     [slim.conv2d],
-                    stride=1, padding='SAME', activation_fn=tf.nn.relu,
+                    stride=1, padding='SAME',
+                    activation_fn=tf.nn.relu,
+                    weights_regularizer=slim.l2_regularizer(0.00004),
+                    biases_regularizer=slim.l2_regularizer(0.00004),
                     normalizer_fn=slim.batch_norm):
                 with tf.variable_scope('stage128'):
                     sc = 'stage128_image'
-                    net = slim.conv2d(input_tensor, 16, 3, scope='conv128_3x3_1')
-                    net = slim.conv2d(net, 16, 3, stride=2, scope='conv128_3x3_2')
-                    net = slim.max_pool2d(net, 3, scope='maxpool128_3x3_1')
-                    net = slim.conv2d(net, 32, 3, scope='conv64_3x3_1')
-                    net = slim.max_pool2d(net, 3, stride=2, scope='maxpool64_3x3_2')
+                    net = slim.conv2d(
+                        input_tensor, 16, 3, scope='conv128_3x3_1')
+                    net = slim.conv2d(
+                        net, 16, 3, stride=2, scope='conv128_3x3_2')
+                    net = slim.max_pool2d(
+                        net, 3, scope='maxpool128_3x3_1')
+                    net = slim.conv2d(
+                        net, 32, 3, stride=2, scope='conv64_3x3_2')
+                    net = slim.max_pool2d(
+                        net, 3, scope='maxpool64_3x3_1')
                     self.end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points
                 with tf.variable_scope('stage32'):
                     sc = 'stage32_image'
-                    net = slim.conv2d(net, 64, 3, scope='conv32_3x3_1')
-                    net = slim.max_pool2d(net, 3, stride=2, scope='maxpool32_3x3_2')
+                    net = slim.conv2d(
+                        net, 64, 3, stride=2, scope='conv32_3x3_2')
+                    net = slim.max_pool2d(
+                        net, 3, scope='maxpool32_3x3_1')
                     self.end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points
                 with tf.variable_scope('stage16'):
                     sc = 'stage16_image'
-                    net = slim.conv2d(net, 128, 3, scope='conv16_3x3_1')
-                    net = slim.max_pool2d(net, 3, stride=2, scope='maxpool16_3x3_2')
+                    net = slim.conv2d(
+                        net, 128, 3, stride=2, scope='conv16_3x3_2')
+                    net = slim.max_pool2d(
+                        net, 3, scope='maxpool16_3x3_1')
                     self.end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points
                 with tf.variable_scope('stage8'):
-                    net = slim.flatten(net)
                     sc = 'stage_out'
-                    net = slim.fully_connected(net, 768, scope='fullconn8')
+                    net = slim.avg_pool2d(
+                        net, 5, stride=3, padding='VALID',
+                        scope='avgpool8_5x5_3')
+                    self.end_point_list.append('avgpool8_5x5_3')
+                    if add_and_check_final('avgpool8_5x5_3', net):
+                        return net, end_points
+                    net = slim.conv2d(net, 64, 1, scope='reduce8')
+                    self.end_point_list.append('reduce8')
+                    if add_and_check_final('reduce8', net):
+                        return net, end_points
+                    net = slim.conv2d(
+                        net, 128, net.get_shape()[1:3],
+                        padding='VALID', scope='fullconn8_a')
+                    self.end_point_list.append('fullconn8_a')
+                    if add_and_check_final('fullconn8_a', net):
+                        return net, end_points
                     net = slim.dropout(
-                        net, 0.5, is_training=is_training, scope='dropout8')
+                        net, 0.5, scope='dropout8')
+                    net = slim.flatten(net)
                     net = slim.fully_connected(
-                        net, self.out_dim, activation_fn=None, scope='output8')
+                        net, self.out_dim, scope='output8')
                     self.end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points
 
         raise ValueError('final_endpoint (%s) not recognized', final_endpoint)
 
-        # shapestr = 'input: {}'.format(input_image.shape)
-        # net, shapestr = tf_util.conv2d(
-        #     input_image, 16, [5, 5], stride=[1, 1], scope='conv1', shapestr=shapestr,
+        # tf_util = import_module('utils.tf_util')
+        # bn_decay = 0.9997
+        # net = tf_util.conv2d(
+        #     input_tensor, 16, [5, 5], stride=[1, 1], scope='conv1',
         #     padding='VALID', is_training=is_training, bn=True, bn_decay=bn_decay)
-        # net, shapestr = tf_util.max_pool2d(
-        #     net, [4, 4], scope='maxpool1', shapestr=shapestr, padding='VALID')
-        # net, shapestr = tf_util.conv2d(
-        #     net, 32, [3, 3], stride=[1, 1], scope='conv2', shapestr=shapestr,
+        # net = tf_util.max_pool2d(
+        #     net, [4, 4], scope='maxpool1', padding='VALID')
+        # net = tf_util.conv2d(
+        #     net, 32, [3, 3], stride=[1, 1], scope='conv2',
         #     padding='VALID', is_training=is_training, bn=True, bn_decay=bn_decay)
-        # net, shapestr = tf_util.max_pool2d(
-        #     net, [2, 2], scope='maxpool2', shapestr=shapestr, padding='VALID')
-        # net, shapestr = tf_util.conv2d(
-        #     net, 64, [3, 3], stride=[1, 1], scope='conv3', shapestr=shapestr,
+        # net = tf_util.max_pool2d(
+        #     net, [2, 2], scope='maxpool2', padding='VALID')
+        # net = tf_util.conv2d(
+        #     net, 64, [3, 3], stride=[1, 1], scope='conv3',
         #     padding='VALID', is_training=is_training, bn=True, bn_decay=bn_decay)
-        # net, shapestr = tf_util.max_pool2d(
-        #     net, [2, 2], scope='maxpool3', shapestr=shapestr, padding='VALID')
+        # net = tf_util.max_pool2d(
+        #     net, [2, 2], scope='maxpool3', padding='VALID')
         # # print(net.shape)
         #
-        # net = tf.reshape(net, [batch_size, -1])
-        # net, shapestr = tf_util.fully_connected(
-        #     net, 1024, scope='fullconn1', shapestr=shapestr,
+        # net = tf.reshape(net, [self.batch_size, -1])
+        # net = tf_util.fully_connected(
+        #     net, 1024, scope='fullconn1',
         #     is_training=is_training, bn=True, bn_decay=bn_decay)
-        # # net = tf_util.conv2d(
-        # #     net, 1024, [1, 1], stride=[1, 1], scope='fullconn1',
-        # #     padding='VALID', is_training=is_training, bn=True, bn_decay=bn_decay)
-        # net, shapestr = tf_util.dropout(
-        #     net, keep_prob=0.5, scope='dropout1', shapestr=shapestr, is_training=is_training)
-        # net, shapestr = tf_util.fully_connected(
-        #     net, self.out_dim, scope='fullconn3', shapestr=shapestr, activation_fn=None)
-        # # net = tf_util.conv2d(
-        # #     net, self.out_dim, [1, 1], stride=[1, 1], scope='fullconn3',
-        # #     padding='VALID', is_training=is_training, bn=True, bn_decay=bn_decay)
+        # net = tf_util.dropout(
+        #     net, keep_prob=0.5, scope='dropout1', is_training=is_training)
+        # net = tf_util.fully_connected(
+        #     net, self.out_dim, scope='fullconn3', activation_fn=None)
 
-        # return net, end_points
+        return net, end_points
+
+    def placeholder_inputs(self, batch_size=None):
+        if batch_size is None:
+            batch_size = self.batch_size
+        frames_tf = tf.placeholder(
+            tf.float32, shape=(
+                batch_size,
+                self.crop_size, self.crop_size,
+                1))
+        poses_tf = tf.placeholder(
+            tf.float32, shape=(batch_size, self.out_dim))
+        return frames_tf, poses_tf
 
     def get_loss(self, pred, anno, end_points):
         """ simple sum-of-squares loss

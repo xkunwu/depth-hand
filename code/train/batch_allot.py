@@ -60,55 +60,55 @@ class batch_allot(object):
             # dtype=np.float32)
             dtype=float)
 
-    def fetch_store(self):
-        if self.store_beg >= self.file_size:
-            return False
-        store_end = min(
-            self.store_beg + self.store_size,
-            self.file_size
-        )
-        self.store_size = store_end - self.store_beg
-        self.batch_index = self.store_file['index'][self.store_beg:store_end, ...]
-        self.batch_frame = self.store_file['frame'][self.store_beg:store_end, ...]
-        self.batch_poses = self.store_file['poses'][self.store_beg:store_end, ...]
-        self.batch_resce = self.store_file['resce'][self.store_beg:store_end, ...]
-        self.store_beg = store_end
-        self.batch_beg = 0
-        return True
-
-    def assign(self, store_file):
-        self.store_file = store_file
-        self.file_size = self.store_file['index'].shape[0]
-        self.store_size = min(
-            self.file_size,
-            ((virtual_memory().total >> 1) // self.batch_bytes) * self.batch_size
-        )
-        self.store_beg = 0
-        self.fetch_store()
-
-    def fetch_batch(self):
-        # if self.batch_beg >= self.store_size:
-        #     if not self.fetch_store():
-        #         return None
-        # batch_end = min(
-        #     self.batch_beg + self.batch_size,
-        #     self.store_size
-        # )
-        batch_end = self.batch_beg + self.batch_size
-        if batch_end >= self.store_size:
-            if not self.fetch_store():
-                return None
-            batch_end = self.batch_beg + self.batch_size
-            if batch_end >= self.store_size:
-                return None
-        batch_data = {
-            'batch_index': self.batch_index[self.batch_beg:batch_end, ...],
-            'batch_frame': self.batch_frame[self.batch_beg:batch_end, ...],
-            'batch_poses': self.batch_poses[self.batch_beg:batch_end, ...],
-            'batch_resce': self.batch_resce[self.batch_beg:batch_end, ...]
-        }
-        self.batch_beg = batch_end
-        return batch_data
+    # def fetch_store(self):
+    #     if self.store_beg >= self.file_size:
+    #         return False
+    #     store_end = min(
+    #         self.store_beg + self.store_size,
+    #         self.file_size
+    #     )
+    #     self.store_size = store_end - self.store_beg
+    #     self.batch_index = self.store_file['index'][self.store_beg:store_end, ...]
+    #     self.batch_frame = self.store_file['frame'][self.store_beg:store_end, ...]
+    #     self.batch_poses = self.store_file['poses'][self.store_beg:store_end, ...]
+    #     self.batch_resce = self.store_file['resce'][self.store_beg:store_end, ...]
+    #     self.store_beg = store_end
+    #     self.batch_beg = 0
+    #     return True
+    #
+    # def assign(self, store_file):
+    #     self.store_file = store_file
+    #     self.file_size = self.store_file['index'].shape[0]
+    #     self.store_size = min(
+    #         self.file_size,
+    #         ((virtual_memory().total >> 1) // self.batch_bytes) * self.batch_size
+    #     )
+    #     self.store_beg = 0
+    #     self.fetch_store()
+    #
+    # def fetch_batch(self):
+    #     # if self.batch_beg >= self.store_size:
+    #     #     if not self.fetch_store():
+    #     #         return None
+    #     # batch_end = min(
+    #     #     self.batch_beg + self.batch_size,
+    #     #     self.store_size
+    #     # )
+    #     batch_end = self.batch_beg + self.batch_size
+    #     if batch_end >= self.store_size:
+    #         if not self.fetch_store():
+    #             return None
+    #         batch_end = self.batch_beg + self.batch_size
+    #         if batch_end >= self.store_size:
+    #             return None
+    #     batch_data = {
+    #         'batch_index': self.batch_index[self.batch_beg:batch_end, ...],
+    #         'batch_frame': self.batch_frame[self.batch_beg:batch_end, ...],
+    #         'batch_poses': self.batch_poses[self.batch_beg:batch_end, ...],
+    #         'batch_resce': self.batch_resce[self.batch_beg:batch_end, ...]
+    #     }
+    #     self.batch_beg = batch_end
+    #     return batch_data
 
 
 class batch_allot_conv3(batch_allot):

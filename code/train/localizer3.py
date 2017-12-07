@@ -308,16 +308,16 @@ class localizer3(base_conv3):
 
         raise ValueError('final_endpoint (%s) not recognized', final_endpoint)
 
-    def placeholder_inputs(self, n_frame=None):
-        if n_frame is None:
-            n_frame = self.batch_size
+    def placeholder_inputs(self, batch_size=None):
+        if batch_size is None:
+            batch_size = self.batch_size
         frames_tf = tf.placeholder(
             tf.float32, shape=(
-                n_frame,
+                batch_size,
                 self.crop_size, self.crop_size, self.crop_size,
                 1))
         poses_tf = tf.placeholder(
-            tf.float32, shape=(n_frame, self.out_dim))
+            tf.float32, shape=(batch_size, self.out_dim))
         return frames_tf, poses_tf
 
     def get_loss(self, pred, echt, end_points):

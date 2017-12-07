@@ -36,6 +36,7 @@ regu_grid = getattr(
 class localizer2(base_regre):
     def __init__(self, args):
         super(localizer2, self).__init__(args)
+        self.net_type = 'locor'
         self.batch_allot = batch_allot_loc2
         self.crop_size = 256
         self.anchor_num = 8
@@ -176,14 +177,114 @@ class localizer2(base_regre):
         mpplot.savefig(os.path.join(self.predict_dir, fname))
         print('figures saved: {}'.format(fname))
 
+        from sklearn.metrics import precision_recall_curve
+        from sklearn.metrics import average_precision_score
+        import re
+        mpplot.gcf().clear()
+        anchor_num = self.anchor_num ** 2
+        with h5py.File(self.appen_test, 'r') as h5file:
+            label = h5file['poses'][:, :anchor_num]
+        num_p = label.shape[0]
+        pred_conf = np.empty((num_p, anchor_num))
+        with open(self.predict_file, 'r') as pred_f:
+            for ii, line_pred in enumerate(pred_f):
+                pred_list = re.split(r'\s+', line_pred.strip())
+                pred_val = [float(i) for i in pred_list[4:]]
+                pred_conf[ii, :] = np.array(pred_val)
+        lid = np.argmax(label, axis=1)
+        pred_conf_pos = pred_conf[np.arange(num_p), lid]
+        percent = np.arange(num_p + 1) * 100 / num_p
+        pred_conf_pos_sort = np.sort(
+            np.append(pred_conf_pos, np.max(pred_conf_pos)))
+        mpplot.plot(
+            pred_conf_pos_sort, percent,
+            '-',
+            linewidth=2.0
+        )
+        mpplot.ylabel('Percentage (%)')
+        mpplot.ylim([0, 100])
+        mpplot.xlabel('Dectection confidence')
+        mpplot.xlim([0, 1.])
+        # mpplot.xlim(left=0)
+        # mpplot.xlim(right=100)
+        mpplot.tight_layout()
+        fname = 'evaluate_confidence_{}.png'.format(
+            self.__class__.__name__)
+        mpplot.savefig(os.path.join(self.predict_dir, fname))
+        print('figures saved: {}'.format(fname))
+
+        mpplot.gcf().clear()
+        label = label.flatten()
+        pred_conf = pred_conf.flatten()
+        pr, rc, _ = precision_recall_curve(
+            label, pred_conf)
+        avg_ps = average_precision_score(label, pred_conf)
+        # prInv = np.fliplr([pr])[0]
+        # rcInv = np.fliplr([rc])[0]
+        # j = rc.shape[0] - 2
+        # while 0 <= j:
+        #     if prInv[j + 1] > prInv[j]:
+        #         prInv[j] = prInv[j + 1]
+        #     j -= 1
+        # decreasing_max_pr = np.maximum.accumulate(
+        #     prInv[::-1][::-1]
+        # )
+        # mpplot.plot(
+        #     rcInv, decreasing_max_pr)
+        # mpplot.fill_between(
+        #     rcInv, decreasing_max_pr, step='post', alpha=0.2,
+        #     color='b')
+        mpplot.step(rc, pr, color='b', alpha=0.2, where='post')
+        mpplot.fill_between(rc, pr, step='post', color='b', alpha=0.2)
+        mpplot.ylim([0., 1.01])
+        mpplot.xlim([0., 1.])
+        mpplot.ylabel('Precision')
+        mpplot.xlabel('Recall')
+        mpplot.title('Hand detection: AP={0:0.2f}'.format(
+            avg_ps))
+        mpplot.tight_layout()
+        # mpplot.show()
+        fname = 'evaluate_pr_{}.png'.format(self.__class__.__name__)
+        mpplot.savefig(os.path.join(self.predict_dir, fname))
+        print('figures saved: {}'.format(fname))
+
     def convert_input(self, img, args, caminfo):
         return np.expand_dims(np.expand_dims(img, axis=0), axis=-1)
 
     def convert_output(self, pred_val, args, caminfo):
-        centre_raw, _ = self.yanker(
+        centre, index, confidence = self.yanker(
             pred_val.flatten(), np.zeros(3), caminfo)
-        cube = iso_cube(centre_raw.flatten(), self.region_size)
-        return cube
+        cube = iso_cube(centre.flatten(), self.region_size)
+        return cube, index, confidence
+
+    def _draw_prediction(self, frame_h5, resce_h5, pred_val):
+        frame_h5 = self.args.data_ops.rescale_depth_inv(
+            frame_h5, self.caminfo)
+        colors = [Color('orange').rgb, Color('red').rgb, Color('lime').rgb]
+        mpplot.subplot(1, 2, 1)
+        mpplot.imshow(frame_h5, cmap='bone')
+        resce3 = resce_h5[0:4]
+        cube = iso_cube()
+        cube.load(resce3)
+        cube.show_dims()
+        rects = cube.proj_rects_3(
+            self.args.data_ops.raw_to_2d, self.caminfo
+        )
+        for ii, rect in enumerate(rects):
+            rect.draw(colors[ii])
+        mpplot.gcf().gca().set_title('Ground truth')
+
+        mpplot.subplot(1, 2, 2)
+        mpplot.imshow(frame_h5, cmap='bone')
+        cube, index, confidence = self.convert_output(
+            pred_val, self.args, self.caminfo)
+        cube.show_dims()
+        rects = cube.proj_rects_3(
+            self.args.data_ops.raw_to_2d, self.caminfo
+        )
+        for ii, rect in enumerate(rects):
+            rect.draw(colors[ii])
+        mpplot.gca().set_title('Prediction')
 
     def draw_prediction(self, thedata, args):
         import linecache
@@ -193,7 +294,7 @@ class localizer2(base_regre):
         with h5py.File(self.appen_test, 'r') as h5file:
             img_id = h5file['index'][frame_id, 0]
             frame_h5 = np.squeeze(h5file['frame'][frame_id, ...], -1)
-            # poses_h5 = h5file['poses'][frame_id, ...].reshape(-1, 3)
+            # poses_h5 = h5file['poses'][frame_id, ...]
             resce_h5 = h5file['resce'][frame_id, ...]
             frame_h5 = args.data_ops.rescale_depth_inv(
                 frame_h5, self.caminfo)
@@ -350,43 +451,60 @@ class localizer2(base_regre):
             end_points[name] = net
             return name == final_endpoint
 
-        with tf.variable_scope(scope, self.__class__.__name__, [input_tensor]):
+        with tf.variable_scope(
+                scope, self.__class__.__name__, [input_tensor]):
             with slim.arg_scope(
-                    [slim.batch_norm, slim.dropout], is_training=is_training), \
+                    [slim.batch_norm, slim.dropout],
+                    is_training=is_training), \
                 slim.arg_scope(
                     [slim.fully_connected],
-                    # activation_fn=tf.nn.relu, normalizer_fn=slim.batch_norm), \
+                    weights_regularizer=slim.l2_regularizer(0.00004),
+                    biases_regularizer=slim.l2_regularizer(0.00004),
                     activation_fn=None, normalizer_fn=None), \
                 slim.arg_scope(
                     [slim.max_pool2d, slim.avg_pool2d],
                     stride=1, padding='SAME'), \
                 slim.arg_scope(
                     [slim.conv2d],
-                    stride=1, padding='SAME', activation_fn=tf.nn.relu,
+                    stride=1, padding='SAME',
+                    activation_fn=tf.nn.relu,
+                    weights_regularizer=slim.l2_regularizer(0.00004),
+                    biases_regularizer=slim.l2_regularizer(0.00004),
                     normalizer_fn=slim.batch_norm):
                 with tf.variable_scope('stage0'):
                     sc = 'stage0_image'
-                    net = slim.conv2d(input_tensor, 8, 3, scope='conv0a_3x3_1')
-                    net = slim.conv2d(net, 8, 3, stride=2, scope='conv0a_3x3_2')
-                    net = slim.max_pool2d(net, 3, scope='maxpool0a_3x3_1')
+                    net = slim.conv2d(
+                        input_tensor, 8, 3, scope='conv0a_3x3_1')
+                    net = slim.conv2d(
+                        net, 8, 3, stride=2, scope='conv0a_3x3_2')
+                    net = slim.max_pool2d(
+                        net, 3, scope='maxpool0a_3x3_1')
                     self.end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points
                 with tf.variable_scope('stage1'):
                     sc = 'stage1_image'
-                    net = slim.conv2d(net, 16, 3, stride=2, scope='conv1a_3x3_2')
-                    net = slim.max_pool2d(net, 3, scope='maxpool1a_3x3_1')
-                    net = slim.conv2d(net, 32, 3, stride=2, scope='conv1b_3x3_2')
-                    net = slim.max_pool2d(net, 3, scope='maxpool1b_3x3_1')
-                    net = slim.conv2d(net, 64, 3, stride=2, scope='conv1c_3x3_2')
-                    net = slim.max_pool2d(net, 3, scope='maxpool1c_3x3_1')
+                    net = slim.conv2d(
+                        net, 16, 3, stride=2, scope='conv1a_3x3_2')
+                    net = slim.max_pool2d(
+                        net, 3, scope='maxpool1a_3x3_1')
+                    net = slim.conv2d(
+                        net, 32, 3, stride=2, scope='conv1b_3x3_2')
+                    net = slim.max_pool2d(
+                        net, 3, scope='maxpool1b_3x3_1')
+                    net = slim.conv2d(
+                        net, 64, 3, stride=2, scope='conv1c_3x3_2')
+                    net = slim.max_pool2d(
+                        net, 3, scope='maxpool1c_3x3_1')
                     self.end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points
                 with tf.variable_scope('stage16'):
                     sc = 'stage16_image'
-                    net = slim.conv2d(net, 128, 3, stride=2, scope='conv16_3x3_1')
-                    net = slim.max_pool2d(net, 3, scope='maxpool16_3x3_2')
+                    net = slim.conv2d(
+                        net, 128, 3, stride=2, scope='conv16_3x3_1')
+                    net = slim.max_pool2d(
+                        net, 3, scope='maxpool16_3x3_2')
                     self.end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points
@@ -395,7 +513,8 @@ class localizer2(base_regre):
                     fshape = net.get_shape()[1:3]
                     anchor_num = self.anchor_num ** 2
                     with tf.variable_scope('branch_cls'):
-                        out_cls = slim.conv2d(net, 16, 1, scope='reduce_cls_a')
+                        out_cls = slim.conv2d(
+                            net, 16, 1, scope='reduce_cls_a')
                         out_cls = slim.conv2d(
                             out_cls, 16, fshape,
                             scope='fullconn_cls_a')
@@ -408,12 +527,13 @@ class localizer2(base_regre):
                         out_cls = slim.flatten(out_cls)
                         out_cls = slim.fully_connected(
                             out_cls, anchor_num,
-                            activation_fn=None, scope='fullconn_cls_b')
+                            scope='fullconn_cls_b')
                         self.end_point_list.append('branch_cls')
                         if add_and_check_final('branch_cls', out_cls):
                             return net, end_points
                     with tf.variable_scope('branch_reg'):
-                        out_reg = slim.conv2d(net, 16, 1, scope='reduce_reg_a')
+                        out_reg = slim.conv2d(
+                            net, 16, 1, scope='reduce_reg_a')
                         out_reg = slim.conv2d(
                             out_reg, 16, fshape,
                             scope='fullconn_reg_a')
@@ -432,7 +552,7 @@ class localizer2(base_regre):
                         out_reg = slim.flatten(out_reg)
                         out_reg = slim.fully_connected(
                             out_reg, anchor_num * 3,
-                            activation_fn=None, scope='fullconn_cls_b')
+                            scope='fullconn_reg_b')
                         self.end_point_list.append('branch_reg')
                         if add_and_check_final('branch_reg', out_reg):
                             return net, end_points
@@ -443,16 +563,16 @@ class localizer2(base_regre):
 
         raise ValueError('final_endpoint (%s) not recognized', final_endpoint)
 
-    def placeholder_inputs(self, n_frame=None):
-        if n_frame is None:
-            n_frame = self.batch_size
+    def placeholder_inputs(self, batch_size=None):
+        if batch_size is None:
+            batch_size = self.batch_size
         frames_tf = tf.placeholder(
             tf.float32, shape=(
-                n_frame,
+                batch_size,
                 self.crop_size, self.crop_size,
                 1))
         poses_tf = tf.placeholder(
-            tf.float32, shape=(n_frame, self.out_dim))
+            tf.float32, shape=(batch_size, self.out_dim))
         return frames_tf, poses_tf
 
     @staticmethod

@@ -15,15 +15,15 @@ args_holder = getattr(
 )
 
 
-def run_one(args, mpplot, with_train=False):
+def run_one(args, mpplot, with_train=False, with_eval=False):
     predict_file = args.model_inst.predict_file
     trainer = train_abc(args, False)
     if with_train or (not os.path.exists(os.path.join(
             args.log_dir_t, 'model.ckpt.meta'))):
         trainer.train()
-    if with_train or (not os.path.exists(predict_file)):
+    if with_eval or (not os.path.exists(predict_file)):
         trainer.evaluate()
-    trainer.evaluate()
+    # trainer.evaluate()
 
 
 def draw_compare(args, mpplot, predict_dir=None):
@@ -105,6 +105,8 @@ if __name__ == "__main__":
 
     with_train = True
     # with_train = False
+    with_eval = True
+    # with_eval = False
 
     mpl = import_module('matplotlib')
     mpl.use('Agg')
@@ -119,7 +121,7 @@ if __name__ == "__main__":
 
         test_dataops(args)
 
-        run_one(args, mpplot, with_train)
+        run_one(args, mpplot, with_train, with_eval)
 
         # draw_compare(args, mpplot)
     sys.exit()
@@ -132,9 +134,9 @@ if __name__ == "__main__":
         # 'trunc_dist',
         # 'base_conv3',
         # 'ortho3view',
-        'base_clean',
+        # 'base_clean',
         'base_regre',
-        'base_clean_inres',
+        # 'base_clean_inres',
         'base_regre_inres'
     ]
     for meth in methlist:
@@ -143,7 +145,8 @@ if __name__ == "__main__":
             args = argsholder.args
             args.model_name = meth
             argsholder.create_instance()
-            run_one(args, mpplot, with_train)
+            # run_one(args, mpplot, with_train, with_eval)
+            run_one(args, mpplot, True, True)
             # test_dataops(args)
     draw_compare(args, mpplot)
     copyfile(

@@ -88,10 +88,12 @@ def yank_localizer2(pose_local, resce, caminfo):
     pcnt = pose_local[:anchor_num].reshape(
         caminfo.anchor_num, caminfo.anchor_num)
     index = np.array(np.unravel_index(np.argmax(pcnt), pcnt.shape))
+    logits = pcnt[index[0], index[1]]
+    confidence = 1 / (1 + np.exp(-logits))
     anchors = pose_local[anchor_num:]
     points2, wsizes, centre = yank_localizer2_rect(
         index, anchors, caminfo)
-    return centre, index
+    return centre, index, confidence
 
 
 def prow_localizer3(line, image_dir, caminfo):
@@ -246,13 +248,22 @@ def write_region2(fanno, yanker, caminfo, batch_index, batch_resce, batch_poses)
     for ii in range(batch_index.shape[0]):
         img_name = dataio.index2imagename(batch_index[ii, 0])
         pose_local = batch_poses[ii, :]
-        resce = batch_resce[ii, :]
-        centre, index = yanker(pose_local, resce, caminfo)
-        # crimg_line = ''.join("%12.4f" % x for x in centre.flatten())
+        # resce = batch_resce[ii, :]
+        # centre, index, confidence = yanker(pose_local, resce, caminfo)
+        anchor_num = caminfo.anchor_num ** 2
+        pcnt = pose_local[:anchor_num]
+        label = np.argmax(pcnt)
+        index = np.array(np.unravel_index(
+            label,
+            (caminfo.anchor_num, caminfo.anchor_num)))
+        confidence = 1 / (1 + np.exp(-pcnt))
+        anchors = pose_local[anchor_num:]
+        _, _, centre = yank_localizer2_rect(
+            index, anchors, caminfo)
         fanno.write(
             img_name +
             '\t' + '\t'.join("%.4f" % x for x in centre.flatten()) +
-            '\t' + '\t'.join("%.4f" % x for x in index.flatten()) +
+            '\t' + '\t'.join("%.4f" % x for x in confidence.flatten()) +
             '\n')
 
 
@@ -262,8 +273,10 @@ def write_region(fanno, yanker, caminfo, batch_index, batch_resce, batch_poses):
         pose_local = batch_poses[ii, :]
         resce = batch_resce[ii, :]
         centre = yanker(pose_local, resce, caminfo)
-        crimg_line = ''.join("%12.4f" % x for x in centre.flatten())
-        fanno.write(img_name + crimg_line + '\n')
+        fanno.write(
+            img_name +
+            '\t' + '\t'.join("%.4f" % x for x in centre.flatten()) +
+            '\n')
 
 
 def write2d(fanno, yanker, caminfo, batch_index, batch_resce, batch_poses):
@@ -272,5 +285,7 @@ def write2d(fanno, yanker, caminfo, batch_index, batch_resce, batch_poses):
         pose_local = batch_poses[ii, :].reshape(-1, 3)
         resce = batch_resce[ii, :]
         pose_raw = yanker(pose_local, resce, caminfo)
-        crimg_line = ''.join("%12.4f" % x for x in pose_raw.flatten())
-        fanno.write(img_name + crimg_line + '\n')
+        fanno.write(
+            img_name +
+            '\t' + '\t'.join("%.4f" % x for x in pose_raw.flatten()) +
+            '\n')

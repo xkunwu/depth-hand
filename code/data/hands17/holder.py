@@ -11,24 +11,23 @@ from . import io as dataio
 class hands17holder:
     """ Pose class for Hands17 dataset """
 
-    # dataset info
-    data_dir = ''
-    out_dir = ''
-    predict_dir = ''
-    training_images = ''
-    frame_images = ''
-    training_annot_origin = ''
-    training_annot_cleaned = ''
-    training_annot_train = ''
-    training_annot_test = ''
-    frame_bbox = ''
-
-    # num_training = int(957032)
-    num_training = int(992)
-    # num_training = int(96)
-    tt_split = int(64)
-    range_train = np.zeros(2, dtype=np.int)
-    range_test = np.zeros(2, dtype=np.int)
+    # # dataset info
+    # data_dir = ''
+    # out_dir = ''
+    # predict_dir = ''
+    # training_images = ''
+    # frame_images = ''
+    # training_annot_origin = ''
+    # training_annot_cleaned = ''
+    # training_annot_train = ''
+    # training_annot_test = ''
+    # frame_bbox = ''
+    #
+    # # num_training = int(957032)
+    # num_training = int(992)
+    # # num_training = int(96)
+    # range_train = np.zeros(2, dtype=np.int)
+    # range_test = np.zeros(2, dtype=np.int)
 
     # cropped & resized training images
     # world/image coordinates are reversed!!!
@@ -131,17 +130,23 @@ class hands17holder:
         # import random
         # np.random.shuffle(lines)
         with open(self.training_annot_train, 'w') as f:
-            for line in lines[self.range_train[0]:self.range_train[1]]:
+            for line in lines[:self.train_test_split]:
                 f.write(line)
         with open(self.training_annot_test, 'w') as f:
-            for line in lines[self.range_test[0]:self.range_test[1]]:
+            for line in lines[self.train_test_split:]:
                 # name = re.match(r'^(image_D\d+\.png)', line).group(1)
                 # shutil.move(
                 #     os.path.join(self.training_cropped, name),
                 #     os.path.join(self.evaluate_cropped, name))
                 f.write(line)
-        self.logger.info('splitted data: {} training, {} test ({:d} portions).'.format(
-            self.range_train, self.range_test, self.tt_split))
+
+    def next_split_range(self):
+        split_beg = self.portion * self.split_id
+        self.split_id = (self.split_id + 1) % self.split_num
+        split_end = self.portion * self.split_id
+        # split_all = self.portion * self.split_num
+        # return split_beg, split_end, split_all
+        return split_beg, split_end
 
     def init_data(self):
         if (not os.path.exists(self.training_annot_cleaned)):
@@ -157,15 +162,24 @@ class hands17holder:
             self.num_training = int(sum(
                 1 for line in open(self.training_annot_cleaned, 'r')))
 
-        portion = int(self.num_training / self.tt_split)
-        self.range_train[0] = int(0)
-        self.range_train[1] = int(portion * (self.tt_split - 1))
-        self.range_test[0] = self.range_train[1]
-        self.range_test[1] = self.num_training
+        split_num = int(16)
+        portion = int(np.ceil(float(self.num_training) / split_num))
+        self.train_test_split = int(portion * (split_num - 1))
+        # self.range_train[0] = int(0)
+        # self.range_train[1] = int(portion * (split_num - 1))
+        # self.range_test[0] = self.range_train[1]
+        # self.range_test[1] = self.num_training
+        self.split_num = split_num - 1
+        self.portion = portion
+        self.split_id = -1 % self.split_num
 
         if ((not os.path.exists(self.training_annot_train)) or
                 (not os.path.exists(self.training_annot_test))):
             self.shuffle_split()
+            self.logger.info('splitted data: {} training, {} test ({:d} portions).'.format(
+                self.self.train_test_split,
+                self.num_training - self.self.train_test_split,
+                split_num))
         test_file = os.path.basename(self.training_annot_test)
         if not os.path.exists(os.path.join(self.predict_dir, test_file)):
             shutil.copy2(self.training_annot_test, self.predict_dir)
