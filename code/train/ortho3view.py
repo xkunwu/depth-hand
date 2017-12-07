@@ -1,9 +1,11 @@
-import tensorflow as tf
 import os
 import sys
-import numpy as np
 from importlib import import_module
+import numpy as np
+import tensorflow as tf
+from tensorflow.contrib import slim
 import h5py
+import matplotlib.pyplot as mpplot
 from base_regre import base_regre
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -23,7 +25,7 @@ class ortho3view(base_regre):
     def __init__(self, args):
         super(ortho3view, self).__init__(args)
         self.num_channel = 3
-        self.num_appen = 11
+        self.num_appen = 4
 
     def receive_data(self, thedata, args):
         """ Receive parameters specific to the data """
@@ -32,8 +34,7 @@ class ortho3view(base_regre):
         self.yanker = self.provider.yank_ortho3v
 
     def draw_random(self, thedata, args):
-        import matplotlib.pyplot as mpplot
-
+        from cv2 import resize as cv2resize
         with h5py.File(self.appen_train, 'r') as h5file:
             store_size = h5file['index'].shape[0]
             frame_id = np.random.choice(store_size)
@@ -41,32 +42,35 @@ class ortho3view(base_regre):
             frame_h5 = h5file['frame'][frame_id, ...]
             poses_h5 = h5file['poses'][frame_id, ...].reshape(-1, 3)
             resce_h5 = h5file['resce'][frame_id, ...]
+            print(np.min(frame_h5), np.max(frame_h5))
+            print(np.histogram(frame_h5, range=(1e-4, np.max(frame_h5))))
 
-        print('[{}] drawing image #{:d}'.format(self.__class__.__name__, img_id))
+        print('[{}] drawing image #{:d}'.format(self.name_desc, img_id))
         mpplot.subplots(nrows=2, ncols=2, figsize=(3 * 5, 3 * 5))
-        resce2 = resce_h5[0:3]
-        resce3 = resce_h5[3:11]
+
+        resce3 = resce_h5[0:4]
         cube = iso_cube()
         cube.load(resce3)
-        pose_pca = poses_h5 * resce3[0]  # still in the transformed coordinates
+        sizel = np.floor(resce3[0]).astype(int)
         for spi in range(3):
             mpplot.subplot(3, 3, spi + 7)
             img = frame_h5[..., spi]
-            mpplot.imshow(img, cmap='bone')
-            pose2d, _ = cube.project_pca(pose_pca, roll=spi, sort=False)
-            pose2d = pose2d * resce2[0]
+            mpplot.imshow(
+                cv2resize(img, (sizel, sizel)),
+                cmap='bone')
+            pose2d, _ = cube.project_pca(poses_h5, roll=spi, sort=False)
+            pose2d *= sizel
             args.data_draw.draw_pose2d(
                 thedata,
                 pose2d,
             )
-            mpplot.gcf().gca().axis('off')
-            # mpplot.tight_layout()
+            mpplot.gca().axis('off')
 
         mpplot.subplot(3, 3, 3)
         img_name = args.data_io.index2imagename(img_id)
         img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
         mpplot.imshow(img, cmap='bone')
-        pose_raw = self.yanker(poses_h5, resce_h5)
+        pose_raw = self.yanker(poses_h5, resce_h5, self.caminfo)
         args.data_draw.draw_pose2d(
             thedata,
             args.data_ops.raw_to_2d(pose_raw, thedata)
@@ -102,72 +106,120 @@ class ortho3view(base_regre):
                 frame_2 = h5file['frame'][:]
                 print(np.linalg.norm(frame_1 - frame_2))
             print('ERROR - h5 storage corrupted!')
-        poses = poses.reshape(-1, 3)
-        resce2 = resce[0:3]
-        resce3 = resce[3:11]
+        resce3 = resce[0:4]
         cube = iso_cube()
         cube.load(resce3)
-        pose_pca = poses * resce3[0]  # still in the transformed coordinates
+        sizel = np.floor(resce3[0]).astype(int)
         for spi in range(3):
             mpplot.subplot(3, 3, spi + 4)
             img = frame[..., spi]
-            mpplot.imshow(img, cmap='bone')
-            pose2d, _ = cube.project_pca(pose_pca, roll=spi, sort=False)
-            pose2d = pose2d * resce2[0]
+            mpplot.imshow(
+                cv2resize(img, (sizel, sizel)),
+                cmap='bone')
+            pose2d, _ = cube.project_pca(poses, roll=spi, sort=False)
+            pose2d *= sizel
             args.data_draw.draw_pose2d(
                 thedata,
                 pose2d,
             )
-            mpplot.gcf().gca().axis('off')
-            # mpplot.tight_layout()
+            mpplot.gca().axis('off')
+
         mpplot.savefig(os.path.join(
             args.predict_dir,
             'draw_{}.png'.format(self.__class__.__name__)))
         mpplot.show()
 
-    def placeholder_inputs(self):
+    def get_model(
+            self, input_tensor, is_training,
+            scope=None, final_endpoint='stage_out'):
+        """ frames_tf: BxHxWxC
+            out_dim: BxJ, where J is flattened 3D locations
+        """
+        end_points = {}
+        self.end_point_list = []
+
+        def add_and_check_final(name, net):
+            end_points[name] = net
+            return name == final_endpoint
+
+        with tf.variable_scope(
+                scope, self.name_desc, [input_tensor]):
+            with slim.arg_scope(
+                    [slim.batch_norm, slim.dropout],
+                    is_training=is_training), \
+                slim.arg_scope(
+                    [slim.fully_connected],
+                    weights_regularizer=slim.l2_regularizer(0.00004),
+                    biases_regularizer=slim.l2_regularizer(0.00004),
+                    activation_fn=None, normalizer_fn=None), \
+                slim.arg_scope(
+                    [slim.max_pool2d, slim.avg_pool2d],
+                    stride=1, padding='SAME'), \
+                slim.arg_scope(
+                    [slim.conv2d],
+                    stride=1, padding='SAME',
+                    activation_fn=tf.nn.relu,
+                    weights_regularizer=slim.l2_regularizer(0.00004),
+                    biases_regularizer=slim.l2_regularizer(0.00004),
+                    normalizer_fn=slim.batch_norm):
+                with tf.variable_scope('stage128'):
+                    sc = 'stage128_image'
+                    net = slim.conv2d(
+                        input_tensor, 16, 3, scope='conv128_3x3_1')
+                    net = slim.conv2d(
+                        net, 16, 3, stride=2, scope='conv128_3x3_2')
+                    net = slim.max_pool2d(
+                        net, 3, scope='maxpool128_3x3_1')
+                    net = slim.conv2d(
+                        net, 32, 3, scope='conv64_3x3_1')
+                    net = slim.max_pool2d(
+                        net, 3, stride=2, scope='maxpool64_3x3_2')
+                    self.end_point_list.append(sc)
+                    if add_and_check_final(sc, net):
+                        return net, end_points
+                with tf.variable_scope('stage32'):
+                    sc = 'stage32_image'
+                    net = slim.conv2d(
+                        net, 64, 3, scope='conv32_3x3_1')
+                    net = slim.max_pool2d(
+                        net, 3, stride=2, scope='maxpool32_3x3_2')
+                    self.end_point_list.append(sc)
+                    if add_and_check_final(sc, net):
+                        return net, end_points
+                with tf.variable_scope('stage16'):
+                    sc = 'stage16_image'
+                    net = slim.conv2d(
+                        net, 128, 3, scope='conv16_3x3_1')
+                    net = slim.max_pool2d(
+                        net, 3, stride=2, scope='maxpool16_3x3_2')
+                    self.end_point_list.append(sc)
+                    if add_and_check_final(sc, net):
+                        return net, end_points
+                with tf.variable_scope('stage8'):
+                    sc = 'stage_out'
+                    net = slim.flatten(net)
+                    net = slim.fully_connected(
+                        net, 2592,
+                        activation_fn=tf.nn.relu,
+                        normalizer_fn=slim.batch_norm,
+                        scope='fullconn8')
+                    net = slim.dropout(
+                        net, 0.5, scope='dropout8')
+                    net = slim.fully_connected(
+                        net, self.out_dim, scope='output8')
+                    self.end_point_list.append(sc)
+                    if add_and_check_final(sc, net):
+                        return net, end_points
+        raise ValueError('final_endpoint (%s) not recognized', final_endpoint)
+
+    def placeholder_inputs(self, batch_size=None):
+        if batch_size is None:
+            batch_size = self.batch_size
         frames_tf = tf.placeholder(
             tf.float32, shape=(
-                self.batch_size,
+                batch_size,
                 self.crop_size, self.crop_size,
                 3))
         poses_tf = tf.placeholder(
-            tf.float32, shape=(self.batch_size, self.out_dim))
+            tf.float32, shape=(batch_size, self.out_dim))
         return frames_tf, poses_tf
-
-    def get_model(self, frames_tf, is_training, bn_decay=None):
-        """ directly predict all joints' location using regression
-            frames_tf: BxHxWx3
-            out_dim: BxJ, where J is flattened 3D locations
-        """
-        batch_size = frames_tf.get_shape()[0].value
-        end_points = {}
-        input_image = frames_tf
-
-        net = tf_util.conv2d(
-            input_image, 16, [5, 5], stride=[1, 1], scope='conv1',
-            padding='VALID', is_training=is_training, bn=True, bn_decay=bn_decay)
-        net = tf_util.max_pool2d(
-            net, [4, 4], scope='maxpool1', padding='VALID')
-        net = tf_util.conv2d(
-            net, 32, [3, 3], stride=[1, 1], scope='conv2',
-            padding='VALID', is_training=is_training, bn=True, bn_decay=bn_decay)
-        net = tf_util.max_pool2d(
-            net, [2, 2], scope='maxpool2', padding='VALID')
-        net = tf_util.conv2d(
-            net, 64, [3, 3], stride=[1, 1], scope='conv3',
-            padding='VALID', is_training=is_training, bn=True, bn_decay=bn_decay)
-        net = tf_util.max_pool2d(
-            net, [2, 2], scope='maxpool3', padding='VALID')
-        # print(net.shape)
-
-        net = tf.reshape(net, [batch_size, -1])
-        net = tf_util.fully_connected(
-            net, 2592, scope='fullconn1',
-            is_training=is_training, bn=True, bn_decay=bn_decay)
-        net = tf_util.dropout(
-            net, keep_prob=0.5, scope='dropout1', is_training=is_training)
-        net = tf_util.fully_connected(
-            net, self.out_dim, scope='fullconn3', activation_fn=None)
-
-        return net, end_points

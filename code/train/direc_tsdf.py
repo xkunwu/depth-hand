@@ -25,7 +25,6 @@ class direc_tsdf(base_conv3):
     def __init__(self, args):
         super(direc_tsdf, self).__init__(args)
         self.num_channel = 3
-        self.num_appen = 9
 
     def receive_data(self, thedata, args):
         """ Receive parameters specific to the data """
@@ -88,12 +87,14 @@ class direc_tsdf(base_conv3):
             mlab.outline()
         mlab.show()
 
-    def placeholder_inputs(self):
+    def placeholder_inputs(self, batch_size=None):
+        if batch_size is None:
+            batch_size = self.batch_size
         frames_tf = tf.placeholder(
             tf.float32, shape=(
-                self.batch_size,
+                batch_size,
                 self.crop_size, self.crop_size, self.crop_size,
                 3))
         poses_tf = tf.placeholder(
-            tf.float32, shape=(self.batch_size, self.out_dim))
+            tf.float32, shape=(batch_size, self.out_dim))
         return frames_tf, poses_tf

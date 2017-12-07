@@ -27,7 +27,6 @@ class base_clean(base_regre):
     """
     def __init__(self, args):
         super(base_clean, self).__init__(args)
-        # self.num_appen = 11
         self.num_appen = 4
 
     def receive_data(self, thedata, args):
@@ -67,13 +66,13 @@ class base_clean(base_regre):
             print(np.histogram(frame_h5, range=(1e-4, np.max(frame_h5))))
             print(np.min(poses_h5, axis=0), np.max(poses_h5, axis=0))
 
-        print('[{}] drawing image #{:d}'.format(self.__class__.__name__, img_id))
+        print('[{}] drawing image #{:d}'.format(self.name_desc, img_id))
         from colour import Color
         colors = [Color('orange').rgb, Color('red').rgb, Color('lime').rgb]
         mpplot.subplots(nrows=2, ncols=2, figsize=(2 * 5, 2 * 5))
 
         mpplot.subplot(2, 2, 3)
-        mpplot.gcf().gca().set_title('test storage read')
+        mpplot.gca().set_title('test storage read')
         resce3 = resce_h5[0:4]
         cube = iso_cube()
         cube.load(resce3)
@@ -89,7 +88,7 @@ class base_clean(base_regre):
         )
 
         mpplot.subplot(2, 2, 4)
-        mpplot.gcf().gca().set_title('test output')
+        mpplot.gca().set_title('test output')
         img_name = args.data_io.index2imagename(img_id)
         img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
         mpplot.imshow(img, cmap='bone')
@@ -105,7 +104,7 @@ class base_clean(base_regre):
             rect.draw(colors[ii])
 
         mpplot.subplot(2, 2, 1)
-        mpplot.gcf().gca().set_title('test input')
+        mpplot.gca().set_title('test input')
         annot_line = args.data_io.get_line(
             thedata.training_annot_cleaned, img_id)
         img_name, pose_raw = args.data_io.parse_line_annot(annot_line)
@@ -116,7 +115,7 @@ class base_clean(base_regre):
             args.data_ops.raw_to_2d(pose_raw, thedata))
 
         mpplot.subplot(2, 2, 2)
-        mpplot.gcf().gca().set_title('test storage write')
+        mpplot.gca().set_title('test storage write')
         img_name, frame, poses, resce = self.provider_worker(
             annot_line, self.image_dir, thedata)
         frame = np.squeeze(frame, axis=-1)
@@ -144,5 +143,5 @@ class base_clean(base_regre):
 
         mpplot.savefig(os.path.join(
             args.predict_dir,
-            'draw_{}.png'.format(self.__class__.__name__)))
+            'draw_{}.png'.format(self.name_desc)))
         mpplot.show()

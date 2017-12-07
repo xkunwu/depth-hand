@@ -37,22 +37,14 @@ class localizer2(base_regre):
     def __init__(self, args):
         super(localizer2, self).__init__(args)
         self.net_type = 'locor'
-        self.batch_allot = batch_allot_loc2
         self.crop_size = 256
         self.anchor_num = 8
         self.num_appen = 4
+        self.batch_allot = batch_allot_loc2
+        self.predict_file = os.path.join(
+            self.predict_dir, 'detection_{}'.format(
+                self.name_desc))
         self.loss_lambda = 1.
-
-    def start_train(self):
-        self.batchallot = self.batch_allot(
-            self.batch_size, self.caminfo.crop_size, self.out_dim,
-            self.num_channel, self.num_appen)
-
-    def start_evaluate(self, filepack):
-        self.batchallot = self.batch_allot(
-            self.batch_size, self.caminfo.crop_size, self.out_dim,
-            self.num_channel, self.num_appen)
-        return filepack.write_file(self.predict_file)
 
     def prepare_data(self, thedata, args, batchallot, file_annot, name_appen):
         num_line = int(sum(1 for line in file_annot))
@@ -156,8 +148,6 @@ class localizer2(base_regre):
         """ Receive parameters specific to the data """
         super(localizer2, self).receive_data(thedata, args)
         self.out_dim = self.anchor_num ** 2 * 4
-        self.predict_file = os.path.join(
-            self.predict_dir, 'detection_{}'.format(self.__class__.__name__))
         self.provider_worker = self.provider.prow_localizer2
         self.yanker = self.provider.yank_localizer2
 
@@ -173,7 +163,7 @@ class localizer2(base_regre):
         mpplot.figure(figsize=(2 * 5, 1 * 5))
         self.draw_prediction(thedata, args)
         mpplot.tight_layout()
-        fname = 'detection_{}.png'.format(self.__class__.__name__)
+        fname = 'detection_{}.png'.format(self.name_desc)
         mpplot.savefig(os.path.join(self.predict_dir, fname))
         print('figures saved: {}'.format(fname))
 
@@ -209,7 +199,7 @@ class localizer2(base_regre):
         # mpplot.xlim(right=100)
         mpplot.tight_layout()
         fname = 'evaluate_confidence_{}.png'.format(
-            self.__class__.__name__)
+            self.name_desc)
         mpplot.savefig(os.path.join(self.predict_dir, fname))
         print('figures saved: {}'.format(fname))
 
@@ -244,7 +234,7 @@ class localizer2(base_regre):
             avg_ps))
         mpplot.tight_layout()
         # mpplot.show()
-        fname = 'evaluate_pr_{}.png'.format(self.__class__.__name__)
+        fname = 'evaluate_pr_{}.png'.format(self.name_desc)
         mpplot.savefig(os.path.join(self.predict_dir, fname))
         print('figures saved: {}'.format(fname))
 
@@ -272,7 +262,7 @@ class localizer2(base_regre):
         )
         for ii, rect in enumerate(rects):
             rect.draw(colors[ii])
-        mpplot.gcf().gca().set_title('Ground truth')
+        mpplot.gca().set_title('Ground truth')
 
         mpplot.subplot(1, 2, 2)
         mpplot.imshow(frame_h5, cmap='bone')
@@ -299,7 +289,7 @@ class localizer2(base_regre):
             frame_h5 = args.data_ops.rescale_depth_inv(
                 frame_h5, self.caminfo)
 
-        print('[{}] drawing image #{:d}'.format(self.__class__.__name__, img_id))
+        print('[{}] drawing image #{:d}'.format(self.name_desc, img_id))
         colors = [Color('orange').rgb, Color('red').rgb, Color('lime').rgb]
         mpplot.subplot(1, 2, 1)
         annot_line = args.data_io.get_line(
@@ -316,7 +306,7 @@ class localizer2(base_regre):
         )
         for ii, rect in enumerate(rects):
             rect.draw(colors[ii])
-        mpplot.gcf().gca().set_title('Ground truth')
+        mpplot.gca().set_title('Ground truth')
 
         mpplot.subplot(1, 2, 2)
         img = frame_h5
@@ -346,11 +336,11 @@ class localizer2(base_regre):
             frame_h5 = args.data_ops.rescale_depth_inv(
                 frame_h5, self.caminfo)
 
-        print('[{}] drawing image #{:d}'.format(self.__class__.__name__, img_id))
+        print('[{}] drawing image #{:d}'.format(self.name_desc, img_id))
         colors = [Color('orange').rgb, Color('red').rgb, Color('lime').rgb]
         mpplot.subplots(nrows=2, ncols=2, figsize=(2 * 5, 2 * 5))
         mpplot.subplot(2, 2, 1)
-        mpplot.gcf().gca().set_title('test input')
+        mpplot.gca().set_title('test input')
         annot_line = args.data_io.get_line(
             thedata.training_annot_cleaned, img_id)
         img_name, pose_raw = args.data_io.parse_line_annot(annot_line)
@@ -361,7 +351,7 @@ class localizer2(base_regre):
             args.data_ops.raw_to_2d(pose_raw, thedata))
 
         ax = mpplot.subplot(2, 2, 3, projection='3d')
-        mpplot.gcf().gca().set_title('test storage read')
+        mpplot.gca().set_title('test storage read')
         resce3 = resce_h5[0:4]
         cube = iso_cube()
         cube.load(resce3)
@@ -383,7 +373,7 @@ class localizer2(base_regre):
         iso_cube.draw_cube_wire(corners)
 
         mpplot.subplot(2, 2, 4)
-        mpplot.gcf().gca().set_title('test output')
+        mpplot.gca().set_title('test output')
         img_name = args.data_io.index2imagename(img_id)
         img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
         mpplot.imshow(img, cmap='bone')
@@ -409,7 +399,7 @@ class localizer2(base_regre):
             rect.draw(colors[ii])
 
         mpplot.subplot(2, 2, 2)
-        mpplot.gcf().gca().set_title('test storage write')
+        mpplot.gca().set_title('test storage write')
         img_name, frame, poses, resce = self.provider_worker(
             annot_line, self.image_dir, thedata)
         frame = args.data_ops.rescale_depth_inv(
@@ -434,7 +424,7 @@ class localizer2(base_regre):
 
         mpplot.savefig(os.path.join(
             args.predict_dir,
-            'draw_{}.png'.format(self.__class__.__name__)))
+            'draw_{}.png'.format(self.name_desc)))
         mpplot.show()
 
     def get_model(
@@ -452,7 +442,7 @@ class localizer2(base_regre):
             return name == final_endpoint
 
         with tf.variable_scope(
-                scope, self.__class__.__name__, [input_tensor]):
+                scope, self.name_desc, [input_tensor]):
             with slim.arg_scope(
                     [slim.batch_norm, slim.dropout],
                     is_training=is_training), \
@@ -485,26 +475,26 @@ class localizer2(base_regre):
                 with tf.variable_scope('stage1'):
                     sc = 'stage1_image'
                     net = slim.conv2d(
-                        net, 16, 3, stride=2, scope='conv1a_3x3_2')
+                        net, 16, 3, scope='conv1a_3x3_1')
                     net = slim.max_pool2d(
-                        net, 3, scope='maxpool1a_3x3_1')
+                        net, 3, stride=2, scope='maxpool1a_3x3_2')
                     net = slim.conv2d(
-                        net, 32, 3, stride=2, scope='conv1b_3x3_2')
+                        net, 32, 3, scope='conv1b_3x3_1')
                     net = slim.max_pool2d(
-                        net, 3, scope='maxpool1b_3x3_1')
+                        net, 3, stride=2, scope='maxpool1b_3x3_2')
                     net = slim.conv2d(
-                        net, 64, 3, stride=2, scope='conv1c_3x3_2')
+                        net, 64, 3, scope='conv1c_3x3_1')
                     net = slim.max_pool2d(
-                        net, 3, scope='maxpool1c_3x3_1')
+                        net, 3, stride=2, scope='maxpool1c_3x3_2')
                     self.end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points
                 with tf.variable_scope('stage16'):
                     sc = 'stage16_image'
                     net = slim.conv2d(
-                        net, 128, 3, stride=2, scope='conv16_3x3_1')
+                        net, 128, 3, scope='conv16_3x3_1')
                     net = slim.max_pool2d(
-                        net, 3, scope='maxpool16_3x3_2')
+                        net, 3, stride=2, scope='maxpool16_3x3_2')
                     self.end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points
@@ -520,10 +510,6 @@ class localizer2(base_regre):
                             scope='fullconn_cls_a')
                         out_cls = slim.dropout(
                             out_cls, 0.5, scope='dropout_cls')
-                        # out_cls = slim.conv2d(out_cls, 1, 1, scope='reduce_cls_b')
-                        # out_cls = slim.conv2d(
-                        #     out_cls, 1, fshape, activation_fn=None,
-                        #     scope='fullconn_cls_b')
                         out_cls = slim.flatten(out_cls)
                         out_cls = slim.fully_connected(
                             out_cls, anchor_num,
@@ -545,10 +531,6 @@ class localizer2(base_regre):
                         # self.end_point_list.append('dropout_reg')
                         # if add_and_check_final('dropout_reg', out_reg):
                         #     return net, end_points
-                        # out_reg = slim.conv2d(out_reg, 3, 1, scope='reduce_reg_b')
-                        # out_reg = slim.conv2d(
-                        #     out_reg, 3, fshape, activation_fn=None,
-                        #     scope='fullconn_reg_b')
                         out_reg = slim.flatten(out_reg)
                         out_reg = slim.fully_connected(
                             out_reg, anchor_num * 3,

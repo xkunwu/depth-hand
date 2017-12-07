@@ -55,6 +55,10 @@ class args_holder:
             help='Model name [default: base_clean], from \
             [base_regre, base_clean, ortho3view, base_conv3, trunc_dist]')
         self.parser.add_argument(
+            '--model_desc', default='',
+            help='variant version description [default: [empty]]'
+        )
+        self.parser.add_argument(
             '--localizer_name', default='localizer2',
             help='localize hand region [default: localizer2]'
         )
@@ -90,7 +94,7 @@ class args_holder:
         if not os.path.exists(blinks):
             os.makedirs(blinks)
         log_dir_ln = os.path.join(
-            blinks, self.args.model_name)
+            blinks, self.args.model_name + self.args.model_desc)
         if (not os.path.exists(log_dir_ln)):
             from datetime import datetime
             log_time = datetime.now().strftime('%y%m%d-%H%M%S')
@@ -200,7 +204,8 @@ class args_holder:
             self.args.retrain = True
         self.make_logging()
         self.args.logger.info('######## {} [{}] ########'.format(
-            self.args.data_name, self.args.model_name))
+            self.args.data_name,
+            self.args.model_name + self.args.model_desc))
         # self.args.localizer_class = getattr(
         #     import_module(model_map[self.args.localizer_name]),
         #     self.args.localizer_name

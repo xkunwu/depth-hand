@@ -3,6 +3,7 @@ import sys
 from importlib import import_module
 import numpy as np
 import tensorflow as tf
+from tensorflow.contrib import slim
 import progressbar
 import h5py
 from base_regre import base_regre
@@ -35,7 +36,8 @@ class base_conv3(base_regre):
         self.crop_size = 32
         self.num_appen = 4
 
-    def prepare_data(self, thedata, args, batchallot, file_annot, name_appen):
+    def prepare_data(self, thedata, args,
+                     batchallot, file_annot, name_appen):
         num_line = int(sum(1 for line in file_annot))
         file_annot.seek(0)
         batchallot.allot(num_line)
@@ -44,7 +46,8 @@ class base_conv3(base_regre):
         args.logger.debug(
             'preparing data [{}]: {:d} lines (producing {:.4f} GB for store size {:d}) ...'.format(
                 self.__class__.__name__, num_line,
-                float(batchallot.store_bytes) / (2 << 30), store_size))
+                float(batchallot.store_bytes) / (2 << 30),
+                store_size))
         timerbar = progressbar.ProgressBar(
             maxval=num_stores,
             widgets=[
@@ -53,9 +56,9 @@ class base_conv3(base_regre):
                 ' ', progressbar.ETA()]
         ).start()
         image_size = self.crop_size
-        out_dim = batchallot.out_dim
-        num_channel = batchallot.num_channel
-        num_appen = batchallot.num_appen
+        out_dim = self.out_dim
+        num_channel = self.num_channel
+        num_appen = self.num_appen
         with h5py.File(os.path.join(self.prepare_dir, name_appen), 'w') as h5file:
             h5file.create_dataset(
                 'index',
@@ -91,7 +94,7 @@ class base_conv3(base_regre):
             while True:
                 resline = self.provider.puttensor_mt(
                     file_annot, self.provider_worker,
-                    self.image_dir, thedata, batchallot
+                    self.image_dir, self.caminfo, batchallot
                 )
                 if 0 > resline:
                     break
@@ -150,11 +153,11 @@ class base_conv3(base_regre):
             frame_h5 = np.squeeze(h5file['frame'][frame_id, ...], -1)
             poses_h5 = h5file['poses'][frame_id, ...].reshape(-1, 3)
             resce_h5 = h5file['resce'][frame_id, ...]
+            print(np.min(frame_h5), np.max(frame_h5))
+            print(np.histogram(frame_h5, range=(1e-4, np.max(frame_h5))))
 
-        print('[{}] drawing image #{:d}'.format(self.__class__.__name__, img_id))
-        resce3 = resce_h5[0:4]
-        cube = iso_cube()
-        cube.load(resce3)
+        print('[{}] drawing image #{:d}'.format(self.name_desc, img_id))
+        colors = [Color('orange').rgb, Color('red').rgb, Color('lime').rgb]
         mpplot.subplots(nrows=2, ncols=2, figsize=(2 * 5, 2 * 5))
         mpplot.subplot(2, 2, 1)
         annot_line = args.data_io.get_line(
@@ -164,14 +167,43 @@ class base_conv3(base_regre):
         mpplot.imshow(img, cmap='bone')
         args.data_draw.draw_pose2d(
             thedata,
-            args.data_ops.raw_to_2d(pose_raw, thedata))
+            args.data_ops.raw_to_2d(pose_raw, self.caminfo))
+
+        ax = mpplot.subplot(2, 2, 3, projection='3d')
+        resce3 = resce_h5[0:4]
+        cube = iso_cube()
+        cube.load(resce3)
+        cube.show_dims()
+        points3 = args.data_ops.img_to_raw(img, self.caminfo)
+        _, points3_trans = cube.pick(points3)
+        numpts = points3_trans.shape[0]
+        if 1000 < numpts:
+            points3_trans = points3_trans[
+                np.random.choice(numpts, 1000, replace=False), :]
+        ax.scatter(
+            points3_trans[:, 0], points3_trans[:, 1], points3_trans[:, 2],
+            color=Color('lightsteelblue').rgb)
+        args.data_draw.draw_raw3d_pose(thedata, poses_h5)
+        corners = cube.transform(cube.get_corners())
+        cube.draw_cube_wire(corners)
+        ax.view_init(azim=-120, elev=-150)
+
+        ax = mpplot.subplot(2, 2, 4)
+        img_name = args.data_io.index2imagename(img_id)
+        img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
+        mpplot.imshow(img, cmap='bone')
+        pose_raw = self.yanker(poses_h5, resce_h5, self.caminfo)
+        args.data_draw.draw_pose2d(
+            thedata,
+            args.data_ops.raw_to_2d(pose_raw, self.caminfo)
+        )
+        rects = cube.proj_rects_3(
+            args.data_ops.raw_to_2d, self.caminfo
+        )
+        for ii, rect in enumerate(rects):
+            rect.draw(colors[ii])
 
         ax = mpplot.subplot(2, 2, 2, projection='3d')
-        annot_line = args.data_io.get_line(
-            thedata.training_annot_cleaned, img_id)
-        img_name, pose_raw = args.data_io.parse_line_annot(annot_line)
-        img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
-        points3 = args.data_ops.img_to_raw(img, thedata)
         numpts = points3.shape[0]
         if 1000 < numpts:
             samid = np.random.choice(numpts, 1000, replace=False)
@@ -185,7 +217,6 @@ class base_conv3(base_regre):
         ax.set_zlabel('depth (mm)', labelpad=15)
         args.data_draw.draw_raw3d_pose(thedata, pose_raw)
         corners = cube.get_corners()
-        corners = cube.transform_inv(corners)
         iso_cube.draw_cube_wire(corners)
 
         # mlab.figure(size=(800, 800))
@@ -196,33 +227,9 @@ class base_conv3(base_regre):
         #     color=Color('lightsteelblue').rgb)
         # mlab.outline()
 
-        ax = mpplot.subplot(2, 2, 3, projection='3d')
-        _, points3_trans = cube.pick(points3)
-        numpts = points3_trans.shape[0]
-        if 1000 < numpts:
-            points3_trans = points3_trans[np.random.choice(numpts, 1000, replace=False), :]
-        pose_trans = cube.transform(pose_raw)
-        ax.scatter(
-            points3_trans[:, 0], points3_trans[:, 1], points3_trans[:, 2],
-            color=Color('lightsteelblue').rgb)
-        args.data_draw.draw_raw3d_pose(thedata, pose_trans)
-        corners = cube.get_corners()
-        cube.draw_cube_wire(corners)
-        ax.view_init(azim=-120, elev=-150)
-
-        ax = mpplot.subplot(2, 2, 4)
-        img_name = args.data_io.index2imagename(img_id)
-        img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
-        mpplot.imshow(img, cmap='bone')
-        pose_raw = self.yanker(poses_h5, resce_h5)
-        args.data_draw.draw_pose2d(
-            thedata,
-            args.data_ops.raw_to_2d(pose_raw, thedata)
-        )
-
         mlab.figure(size=(800, 800))
         img_name, frame, poses, resce = self.provider_worker(
-            annot_line, self.image_dir, thedata)
+            annot_line, self.image_dir, self.caminfo)
         frame = np.squeeze(frame, axis=-1)
         poses = poses.reshape(-1, 3)
         if (
@@ -232,7 +239,7 @@ class base_conv3(base_regre):
             print(np.linalg.norm(frame_h5 - frame))
             print(np.linalg.norm(poses_h5 - poses))
             _, frame_1, _, _ = self.provider_worker(
-                annot_line, self.image_dir, thedata)
+                annot_line, self.image_dir, self.caminfo)
             print(np.linalg.norm(frame_1 - frame))
             with h5py.File('/tmp/111', 'w') as h5file:
                 h5file.create_dataset(
@@ -245,6 +252,7 @@ class base_conv3(base_regre):
         resce3 = resce_h5[0:4]
         cube = iso_cube()
         cube.load(resce3)
+        cube.show_dims()
         # mlab.contour3d(frame)
         mlab.pipeline.volume(mlab.pipeline.scalar_field(frame))
         mlab.pipeline.image_plane_widget(
@@ -254,53 +262,105 @@ class base_conv3(base_regre):
         np.set_printoptions(precision=4)
         # print(frame[12:20, 12:20, 16])
         mlab.outline()
+
         mpplot.savefig(os.path.join(
             args.predict_dir,
-            'draw_{}.png'.format(self.__class__.__name__)))
+            'draw_{}.png'.format(self.name_desc)))
         mpplot.show()
 
-    def placeholder_inputs(self):
+    def get_model(
+            self, input_tensor, is_training,
+            scope=None, final_endpoint='stage_out'):
+        """ frames_tf: BxHxWxDx1
+            out_dim: BxJ, where J is flattened 3D locations
+        """
+        end_points = {}
+        self.end_point_list = []
+
+        def add_and_check_final(name, net):
+            end_points[name] = net
+            return name == final_endpoint
+
+        with tf.variable_scope(
+                scope, self.name_desc, [input_tensor]):
+            with slim.arg_scope(
+                    [slim.batch_norm, slim.dropout],
+                    is_training=is_training), \
+                slim.arg_scope(
+                    [slim.fully_connected],
+                    weights_regularizer=slim.l2_regularizer(0.00004),
+                    biases_regularizer=slim.l2_regularizer(0.00004),
+                    activation_fn=None, normalizer_fn=None), \
+                slim.arg_scope(
+                    [slim.max_pool3d, slim.avg_pool3d],
+                    stride=1, padding='SAME'), \
+                slim.arg_scope(
+                    [slim.conv3d],
+                    stride=1, padding='SAME',
+                    activation_fn=tf.nn.relu,
+                    weights_regularizer=slim.l2_regularizer(0.00004),
+                    biases_regularizer=slim.l2_regularizer(0.00004),
+                    normalizer_fn=slim.batch_norm):
+                with tf.variable_scope('stage32'):
+                    sc = 'stage32'
+                    net = slim.conv3d(
+                        input_tensor, 32, 3, scope='conv32_3x3x3_1')
+                    net = slim.conv3d(
+                        net, 32, 3, stride=2, scope='conv32_3x3x3_2')
+                    net = slim.max_pool3d(
+                        net, 3, scope='maxpool32_3x3x3_1')
+                    self.end_point_list.append(sc)
+                    if add_and_check_final(sc, net):
+                        return net, end_points
+                with tf.variable_scope('stage16'):
+                    sc = 'stage16'
+                    net = slim.conv3d(
+                        net, 64, 3, scope='conv16_3x3x3_1')
+                    net = slim.max_pool3d(
+                        net, 3, stride=2, scope='maxpool16_3x3x3_2')
+                    self.end_point_list.append(sc)
+                    if add_and_check_final(sc, net):
+                        return net, end_points
+                with tf.variable_scope('stage8'):
+                    sc = 'stage8'
+                    net = slim.conv3d(
+                        net, 128, 3, scope='conv16_3x3x3_1')
+                    net = slim.max_pool3d(
+                        net, 3, stride=2, scope='maxpool16_3x3x3_2')
+                    self.end_point_list.append(sc)
+                    if add_and_check_final(sc, net):
+                        return net, end_points
+                with tf.variable_scope('stage4'):
+                    sc = 'stage_out'
+                    net = slim.conv3d(net, 128, 1, scope='reduce4')
+                    self.end_point_list.append('reduce4')
+                    if add_and_check_final('reduce4', net):
+                        return net, end_points
+                    net = slim.conv3d(
+                        net, 1024, net.get_shape()[1:4],
+                        padding='VALID', scope='fullconn4')
+                    self.end_point_list.append('fullconn4')
+                    if add_and_check_final('fullconn4', net):
+                        return net, end_points
+                    net = slim.dropout(
+                        net, 0.5, scope='dropout4')
+                    net = slim.flatten(net)
+                    net = slim.fully_connected(
+                        net, self.out_dim, scope='output4')
+                    self.end_point_list.append(sc)
+                    if add_and_check_final(sc, net):
+                        return net, end_points
+
+        raise ValueError('final_endpoint (%s) not recognized', final_endpoint)
+
+    def placeholder_inputs(self, batch_size=None):
+        if batch_size is None:
+            batch_size = self.batch_size
         frames_tf = tf.placeholder(
             tf.float32, shape=(
-                self.batch_size,
+                batch_size,
                 self.crop_size, self.crop_size, self.crop_size,
                 1))
         poses_tf = tf.placeholder(
-            tf.float32, shape=(self.batch_size, self.out_dim))
+            tf.float32, shape=(batch_size, self.out_dim))
         return frames_tf, poses_tf
-
-    def get_model(self, frames_tf, is_training, bn_decay=None):
-        """ directly predict all joints' location using regression
-            frames_tf: BxHxWxDx1
-            out_dim: BxJ, where J is flattened 3D locations
-        """
-        batch_size = frames_tf.get_shape()[0].value
-        end_points = {}
-        input_image = frames_tf
-
-        shapestr = 'input: {}'.format(input_image.shape)
-        net, shapestr = tf_util.conv3d(
-            input_image, 32, [5, 5, 5], stride=[1, 1, 1], scope='conv1', shapestr=shapestr,
-            padding='VALID', is_training=is_training, bn=True, bn_decay=bn_decay)
-        net, shapestr = tf_util.max_pool3d(
-            net, [2, 2, 2], scope='maxpool1', shapestr=shapestr, padding='VALID')
-        net, shapestr = tf_util.conv3d(
-            net, 64, [3, 3, 3], stride=[1, 1, 1], scope='conv2', shapestr=shapestr,
-            padding='VALID', is_training=is_training, bn=True, bn_decay=bn_decay)
-        net, shapestr = tf_util.max_pool3d(
-            net, [2, 2, 2], scope='maxpool2', shapestr=shapestr, padding='VALID')
-        net, shapestr = tf_util.conv3d(
-            net, 128, [3, 3, 3], stride=[1, 1, 1], scope='conv3', shapestr=shapestr,
-            padding='VALID', is_training=is_training, bn=True, bn_decay=bn_decay)
-        # print(net.shape)
-
-        net = tf.reshape(net, [batch_size, -1])
-        net, shapestr = tf_util.fully_connected(
-            net, 2048, scope='fullconn1', shapestr=shapestr,
-            is_training=is_training, bn=True, bn_decay=bn_decay)
-        net, shapestr = tf_util.dropout(
-            net, keep_prob=0.5, scope='dropout1', shapestr=shapestr, is_training=is_training)
-        net, shapestr = tf_util.fully_connected(
-            net, self.out_dim, scope='fullconn3', shapestr=shapestr, activation_fn=None)
-
-        return net, shapestr, end_points

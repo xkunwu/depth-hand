@@ -187,21 +187,6 @@ def clip_image_border(rect, caminfo):
     return rect
 
 
-def fill_grid(img, pose_raw, step, caminfo):
-    cube = iso_cube()
-    cube.build(pose_raw)
-    _, points3_trans = cube.pick(img_to_raw(img, caminfo))
-    grid = regu_grid()
-    grid.from_cube(cube, step)
-    grid.fill(points3_trans)
-    # resce = np.append(
-    #     cube.dump(),
-    #     step
-    # )
-    resce = cube.dump()
-    return grid.pcnt, resce
-
-
 def voxelize_depth(img, step, caminfo):
     halflen = caminfo.crop_range
     points3 = img_to_raw(img, caminfo, halflen)
@@ -302,9 +287,24 @@ def prop_dist(pcnt):
     return tdf
 
 
+def fill_grid(img, pose_raw, step, caminfo):
+    cube = iso_cube(
+        (np.max(pose_raw, axis=0) + np.min(pose_raw, axis=0)) / 2,
+        caminfo.region_size
+    )
+    _, points3_trans = cube.pick(img_to_raw(img, caminfo))
+    grid = regu_grid()
+    grid.from_cube(cube, step)
+    grid.fill(points3_trans)
+    resce = cube.dump()
+    return grid.pcnt, resce
+
+
 def proj_ortho3(img, pose_raw, caminfo):
-    cube = iso_cube()
-    cube.build(pose_raw)
+    cube = iso_cube(
+        (np.max(pose_raw, axis=0) + np.min(pose_raw, axis=0)) / 2,
+        caminfo.region_size
+    )
     _, points3_trans = cube.pick(img_to_raw(img, caminfo))
     img_l = []
     for spi in range(3):

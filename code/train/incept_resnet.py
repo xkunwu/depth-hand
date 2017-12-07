@@ -116,7 +116,7 @@ class incept_resnet:
     @staticmethod
     def get_net(
             input_tensor, out_dim, is_training, end_point_list,
-            block_rep=[2, 2, 10], block_scale=[0.5, 0.5, 0.2],
+            block_rep=[2, 2, 1], block_scale=[0.5, 0.5, 0.5],
             scope=None, final_endpoint='stage_out'):
         """ input_tensor: BxHxWxC
             out_dim: BxJ, where J is flattened 3D locations
@@ -193,15 +193,15 @@ class incept_resnet:
                     if add_and_check_final(sc, net):
                         return net, end_points
                 with tf.variable_scope('stage8'):
-                    sc = 'stage8'
-                    net = slim.repeat(
-                        net, block_rep[2], incept_resnet.block8,
-                        scale=block_scale[2], scope=sc)
-                    net = incept_resnet.block8(
-                        net, activation_fn=None, scope=sc)
-                    end_point_list.append(sc)
-                    if add_and_check_final(sc, net):
-                        return net, end_points
+                    # sc = 'stage8'
+                    # net = slim.repeat(
+                    #     net, block_rep[2], incept_resnet.block8,
+                    #     scale=block_scale[2], scope=sc)
+                    # net = incept_resnet.block8(
+                    #     net, activation_fn=None, scope=sc)
+                    # end_point_list.append(sc)
+                    # if add_and_check_final(sc, net):
+                    #     return net, end_points
                     sc = 'stage_out'
                     net = incept_resnet.pullout(
                         net, out_dim, is_training,

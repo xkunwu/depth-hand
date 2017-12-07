@@ -103,41 +103,42 @@ if __name__ == "__main__":
     # python evaluate.py --max_epoch=1 --batch_size=16 --model_name=base_clean
     # import pdb; pdb.set_trace()
 
-    with_train = True
-    # with_train = False
-    with_eval = True
-    # with_eval = False
+    # with_train = True
+    with_train = False
+    # with_eval = True
+    with_eval = False
 
-    mpl = import_module('matplotlib')
-    mpl.use('Agg')
-    mpplot = import_module('matplotlib.pyplot')
-    with args_holder() as argsholder:
-        argsholder.parse_args()
-        args = argsholder.args
-        argsholder.create_instance()
-        # import shutil
-        # shutil.rmtree(args.out_dir)
-        # os.makedirs(args.out_dir)
-
-        test_dataops(args)
-
-        run_one(args, mpplot, with_train, with_eval)
-
-        # draw_compare(args, mpplot)
-    sys.exit()
+    # mpl = import_module('matplotlib')
+    # mpl.use('Agg')
+    # mpplot = import_module('matplotlib.pyplot')
+    # with args_holder() as argsholder:
+    #     argsholder.parse_args()
+    #     args = argsholder.args
+    #     argsholder.create_instance()
+    #     # import shutil
+    #     # shutil.rmtree(args.out_dir)
+    #     # os.makedirs(args.out_dir)
+    #
+    #     test_dataops(args)
+    #
+    #     run_one(args, mpplot, with_train, with_eval)
+    #
+    #     # draw_compare(args, mpplot)
+    # sys.exit()
 
     mpl = import_module('matplotlib')
     mpl.use('Agg')
     mpplot = import_module('matplotlib.pyplot')
     methlist = [
+        # 'localizer2',
         # 'direc_tsdf',
         # 'trunc_dist',
         # 'base_conv3',
         # 'ortho3view',
-        # 'base_clean',
         'base_regre',
+        # 'base_clean',
+        # 'base_regre_inres',
         # 'base_clean_inres',
-        'base_regre_inres'
     ]
     for meth in methlist:
         with args_holder() as argsholder:
@@ -145,9 +146,10 @@ if __name__ == "__main__":
             args = argsholder.args
             args.model_name = meth
             argsholder.create_instance()
+            test_dataops(args)
             # run_one(args, mpplot, with_train, with_eval)
-            run_one(args, mpplot, True, True)
-            # test_dataops(args)
+            # run_one(args, mpplot, True, True)
+            run_one(args, mpplot, False, False)
     draw_compare(args, mpplot)
     copyfile(
         os.path.join(args.out_dir, 'log', 'univue.log'),

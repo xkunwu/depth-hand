@@ -33,6 +33,7 @@ class base_regre(object):
     def __init__(self, args):
         self.net_rank = 2
         self.net_type = 'poser'
+        self.name_desc = self.__class__.__name__ + args.model_desc
         self.crop_size = 128
         self.anchor_num = 16
         self.crop_range = 800.
@@ -43,16 +44,19 @@ class base_regre(object):
         self.args = args
         self.prepare_dir = args.prepare_dir
         self.appen_train = os.path.join(
-            self.prepare_dir, 'train_{}'.format(self.__class__.__name__))
+            self.prepare_dir, 'train_{}'.format(
+                self.__class__.__name__))
         self.appen_test = os.path.join(
-            self.prepare_dir, 'test_{}'.format(self.__class__.__name__))
+            self.prepare_dir, 'test_{}'.format(
+                self.__class__.__name__))
         self.predict_dir = args.predict_dir
         self.predict_file = os.path.join(
-            self.predict_dir, 'predict_{}'.format(self.__class__.__name__))
+            self.predict_dir, 'predict_{}'.format(
+                self.name_desc))
         self.batch_size = args.batch_size
         self.ckpt_path = os.path.join(
             args.out_dir, 'log', 'blinks',
-            self.__class__.__name__, 'model.ckpt')
+            self.name_desc, 'model.ckpt')
 
     def tweak_arguments(self, args):
         args.crop_size = self.crop_size
@@ -118,16 +122,17 @@ class base_regre(object):
             thedata.training_annot_test,
             self.predict_file
         )
-        fname = 'detection_{}.png'.format(self.__class__.__name__)
+        fname = 'detection_{}.png'.format(self.name_desc)
         mpplot.savefig(os.path.join(self.predict_dir, fname))
         error_maxj = self.evaluater.evaluate_poses(
-            self.caminfo, self.__class__.__name__,
+            self.caminfo, self.name_desc,
             self.predict_dir, self.predict_file)
         self.logger.info('maximal per-joint mean error: {}'.format(
             error_maxj
         ))
 
-    def prepare_data(self, thedata, args, batchallot, file_annot, name_appen):
+    def prepare_data(self, thedata, args,
+                     batchallot, file_annot, name_appen):
         num_line = int(sum(1 for line in file_annot))
         file_annot.seek(0)
         batchallot.allot(num_line)
@@ -136,7 +141,8 @@ class base_regre(object):
         self.logger.debug(
             'preparing data [{}]: {:d} lines (producing {:.4f} GB for store size {:d}) ...'.format(
                 self.__class__.__name__, num_line,
-                float(batchallot.store_bytes) / (2 << 30), store_size))
+                float(batchallot.store_bytes) / (2 << 30),
+                store_size))
         timerbar = progressbar.ProgressBar(
             maxval=num_stores,
             widgets=[
@@ -251,13 +257,13 @@ class base_regre(object):
             print(np.min(poses_h5, axis=0), np.max(poses_h5, axis=0))
             print(resce_h5)
 
-        print('[{}] drawing image #{:d}'.format(self.__class__.__name__, img_id))
+        print('[{}] drawing image #{:d}'.format(self.name_desc, img_id))
         resce2 = resce_h5[0:3]
         resce3 = resce_h5[3:7]
         mpplot.subplots(nrows=2, ncols=2, figsize=(2 * 5, 2 * 5))
 
         mpplot.subplot(2, 2, 3)
-        mpplot.gcf().gca().set_title('test storage read')
+        mpplot.gca().set_title('test storage read')
         sizel = np.floor(resce2[0]).astype(int)
         resce_cp = np.copy(resce2)
         resce_cp[0] = 1
@@ -271,7 +277,7 @@ class base_regre(object):
         )
 
         mpplot.subplot(2, 2, 4)
-        mpplot.gcf().gca().set_title('test output')
+        mpplot.gca().set_title('test output')
         img_name = args.data_io.index2imagename(img_id)
         img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
         mpplot.imshow(img, cmap='bone')
@@ -285,7 +291,7 @@ class base_regre(object):
         rect.draw()
 
         mpplot.subplot(2, 2, 1)
-        mpplot.gcf().gca().set_title('test input')
+        mpplot.gca().set_title('test input')
         annot_line = args.data_io.get_line(
             thedata.training_annot_cleaned, img_id)
         img_name, pose_raw = args.data_io.parse_line_annot(annot_line)
@@ -296,7 +302,7 @@ class base_regre(object):
             args.data_ops.raw_to_2d(pose_raw, thedata))
 
         mpplot.subplot(2, 2, 2)
-        mpplot.gcf().gca().set_title('test storage write')
+        mpplot.gca().set_title('test storage write')
         img_name, frame, poses, resce = self.provider_worker(
             annot_line, self.image_dir, thedata)
         frame = np.squeeze(frame, axis=-1)
@@ -321,9 +327,10 @@ class base_regre(object):
             thedata,
             args.data_ops.raw_to_2d(pose_raw, thedata, resce_cp)
         )
+
         mpplot.savefig(os.path.join(
             args.predict_dir,
-            'draw_{}.png'.format(self.__class__.__name__)))
+            'draw_{}.png'.format(self.name_desc)))
         mpplot.show()
 
     def get_model(
@@ -332,7 +339,6 @@ class base_regre(object):
         """ input_tensor: BxHxWxC
             out_dim: BxJ, where J is flattened 3D locations
         """
-        # batch_size = frames_tf.get_shape()[0].value
         end_points = {}
         self.end_point_list = []
 
@@ -341,7 +347,7 @@ class base_regre(object):
             return name == final_endpoint
 
         with tf.variable_scope(
-                scope, self.__class__.__name__, [input_tensor]):
+                scope, self.name_desc, [input_tensor]):
             with slim.arg_scope(
                     [slim.batch_norm, slim.dropout],
                     is_training=is_training), \
@@ -369,27 +375,27 @@ class base_regre(object):
                     net = slim.max_pool2d(
                         net, 3, scope='maxpool128_3x3_1')
                     net = slim.conv2d(
-                        net, 32, 3, stride=2, scope='conv64_3x3_2')
+                        net, 32, 3, scope='conv64_3x3_1')
                     net = slim.max_pool2d(
-                        net, 3, scope='maxpool64_3x3_1')
+                        net, 3, stride=2, scope='maxpool64_3x3_2')
                     self.end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points
                 with tf.variable_scope('stage32'):
                     sc = 'stage32_image'
                     net = slim.conv2d(
-                        net, 64, 3, stride=2, scope='conv32_3x3_2')
+                        net, 64, 3, scope='conv32_3x3_1')
                     net = slim.max_pool2d(
-                        net, 3, scope='maxpool32_3x3_1')
+                        net, 3, stride=2, scope='maxpool32_3x3_2')
                     self.end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points
                 with tf.variable_scope('stage16'):
                     sc = 'stage16_image'
                     net = slim.conv2d(
-                        net, 128, 3, stride=2, scope='conv16_3x3_2')
+                        net, 128, 3, scope='conv16_3x3_1')
                     net = slim.max_pool2d(
-                        net, 3, scope='maxpool16_3x3_1')
+                        net, 3, stride=2, scope='maxpool16_3x3_2')
                     self.end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points
@@ -407,9 +413,9 @@ class base_regre(object):
                         return net, end_points
                     net = slim.conv2d(
                         net, 128, net.get_shape()[1:3],
-                        padding='VALID', scope='fullconn8_a')
-                    self.end_point_list.append('fullconn8_a')
-                    if add_and_check_final('fullconn8_a', net):
+                        padding='VALID', scope='fullconn8')
+                    self.end_point_list.append('fullconn8')
+                    if add_and_check_final('fullconn8', net):
                         return net, end_points
                     net = slim.dropout(
                         net, 0.5, scope='dropout8')
@@ -422,6 +428,7 @@ class base_regre(object):
 
         raise ValueError('final_endpoint (%s) not recognized', final_endpoint)
 
+        # batch_size = input_tensor.get_shape()[0].value
         # tf_util = import_module('utils.tf_util')
         # bn_decay = 0.9997
         # net = tf_util.conv2d(

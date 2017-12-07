@@ -63,7 +63,7 @@ def draw_pose2d(thedata, pose2d, show_margin=False):
         # x, y = verts[:, 0], verts[:, 1]
         # z = np.linspace(0, 1, step)
         # colorline(x, y, z, cmap=mpplot.get_cmap('jet'))
-    # mpplot.gcf().gca().add_artist(
+    # mpplot.gca().add_artist(
     #     mpplot.Circle(
     #         p2wrist[0, :],
     #         20,
@@ -140,7 +140,7 @@ def draw_prediction_poses(thedata, image_dir, annot_echt, annot_pred):
     #         thedata, img,
     #         dataops.d2z_to_raw(pose_echt, thedata, rescen_echt),
     #         show_margin=True)
-    mpplot.gcf().gca().set_title('Ground truth')
+    mpplot.gca().set_title('Ground truth')
     mpplot.subplot(1, 2, 2)
     mpplot.imshow(img, cmap='bone')
     draw_pose_raw(
@@ -285,7 +285,7 @@ def draw_raw3d(thedata, img, pose_raw):
         pose2d, _ = cube.project_pca(pose_trans, roll=spi, sort=False)
         draw_pose2d(thedata, pose2d)
         mpplot.imshow(img, cmap='bone')
-    mpplot.gcf().gca().axis('off')
+    mpplot.gca().axis('off')
     mpplot.tight_layout()
     mpplot.show()
 
@@ -329,7 +329,7 @@ def draw_raw3d_random(thedata, image_dir, annot_txt, img_id=-1):
         thedata,
         dataops.raw_to_2d(pose_raw, thedata, resce))
     mpplot.gca().set_title('Cleaned')
-    mpplot.gcf().gca().axis('off')
+    mpplot.gca().axis('off')
     mpplot.tight_layout()
     mpplot.show()
     return img_id
@@ -357,7 +357,7 @@ def draw_bbox_random(thedata):
         edgecolor=thedata.bbox_color.rgb)
     )
     mpplot.subplots_adjust(left=0, bottom=0, right=1, top=1, wspace=0, hspace=0)
-    mpplot.gcf().gca().axis('off')
+    mpplot.gca().axis('off')
     mpplot.show()
 
 

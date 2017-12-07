@@ -11,7 +11,7 @@ def fig2data(fig, show_margin=False):
     @return a numpy 3D array of RGBA values
     """
     # draw the renderer
-    mpplot.gcf().gca().axis('off')
+    mpplot.gca().axis('off')
     if not show_margin:
         mpplot.subplots_adjust(left=0, bottom=0, right=1, top=1, wspace=0, hspace=0)
     else:

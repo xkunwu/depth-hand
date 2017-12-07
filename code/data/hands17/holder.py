@@ -26,8 +26,6 @@ class hands17holder:
     # # num_training = int(957032)
     # num_training = int(992)
     # # num_training = int(96)
-    # range_train = np.zeros(2, dtype=np.int)
-    # range_test = np.zeros(2, dtype=np.int)
 
     # cropped & resized training images
     # world/image coordinates are reversed!!!
@@ -165,10 +163,6 @@ class hands17holder:
         split_num = int(16)
         portion = int(np.ceil(float(self.num_training) / split_num))
         self.train_test_split = int(portion * (split_num - 1))
-        # self.range_train[0] = int(0)
-        # self.range_train[1] = int(portion * (split_num - 1))
-        # self.range_test[0] = self.range_train[1]
-        # self.range_test[1] = self.num_training
         self.split_num = split_num - 1
         self.portion = portion
         self.split_id = -1 % self.split_num
@@ -177,8 +171,8 @@ class hands17holder:
                 (not os.path.exists(self.training_annot_test))):
             self.shuffle_split()
             self.logger.info('splitted data: {} training, {} test ({:d} portions).'.format(
-                self.self.train_test_split,
-                self.num_training - self.self.train_test_split,
+                self.train_test_split,
+                self.num_training - self.train_test_split,
                 split_num))
         test_file = os.path.basename(self.training_annot_test)
         if not os.path.exists(os.path.join(self.predict_dir, test_file)):

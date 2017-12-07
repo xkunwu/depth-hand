@@ -78,15 +78,15 @@ class train_abc():
                 self.args.logger.info(
                     'Epoch #{:03d} processing time: {}'.format(
                         epoch, time_e))
-                save_path = saver.save(sess, model_path)
-                self.logger.info(
-                    'Model saved in file: {}'.format(save_path))
                 if mean_loss > valid_loss:
                     self.args.logger.info(
                         'Break due to validation loss starts to grow: {} --> {}'.format(
                             valid_loss, mean_loss))
                     break
                 valid_loss = mean_loss
+                save_path = saver.save(sess, model_path)
+                self.logger.info(
+                    'Model saved in file: {}'.format(save_path))
             self.args.model_inst.end_train()
             time_all_e = str(timedelta(
                 seconds=(timer() - time_all_s)))

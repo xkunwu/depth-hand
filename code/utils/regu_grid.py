@@ -25,7 +25,7 @@ class grid_cell:
         )
         return points3[conds, :]
 
-    def build(self, points3, m=0.1):
+    def build(self, points3, m=0.):
         pmin = np.min(points3, axis=0)
         pmax = np.max(points3, axis=0)
         cen = (pmin + pmax) / 2
@@ -73,13 +73,13 @@ class regu_grid:
     def show_dims(self):
         print(self.cll, self.cellen, self.step)
 
-    def from_cube(self, cube, step, m=0.01):
-        if 1 > m and -1 < m:
-            m = cube.sidelen * m
-        cubelen = cube.sidelen + m
-        self.cll = np.zeros(3) - cubelen
+    def from_cube(self, cube, step):
+        """ in unit coordinates """
+        # self.cll = np.zeros(3) - cube.sidelen
+        self.cll = - np.ones(3)
         self.step = step
-        self.cellen = cubelen * 2 / step
+        # self.cellen = cube.sidelen * 2. / step
+        self.cellen = 2. / step
         self.pcnt = np.zeros(shape=(self.step, self.step, self.step))
 
     # def subdivide(self, volume, step):

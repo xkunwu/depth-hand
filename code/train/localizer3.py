@@ -39,7 +39,7 @@ class localizer3(base_conv3):
         super(localizer3, self).receive_data(thedata, args)
         self.out_dim = 3
         self.predict_file = os.path.join(
-            self.predict_dir, 'detection_{}'.format(self.__class__.__name__))
+            self.predict_dir, 'detection_{}'.format(self.name_desc))
         self.provider_worker = self.provider.prow_localizer3
         self.yanker = self.provider.yank_localizer3
 
@@ -55,7 +55,7 @@ class localizer3(base_conv3):
         mpplot.figure(figsize=(2 * 5, 1 * 5))
         self.draw_prediction(thedata, args)
         mpplot.tight_layout()
-        fname = 'detection_{}.png'.format(self.__class__.__name__)
+        fname = 'detection_{}.png'.format(self.name_desc)
         mpplot.savefig(os.path.join(self.predict_dir, fname))
         print('figures saved: {}'.format(fname))
 
@@ -84,7 +84,7 @@ class localizer3(base_conv3):
             # poses_h5 = h5file['poses'][frame_id, ...].reshape(-1, 3)
             resce_h5 = h5file['resce'][frame_id, ...]
 
-        print('[{}] drawing image #{:d}'.format(self.__class__.__name__, img_id))
+        print('[{}] drawing image #{:d}'.format(self.name_desc, img_id))
         resce3 = resce_h5[0:4]
         cube = iso_cube()
         cube.load(resce3)
@@ -93,7 +93,7 @@ class localizer3(base_conv3):
             thedata.training_annot_cleaned, img_id)
         img_name, pose_raw = args.data_io.parse_line_annot(annot_line)
         img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
-        points3 = args.data_ops.img_to_raw(img, thedata)
+        points3 = args.data_ops.img_to_raw(img, self.caminfo)
         numpts = points3.shape[0]
         if 1000 < numpts:
             samid = np.random.choice(numpts, 1000, replace=False)
@@ -108,7 +108,7 @@ class localizer3(base_conv3):
         args.data_draw.draw_raw3d_pose(thedata, pose_raw)
         corners = cube.get_corners()
         iso_cube.draw_cube_wire(corners)
-        mpplot.gcf().gca().set_title('Ground truth')
+        mpplot.gca().set_title('Ground truth')
 
         ax = mpplot.subplot(1, 2, 2, projection='3d')
         ax.scatter(
@@ -139,10 +139,8 @@ class localizer3(base_conv3):
             poses_h5 = h5file['poses'][frame_id, ...].reshape(-1, 3)
             resce_h5 = h5file['resce'][frame_id, ...]
 
-        print('[{}] drawing image #{:d}'.format(self.__class__.__name__, img_id))
-        resce3 = resce_h5[0:4]
-        cube = iso_cube()
-        cube.load(resce3)
+        print('[{}] drawing image #{:d}'.format(self.name_desc, img_id))
+        colors = [Color('orange').rgb, Color('red').rgb, Color('lime').rgb]
         mpplot.subplots(nrows=2, ncols=2, figsize=(2 * 5, 2 * 5))
         mpplot.subplot(2, 2, 1)
         annot_line = args.data_io.get_line(
@@ -152,14 +150,33 @@ class localizer3(base_conv3):
         mpplot.imshow(img, cmap='bone')
         args.data_draw.draw_pose2d(
             thedata,
-            args.data_ops.raw_to_2d(pose_raw, thedata))
+            args.data_ops.raw_to_2d(pose_raw, self.caminfo))
+
+        ax = mpplot.subplot(2, 2, 4)
+        img_name = args.data_io.index2imagename(img_id)
+        img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
+        mpplot.imshow(img, cmap='bone')
+
+        ax = mpplot.subplot(2, 2, 3, projection='3d')
+        resce3 = resce_h5[0:4]
+        cube = iso_cube()
+        cube.load(resce3)
+        cube.show_dims()
+        points3 = args.data_ops.img_to_raw(img, self.caminfo)
+        _, points3_trans = cube.pick(points3)
+        numpts = points3_trans.shape[0]
+        if 1000 < numpts:
+            points3_trans = points3_trans[
+                np.random.choice(numpts, 1000, replace=False), :]
+        ax.scatter(
+            points3_trans[:, 0], points3_trans[:, 1], points3_trans[:, 2],
+            color=Color('lightsteelblue').rgb)
+        args.data_draw.draw_raw3d_pose(thedata, poses_h5)
+        corners = cube.transform(cube.get_corners())
+        iso_cube.draw_cube_wire(corners)
+        ax.view_init(azim=-120, elev=-150)
 
         ax = mpplot.subplot(2, 2, 2, projection='3d')
-        annot_line = args.data_io.get_line(
-            thedata.training_annot_cleaned, img_id)
-        img_name, pose_raw = args.data_io.parse_line_annot(annot_line)
-        img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
-        points3 = args.data_ops.img_to_raw(img, thedata)
         numpts = points3.shape[0]
         if 1000 < numpts:
             samid = np.random.choice(numpts, 1000, replace=False)
@@ -175,30 +192,9 @@ class localizer3(base_conv3):
         corners = cube.get_corners()
         iso_cube.draw_cube_wire(corners)
 
-        ax = mpplot.subplot(2, 2, 3, projection='3d')
-        _, points3_trans = cube.pick(points3)
-        numpts = points3_trans.shape[0]
-        if 1000 < numpts:
-            points3_trans = points3_trans[
-                np.random.choice(numpts, 1000, replace=False), :]
-        pose_trans = cube.transform(pose_raw)
-        ax.scatter(
-            points3_trans[:, 0], points3_trans[:, 1], points3_trans[:, 2],
-            color=Color('lightsteelblue').rgb)
-        args.data_draw.draw_raw3d_pose(thedata, pose_trans)
-        corners = cube.get_corners()
-        corners = cube.transform(corners)
-        iso_cube.draw_cube_wire(corners)
-        ax.view_init(azim=-120, elev=-150)
-
-        ax = mpplot.subplot(2, 2, 4)
-        img_name = args.data_io.index2imagename(img_id)
-        img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
-        mpplot.imshow(img, cmap='bone')
-
         mlab.figure(size=(800, 800))
         img_name, frame, poses, resce = self.provider_worker(
-            annot_line, self.image_dir, thedata)
+            annot_line, self.image_dir, self.caminfo)
         frame = np.squeeze(frame, axis=-1)
         poses = poses.reshape(-1, 3)
         if (
@@ -208,7 +204,7 @@ class localizer3(base_conv3):
             print(np.linalg.norm(frame_h5 - frame))
             print(np.linalg.norm(poses_h5 - poses))
             _, frame_1, _, _ = self.provider_worker(
-                annot_line, self.image_dir, thedata)
+                annot_line, self.image_dir, self.caminfo)
             print(np.linalg.norm(frame_1 - frame))
             with h5py.File('/tmp/111', 'w') as h5file:
                 h5file.create_dataset(
@@ -233,7 +229,7 @@ class localizer3(base_conv3):
 
         mpplot.savefig(os.path.join(
             args.predict_dir,
-            'draw_{}.png'.format(self.__class__.__name__)))
+            'draw_{}.png'.format(self.name_desc)))
         mpplot.show()
 
     def get_model(
@@ -250,7 +246,7 @@ class localizer3(base_conv3):
             end_points[name] = net
             return name == final_endpoint
 
-        with tf.variable_scope(scope, self.__class__.__name__, [input_tensor]):
+        with tf.variable_scope(scope, self.name_desc, [input_tensor]):
             with slim.arg_scope(
                     [slim.batch_norm, slim.dropout], is_training=is_training), \
                 slim.arg_scope(

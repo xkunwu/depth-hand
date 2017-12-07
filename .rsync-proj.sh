@@ -24,5 +24,5 @@ echo downloading \
     from: [${SERVER}:${OUT_DIR}/log/blinks/${MODEL}] \
     to: [${HOME}/${OUT_DIR}/${SERVER}/log/${MODEL}]
 rsync -auvh -e ssh \
-    ${SERVER}:${OUT_DIR}/log/blinks/${MODEL}/* \
+    ${SERVER}:${OUT_DIR}/log/blinks/${MODEL}/model.ckpt* \
     ${HOME}/${OUT_DIR}/${SERVER}/log/${MODEL}
