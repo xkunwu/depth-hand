@@ -45,12 +45,13 @@ class ortho3view(base_regre):
             print(np.min(frame_h5), np.max(frame_h5))
             print(np.histogram(frame_h5, range=(1e-4, np.max(frame_h5))))
 
-        print('[{}] drawing image #{:d}'.format(self.name_desc, img_id))
+        print('[{}] drawing image #{:d} ...'.format(self.name_desc, img_id))
         mpplot.subplots(nrows=2, ncols=2, figsize=(3 * 5, 3 * 5))
 
         resce3 = resce_h5[0:4]
         cube = iso_cube()
         cube.load(resce3)
+        # need to maintain both image and poses at the same scale
         sizel = np.floor(resce3[0]).astype(int)
         for spi in range(3):
             mpplot.subplot(3, 3, spi + 7)
@@ -58,7 +59,8 @@ class ortho3view(base_regre):
             mpplot.imshow(
                 cv2resize(img, (sizel, sizel)),
                 cmap='bone')
-            pose2d, _ = cube.project_pca(poses_h5, roll=spi, sort=False)
+            pose3d = cube.trans_scale_to(poses_h5)
+            pose2d, _ = cube.project_pca(pose3d, roll=spi, sort=False)
             pose2d *= sizel
             args.data_draw.draw_pose2d(
                 thedata,
@@ -116,7 +118,8 @@ class ortho3view(base_regre):
             mpplot.imshow(
                 cv2resize(img, (sizel, sizel)),
                 cmap='bone')
-            pose2d, _ = cube.project_pca(poses, roll=spi, sort=False)
+            pose3d = cube.trans_scale_to(poses)
+            pose2d, _ = cube.project_pca(pose3d, roll=spi, sort=False)
             pose2d *= sizel
             args.data_draw.draw_pose2d(
                 thedata,

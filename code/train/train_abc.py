@@ -149,7 +149,7 @@ class train_abc():
                 else:
                     saver.restore(sess, model_path)
                     self.logger.info(
-                        'Model restored from: {}.'.format(
+                        'model restored from: {}.'.format(
                             model_path))
 
                 merged = tf.summary.merge_all()
@@ -173,14 +173,51 @@ class train_abc():
                     sess, ops, saver,
                     model_path, train_writer, valid_writer)
 
-    def debut_pred(self, batch_echt, batch_pred):
+    def debug_locat_3d(self, batch_echt, batch_pred):
+        np.set_printoptions(
+            threshold=np.nan,
+            formatter={'float_kind': lambda x: "%.2f" % x})
+        anchor_num_sub = self.args.model_inst.anchor_num
+        anchor_num = anchor_num_sub ** 3
+        pcnt_echt = batch_echt[0, :anchor_num].reshape(
+            anchor_num_sub, anchor_num_sub, anchor_num_sub)
+        index_echt = np.array(np.unravel_index(
+            np.argmax(pcnt_echt), pcnt_echt.shape))
+        pcnt_pred = batch_pred[0, :anchor_num].reshape(
+            anchor_num_sub, anchor_num_sub, anchor_num_sub)
+        index_pred = np.array(np.unravel_index(
+            np.argmax(pcnt_pred), pcnt_pred.shape))
+        self.logger.info(
+            [index_echt, np.max(pcnt_echt), np.sum(pcnt_echt)])
+        self.logger.info(
+            [index_pred, np.max(pcnt_pred), np.sum(pcnt_pred)])
+        anchors_echt = batch_echt[0, anchor_num:].reshape(
+            anchor_num_sub, anchor_num_sub, anchor_num_sub, 4)
+        anchors_pred = batch_pred[0, anchor_num:].reshape(
+            anchor_num_sub, anchor_num_sub, anchor_num_sub, 4)
+        self.logger.info([
+            anchors_echt[index_echt[0], index_echt[1], index_echt[2], :],
+        ])
+        self.logger.info([
+            anchors_pred[index_pred[0], index_pred[1], index_echt[2], :],
+        ])
+        z_echt = index_echt[2]
+        self.logger.info('\n{}'.format(pcnt_pred[..., z_echt]))
+        anchors_diff = np.fabs(
+            anchors_echt[..., z_echt, 0:3] -
+            anchors_pred[..., z_echt, 0:3])
+        self.logger.info('\n{}'.format(
+            np.sum(anchors_diff, axis=-1)))
+        self.logger.info('\n{}'.format(
+            np.fabs(anchors_echt[..., z_echt, 3] - anchors_pred[..., z_echt, 3])))
+
+    def debug_locat_2d(self, batch_echt, batch_pred):
         np.set_printoptions(
             threshold=np.nan,
             formatter={'float_kind': lambda x: "%.2f" % x})
         anchor_num_sub = self.args.model_inst.anchor_num
         anchor_num = anchor_num_sub ** 2
-        pcnt_echt = batch_echt[0, :anchor_num]
-        pcnt_echt = pcnt_echt.reshape(
+        pcnt_echt = batch_echt[0, :anchor_num].reshape(
             anchor_num_sub, anchor_num_sub)
         index_echt = np.array(np.unravel_index(
             np.argmax(pcnt_echt), pcnt_echt.shape))
@@ -192,8 +229,7 @@ class train_abc():
             [index_echt, np.max(pcnt_echt), np.sum(pcnt_echt)])
         self.logger.info(
             [index_pred, np.max(pcnt_pred), np.sum(pcnt_pred)])
-        anchors_echt = batch_echt[0, anchor_num:]
-        anchors_echt = anchors_echt.reshape(
+        anchors_echt = batch_echt[0, anchor_num:].reshape(
             anchor_num_sub, anchor_num_sub, 3)
         anchors_pred = batch_pred[0, anchor_num:].reshape(
             anchor_num_sub, anchor_num_sub, 3)
@@ -207,22 +243,30 @@ class train_abc():
         ])
         self.logger.info('\n{}'.format(pcnt_pred))
         self.logger.info('\n{}'.format(
-            np.fabs(anchors_echt[..., 0] - anchors_pred[..., 0])))
-        self.logger.info('\n{}'.format(
-            np.fabs(anchors_echt[..., 1] - anchors_pred[..., 1])))
+            np.fabs(anchors_echt[..., 0:2] - anchors_pred[..., 0:2])))
         self.logger.info('\n{}'.format(
             np.fabs(anchors_echt[..., 2] - anchors_pred[..., 2])))
 
+    def debug_detec_2d(self, batch_echt, batch_pred):
+        np.set_printoptions(
+            threshold=np.nan,
+            formatter={'float_kind': lambda x: "%.2f" % x})
+        pcnt_echt = batch_echt[0, :].reshape(21, 3)
+        pcnt_pred = batch_pred[0, :].reshape(21, 3)
+        self.logger.info(np.concatenate(
+            (np.max(pcnt_echt, axis=0), np.min(pcnt_echt, axis=0))
+        ))
+        self.logger.info(np.concatenate(
+            (np.max(pcnt_pred, axis=0), np.min(pcnt_pred, axis=0))
+        ))
+        self.logger.info('\n{}'.format(pcnt_echt))
+        self.logger.info('\n{}'.format(pcnt_pred))
+        self.logger.info('\n{}'.format(
+            np.fabs(pcnt_echt - pcnt_pred)))
+
     def debug_prediction(self, frame_h5, resce_h5, pred_val):
-        import matplotlib.pyplot as mpplot
-        mpplot.figure(figsize=(2 * 5, 1 * 5))
-        self.args.model_inst._draw_prediction(
+        self.args.model_inst._debug_draw_prediction(
             frame_h5, resce_h5, pred_val)
-        mpplot.tight_layout()
-        fname = 'debug_train_{}.png'.format(
-            self.args.model_inst.__class__.__name__)
-        mpplot.savefig(os.path.join(
-            self.args.model_inst.predict_dir, fname))
 
     def train_one_epoch(self, sess, ops, train_writer):
         """ ops: dict mapping from string to tf ops """
@@ -241,24 +285,27 @@ class train_abc():
                 [ops['merged'], ops['step'], ops['train_op'],
                     ops['loss'], ops['pred']],
                 feed_dict=feed_dict)
-            loss_sum += loss_val
+            loss_sum += loss_val / self.args.batch_size
             if batch_count % 10 == 0:
                 if 'locor' == self.args.model_inst.net_type:
-                    self.debut_pred(
-                        batch_data['batch_poses'], pred_val)
-                    did = np.random.randint(
-                        0, self.args.batch_size)
+                    if 2 == self.args.model_inst.net_rank:
+                        self.debug_locat_2d(batch_data['batch_poses'], pred_val)
+                    elif 3 == self.args.model_inst.net_rank:
+                        self.debug_locat_3d(batch_data['batch_poses'], pred_val)
+                    did = np.random.randint(0, self.args.batch_size)
                     self.debug_prediction(
                         np.squeeze(batch_data['batch_frame'][did, ...], -1),
                         batch_data['batch_resce'][did, ...],
                         pred_val[did, ...]
                     )
+                # elif 'poser' == self.args.model_inst.net_type:
+                #     self.debug_detec_2d(batch_data['batch_poses'], pred_val)
                 train_writer.add_summary(summary, step)
                 self.logger.info(
                     'batch {} training loss: {}'.format(
                         batch_count, loss_val))
             batch_count += 1
-        mean_loss = loss_sum / batch_count / self.args.batch_size
+        mean_loss = loss_sum / batch_count
         self.args.logger.info(
             'epoch training mean loss: {:.4f}'.format(
                 mean_loss))
@@ -282,17 +329,23 @@ class train_abc():
                 [ops['merged'], ops['step'],
                     ops['loss'], ops['pred']],
                 feed_dict=feed_dict)
-            loss_sum += loss_val
+            loss_sum += loss_val / self.args.batch_size
             if batch_count % 10 == 0:
                 if 'locor' == self.args.model_inst.net_type:
-                    self.debut_pred(
-                        batch_data['batch_poses'], pred_val)
+                    if 2 == self.args.model_inst.net_rank:
+                        self.debug_locat_2d(
+                            batch_data['batch_poses'], pred_val)
+                    elif 3 == self.args.model_inst.net_rank:
+                        self.debug_locat_3d(
+                            batch_data['batch_poses'], pred_val)
+                # elif 'poser' == self.args.model_inst.net_type:
+                #     self.debug_detec_2d(batch_data['batch_poses'], pred_val)
                 valid_writer.add_summary(summary, step)
                 self.logger.info(
                     'batch {} validate loss: {}'.format(
                         batch_count, loss_val))
             batch_count += 1
-        mean_loss = loss_sum / batch_count / self.args.batch_size
+        mean_loss = loss_sum / batch_count
         self.args.logger.info(
             'epoch validate mean loss: {:.4f}'.format(
                 mean_loss))
@@ -301,8 +354,11 @@ class train_abc():
     def evaluate(self):
         self.logger.info('######## Evaluating ########')
         tf.reset_default_graph()
-        with tf.device('/gpu:' + str(self.args.gpu_id)):
-            frames_tf, poses_tf = self.args.model_inst.placeholder_inputs(1)
+        with tf.Graph().as_default(), \
+                tf.device('/gpu:' + str(self.args.gpu_id)):
+            # sequential evaluate, suited for streaming
+            frames_tf, poses_tf = \
+                self.args.model_inst.placeholder_inputs()
             is_training_tf = tf.placeholder(
                 tf.bool, name='is_training')
 
@@ -313,30 +369,31 @@ class train_abc():
 
             saver = tf.train.Saver()
 
-        config = tf.ConfigProto()
-        config.gpu_options.allow_growth = True
-        config.allow_soft_placement = True
-        config.log_device_placement = False
-        with tf.Session(config=config) as sess:
-            model_path = self.args.model_inst.ckpt_path
-            saver.restore(sess, model_path)
-            self.logger.info(
-                'Model restored from: {}.'.format(model_path))
+            config = tf.ConfigProto()
+            config.gpu_options.allow_growth = True
+            config.allow_soft_placement = True
+            config.log_device_placement = False
+            with tf.Session(config=config) as sess:
+                model_path = self.args.model_inst.ckpt_path
+                self.logger.info(
+                    'restoring model from: {} ...'.format(model_path))
+                saver.restore(sess, model_path)
+                self.logger.info('model restored.')
 
-            ops = {
-                'batch_frame': frames_tf,
-                'batch_poses': poses_tf,
-                'is_training': is_training_tf,
-                'loss': loss,
-                'pred': pred
-            }
+                ops = {
+                    'batch_frame': frames_tf,
+                    'batch_poses': poses_tf,
+                    'is_training': is_training_tf,
+                    'loss': loss,
+                    'pred': pred
+                }
 
-            with file_pack() as filepack:
-                writer = self.args.model_inst.start_evaluate(
-                    filepack)
-                self.eval_one_epoch_write(sess, ops, writer)
-            self.args.model_inst.end_evaluate(
-                self.args.data_inst, self.args)
+                with file_pack() as filepack:
+                    writer = self.args.model_inst.start_evaluate(
+                        filepack)
+                    self.eval_one_epoch_write(sess, ops, writer)
+                self.args.model_inst.end_evaluate(
+                    self.args.data_inst, self.args)
 
     def eval_one_epoch_write(self, sess, ops, writer):
         batch_count = 0
@@ -350,7 +407,7 @@ class train_abc():
                 ' ', progressbar.ETA()]
         ).start()
         while True:
-            batch_data = self.args.model_inst.fetch_batch(1)
+            batch_data = self.args.model_inst.fetch_batch()
             if batch_data is None:
                 break
             feed_dict = {

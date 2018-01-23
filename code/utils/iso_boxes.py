@@ -91,11 +91,11 @@ class iso_aabb:
             m = self.sidelen * m
         self.sidelen += m
 
-    def transform(self, points3):
+    def transform_to_center(self, points3):
         """ world --> local """
         return (points3 - (self.cll + self.sidelen / 2)) / self.sidelen
 
-    def transform_inv(self, points3):
+    def transform_add_center(self, points3):
         """ local --> world """
         return points3 * self.sidelen + (self.cll + self.sidelen / 2)
 
@@ -126,15 +126,17 @@ class iso_cube:
         return np.ceil(2 * self.sidelen).astype(int) + 1
 
     def pick(self, points3):
-        """ only make sense when picked in the local coordinates """
-        points3_trans = self.transform(points3)
+        """ in the local oriented unit coordinates.
+            orientation is important here.
+        """
+        points3_trans = (points3 - self.cen) / self.sidelen
         cmin = - np.ones(3)
         cmax = np.ones(3)
         conds = np.logical_and(
             np.all(cmin < points3_trans, axis=1),
             np.all(cmax > points3_trans, axis=1)
         )
-        return points3[conds, :], points3_trans[conds, :]
+        return points3[conds, :]
 
     def build(self, points3, m=0.):
         pmax = np.max(points3, axis=0)
@@ -143,7 +145,7 @@ class iso_cube:
         self.sidelen = np.max(pmax - pmin) / 2
         # self.evecs = np.eye(3)
         self.add_margan(m)
-        return self.transform(points3)
+        return self.transform_to_center(points3)
 
     # def build_pca(self, points3, m=0.6):
     #     self.cen = np.mean(points3, axis=0)
@@ -170,29 +172,29 @@ class iso_cube:
             m = self.sidelen * m
         self.sidelen += m
 
-    def transform(self, points3):
-        """ world --> local """
+    def transform_to_center(self, points3):
         # return np.dot(points3 - self.cen, self.evecs)
         # return np.dot(points3 - self.cen, self.evecs) / self.sidelen
-        return (points3 - self.cen) / self.sidelen
+        # return (points3 - self.cen) / self.sidelen
+        return (points3 - self.cen)
         # return self.qrot.rotate(points3 - self.cen)
 
-    def transform_inv(self, points3):
-        """ local --> world """
+    def transform_center_shrink(self, points3):
+        return (points3 - self.cen) / self.sidelen
+
+    def transform_add_center(self, points3):
         # return np.dot(points3, self.evecs.T) + self.cen
         # return np.dot(points3 * self.sidelen, self.evecs.T) + self.cen
-        return (points3 * self.sidelen) + self.cen
+        # return (points3 * self.sidelen) + self.cen
+        return (points3) + self.cen
         # return self.qrot.inverse.rotate(points3 - self.cen)
 
-    # def trans_scale(self, points3, sizel):
-    #     """ world --> image """
-    #     return np.dot(points3 - self.cen, self.evecs) * sizel / self.sidelen
-    #
-    # def trans_scale_inv(self, points3, sizel):
-    #     """ image --> world """
-    #     return np.dot(points3 * self.sidelen / sizel, self.evecs.T) + self.cen
+    def trans_scale_to(self, points3, sizel=1.):
+        # return np.dot(points3 - self.cen, self.evecs) * sizel / self.sidelen
+        return points3 * sizel / self.sidelen
 
     def project_pca(self, ps3_pca, roll=0, sort=True):
+        """ produced coordinates in unit range """
         ar3 = np.arange(3)
         if 0 < roll:
             ar3 = np.roll(ar3, roll)
@@ -208,6 +210,7 @@ class iso_cube:
         return coord[:, ::-1], depth
 
     def print_image(self, coord, depth, sizel):
+        """ expand to required image size """
         img = np.zeros((sizel, sizel))
         coord *= 0.999999
         img[
@@ -357,6 +360,6 @@ if __name__ == "__main__":
     ax = Axes3D(fig)
     cube.draw()
     ax.scatter(points3[:, 0], points3[:, 1], points3[:, 2])
-    # points3_trans = cube.transform(points3)
+    # points3_trans = cube.transform_to_center(points3)
     # ax.scatter(points3_trans[:, 0], points3_trans[:, 1], points3_trans[:, 2])
     mpplot.show()

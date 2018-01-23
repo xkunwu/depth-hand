@@ -44,11 +44,11 @@ class hands17holder:
     #         color=colors[ii]
     #     )
     image_size = (480, 640)
-    region_size = 120
-    crop_size = 128
-    anchor_num = 16
-    crop_range = 800.  # +/- limit
-    z_range = (1e-4, 1600.)
+    region_size = 120  # empirical cropping size
+    crop_size = 128  # input image size to models (may changed)
+    anchor_num = 16  # for attention model
+    crop_range = 480.  # +/- limit
+    z_range = (100., 1060.)  # empirical valid depth range
     z_max = 9999.  # max distance set to 10m
     # camera info
     focal = (475.065948, 475.065857)
@@ -99,6 +99,10 @@ class hands17holder:
 
     def remove_out_frame_annot(self):
         self.num_training = int(0)
+        pose_limit = np.array([
+            [np.inf, np.inf, np.inf],
+            [-np.inf, -np.inf, -np.inf],
+        ])
         with open(self.training_annot_cleaned, 'w') as writer, \
                 open(self.training_annot_origin, 'r') as reader:
             lines = reader.readlines()
@@ -117,10 +121,17 @@ class hands17holder:
                 if 0 > np.min(self.image_size - pose2d):
                     continue
                 writer.write(annot_line)
+                pose_limit[0, :] = np.minimum(
+                    pose_limit[0, :],
+                    np.min(pose_raw, axis=0))
+                pose_limit[1, :] = np.maximum(
+                    pose_limit[1, :],
+                    np.max(pose_raw, axis=0))
                 self.num_training += 1
                 if 0 == (li % 10e3):
                     timerbar.update(li)
             timerbar.finish()
+        return pose_limit
 
     def shuffle_split(self):
         with open(self.training_annot_cleaned, 'r') as source:
@@ -152,10 +163,13 @@ class hands17holder:
             from datetime import timedelta
             time_s = timer()
             self.logger.info('cleaning data ...')
-            self.remove_out_frame_annot()
+            pose_limit = self.remove_out_frame_annot()
             time_e = str(timedelta(seconds=timer() - time_s))
             self.logger.info('{:d} images after cleaning, time: {}'.format(
                 self.num_training, time_e))
+            self.logger.info('pose limit: {} --> {}'.format(
+                pose_limit[0, :], pose_limit[1, :])
+            )
         else:
             self.num_training = int(sum(
                 1 for line in open(self.training_annot_cleaned, 'r')))
@@ -186,6 +200,7 @@ class hands17holder:
         self.crop_size = args.crop_size
         self.anchor_num = args.anchor_num
         self.crop_range = args.crop_range
+        # self.z_range[1] = self.crop_range * 2. + self.z_range[0]
         self.training_images = os.path.join(self.data_dir, 'training/images')
         self.frame_images = os.path.join(self.data_dir, 'frame/images')
         self.training_annot_origin = os.path.join(

@@ -1,11 +1,11 @@
 import os
-import sys
-from importlib import import_module
+# import sys
+# from importlib import import_module
 import numpy as np
 import matplotlib.pyplot as mpplot
 from . import ops as dataops
 from . import io as dataio
-from . import draw as datadraw
+# from . import draw as datadraw
 
 
 def compare_error(thedata, fname_echt, fname_pred):
@@ -34,6 +34,7 @@ def compare_error(thedata, fname_echt, fname_pred):
 
 def draw_mean_error_distribution(errors, ax):
     """ errors: FxJ """
+    mpplot.figure(figsize=(2 * 5, 1 * 5))
     err_mean = np.mean(errors, axis=1)
     mpplot.hist(
         err_mean, 100,
@@ -48,6 +49,7 @@ def draw_mean_error_distribution(errors, ax):
 
 def draw_error_percentage_curve(errors, methods, ax):
     """ errors: MxFxJ """
+    mpplot.figure(figsize=(2 * 5, 1 * 5))
     err_max = np.max(errors, axis=-1)
     num_v = err_max.shape[1]
     num_m = err_max.shape[0]
@@ -84,6 +86,7 @@ def draw_error_percentage_curve(errors, methods, ax):
 
 def draw_error_per_joint(errors, methods, ax, join_name=None, draw_std=False):
     """ errors: MxFxJ """
+    mpplot.figure(figsize=(2 * 5, 1 * 5))
     err_mean = np.mean(errors, axis=1)
     err_max = np.max(errors, axis=1)
     err_min = np.min(errors, axis=1)
@@ -152,18 +155,18 @@ def evaluate_poses(thedata, model_name, predict_dir, predict_file):
         thedata.training_annot_test,
         predict_file
     )
-    mpplot.gcf().clear()
+    # mpplot.gcf().clear()
     draw_mean_error_distribution(
         errors, mpplot.gca())
     fname = '{}_error_dist.png'.format(model_name)
     mpplot.savefig(os.path.join(predict_dir, fname))
     errors = np.expand_dims(errors, axis=0)
-    mpplot.gcf().clear()
+    # mpplot.gcf().clear()
     draw_error_percentage_curve(
         errors, [model_name], mpplot.gca())
     fname = '{}_error_rate.png'.format(model_name)
     mpplot.savefig(os.path.join(predict_dir, fname))
-    mpplot.gcf().clear()
+    # mpplot.gcf().clear()
     draw_error_per_joint(
         errors, [model_name], mpplot.gca(), thedata.join_name)
     fname = '{}_error_bar.png'.format(model_name)
@@ -191,5 +194,5 @@ def evaluate_poses(thedata, model_name, predict_dir, predict_file):
 def evaluate_hands(thedata, model_name, predict_dir, predict_file):
     print('evaluating {} ...'.format(model_name))
 
-    from sklearn.metrics import precision_recall_curve
+    # from sklearn.metrics import precision_recall_curve
     pass

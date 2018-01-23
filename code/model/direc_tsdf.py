@@ -61,6 +61,7 @@ class direc_tsdf(base_conv3):
             poses_h5 = h5file['poses'][frame_id, ...].reshape(-1, 3)
             # resce_h5 = h5file['resce'][frame_id, ...]
 
+        print('[{}] drawing image #{:d}'.format(self.__class__.__name__, img_id))
         annot_line = args.data_io.get_line(
             thedata.training_annot_cleaned, img_id)
         img_name, frame, poses, resce = self.provider_worker(
@@ -73,19 +74,18 @@ class direc_tsdf(base_conv3):
             print(np.linalg.norm(frame_h5 - frame))
             print(np.linalg.norm(poses_h5 - poses))
             print('ERROR - h5 storage corrupted!')
-        print('[{}] drawing image #{:d}'.format(self.__class__.__name__, img_id))
-        for spi in range(3):
-            mlab.figure(size=(800, 800))
-            volume3 = frame_h5[..., spi]
-            mlab.pipeline.volume(mlab.pipeline.scalar_field(volume3))
-            mlab.pipeline.image_plane_widget(
-                mlab.pipeline.scalar_field(volume3),
-                plane_orientation='z_axes',
-                slice_index=self.crop_size / 2)
-            np.set_printoptions(precision=4)
-            # print(volume3[12:20, 12:20, 16])
-            mlab.outline()
-        mlab.show()
+        # for spi in range(3):
+        #     mlab.figure(size=(800, 800))
+        #     volume3 = frame_h5[..., spi]
+        #     mlab.pipeline.volume(mlab.pipeline.scalar_field(volume3))
+        #     mlab.pipeline.image_plane_widget(
+        #         mlab.pipeline.scalar_field(volume3),
+        #         plane_orientation='z_axes',
+        #         slice_index=self.crop_size / 2)
+        #     np.set_printoptions(precision=4)
+        #     # print(volume3[12:20, 12:20, 16])
+        #     mlab.outline()
+        # mlab.show()
 
     def placeholder_inputs(self, batch_size=None):
         if batch_size is None:

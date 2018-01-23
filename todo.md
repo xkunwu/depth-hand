@@ -1,0 +1,6 @@
+- [] SPT
+- [] iterative refine
+- [] inres net
+- [] producing small results
+    - due to using different batch size while evaluating, which is necessary for streaming
+- [] 2d localizer

@@ -106,9 +106,11 @@ def draw_pose_raw(thedata, img, pose_raw, show_margin=False):
     # print(pose_raw - points3)
 
     # draw bounding cube
-    cube = iso_cube()
-    cube.build(pose_raw)
-    rect = dataops.get_rect3(cube, thedata)
+    cube = iso_cube(
+        (np.max(pose_raw, axis=0) + np.min(pose_raw, axis=0)) / 2,
+        thedata.region_size
+    )
+    rect = dataops.get_rect2(cube, thedata)
     rect.draw()
 
     img_posed = draw_pose2d(
@@ -119,7 +121,8 @@ def draw_pose_raw(thedata, img, pose_raw, show_margin=False):
 
 
 def draw_prediction_poses(thedata, image_dir, annot_echt, annot_pred):
-    img_id = np.random.randint(1, high=sum(1 for _ in open(annot_pred, 'r')))
+    # mpplot.subplots(nrows=2, ncols=2, figsize=(2 * 4, 2 * 4))
+    img_id = 4
     line_echt = linecache.getline(annot_echt, img_id)
     line_pred = linecache.getline(annot_pred, img_id)
     img_name, pose_echt = dataio.parse_line_annot(line_echt)
@@ -128,31 +131,45 @@ def draw_prediction_poses(thedata, image_dir, annot_echt, annot_pred):
     print('drawing image #{:d}: {}'.format(img_id, img_path))
     img = dataio.read_image(img_path)
 
-    # mpplot.subplots(nrows=1, ncols=2)
-    mpplot.subplot(1, 2, 1)
+    mpplot.subplot(2, 2, 1)
     mpplot.imshow(img, cmap='bone')
     draw_pose_raw(
         thedata, img,
         pose_echt,
         show_margin=True)
-    # else:
-    #     draw_pose_raw(
-    #         thedata, img,
-    #         dataops.d2z_to_raw(pose_echt, thedata, rescen_echt),
-    #         show_margin=True)
-    mpplot.gca().set_title('Ground truth')
-    mpplot.subplot(1, 2, 2)
+    mpplot.gca().set_title('Ground truth #{:d}'.format(img_id))
+    mpplot.subplot(2, 2, 2)
     mpplot.imshow(img, cmap='bone')
     draw_pose_raw(
         thedata, img,
         pose_pred,
         show_margin=True)
-    # else:
-    #     draw_pose_raw(
-    #         thedata, img,
-    #         dataops.d2z_to_raw(pose_pred, thedata, rescen_pred),
-    #         show_margin=True)
     mpplot.gca().set_title('Prediction')
+
+    img_id = np.random.randint(1, high=sum(1 for _ in open(annot_pred, 'r')))
+    line_echt = linecache.getline(annot_echt, img_id)
+    line_pred = linecache.getline(annot_pred, img_id)
+    img_name, pose_echt = dataio.parse_line_annot(line_echt)
+    _, pose_pred = dataio.parse_line_annot(line_pred)
+    img_path = os.path.join(image_dir, img_name)
+    print('drawing image #{:d}: {}'.format(img_id, img_path))
+    img = dataio.read_image(img_path)
+    mpplot.subplot(2, 2, 3)
+    mpplot.imshow(img, cmap='bone')
+    draw_pose_raw(
+        thedata, img,
+        pose_echt,
+        show_margin=True)
+    mpplot.gca().set_title('Ground truth #{:d}'.format(img_id))
+    mpplot.subplot(2, 2, 4)
+    mpplot.imshow(img, cmap='bone')
+    draw_pose_raw(
+        thedata, img,
+        pose_pred,
+        show_margin=True)
+    mpplot.gca().set_title('Prediction')
+    mpplot.tight_layout()
+    return img_id
 
 
 def draw_pose_raw_random(thedata, image_dir, annot_txt, img_id=-1):
@@ -254,18 +271,19 @@ def draw_raw3d(thedata, img, pose_raw):
     ax.set_zlabel('depth (mm)', labelpad=15)
     draw_raw3d_pose(thedata, pose_raw)
     corners = cube.get_corners()
-    corners = cube.transform_inv(corners)
+    corners = cube.transform_add_center(corners)
     cube.draw_wire(corners)
     # draw cropped region
     ax = fig.add_subplot(1, 2, 2, projection='3d')
-    _, points3_trans = cube.pick(points3)
+    points3_trans = cube.pick(points3)
+    points3_trans = cube.transform_to_center(points3_trans)
     numpts = points3_trans.shape[0]
     if 1000 < numpts:
         points3_sam = points3_trans[np.random.choice(numpts, 1000, replace=False), :]
     else:
         points3_sam = points3_trans
-    points3_sam = cube.transform(points3_sam)
-    pose_trans = cube.transform(pose_raw)
+    points3_sam = cube.transform_to_center(points3_sam)
+    pose_trans = cube.transform_to_center(pose_raw)
     ax.scatter(
         points3_sam[:, 0], points3_sam[:, 1], points3_sam[:, 2],
         color=Color('lightsteelblue').rgb)

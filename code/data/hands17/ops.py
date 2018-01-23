@@ -1,61 +1,45 @@
-import os
-import sys
+# import os
+# import sys
 from importlib import import_module
 import numpy as np
 import skfmm
 from cv2 import resize as cv2resize
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-BASE_DIR = os.path.abspath(os.path.join(BASE_DIR, os.pardir, os.pardir))
-sys.path.append(BASE_DIR)
-iso_rect = getattr(
-    import_module('utils.iso_boxes'),
-    'iso_rect'
-)
-iso_aabb = getattr(
-    import_module('utils.iso_boxes'),
-    'iso_aabb'
-)
-iso_cube = getattr(
-    import_module('utils.iso_boxes'),
-    'iso_cube'
-)
-regu_grid = getattr(
-    import_module('utils.regu_grid'),
-    'regu_grid'
-)
-grid_cell = getattr(
-    import_module('utils.regu_grid'),
-    'grid_cell'
-)
-latice_image = getattr(
-    import_module('utils.regu_grid'),
-    'latice_image'
-)
+from utils.iso_boxes import iso_rect
+# from utils.iso_boxes import iso_aabb
+from utils.iso_boxes import iso_cube
+from utils.regu_grid import regu_grid
+# from utils.regu_grid import grid_cell
+from utils.regu_grid import latice_image
 
 
 def raw_to_pca(points3, resce=np.array([1, 0, 0, 0])):
     cube = iso_cube()
     cube.load(resce)
-    return cube.transform(points3)
+    return cube.transform_to_center(points3)
 
 
 def pca_to_raw(points3, resce=np.array([1, 0, 0, 0])):
     cube = iso_cube()
     cube.load(resce)
-    return cube.transform_inv(points3)
+    return cube.transform_add_center(points3)
 
 
 def raw_to_local(points3, resce=np.array([1, 0, 0, 0])):
-    aabb = iso_aabb()
-    aabb.load(resce)
-    return aabb.transform(points3)
+    cube = iso_cube()
+    cube.load(resce)
+    return cube.transform_to_center(points3)
+    # aabb = iso_aabb()
+    # aabb.load(resce)
+    # return aabb.transform_to_center(points3)
 
 
 def local_to_raw(points3, resce=np.array([1, 0, 0, 0])):
-    aabb = iso_aabb()
-    aabb.load(resce)
-    return aabb.transform_inv(points3)
+    cube = iso_cube()
+    cube.load(resce)
+    return cube.transform_add_center(points3)
+    # aabb = iso_aabb()
+    # aabb.load(resce)
+    # return aabb.transform_add_center(points3)
 
 
 def d2z_to_raw(p2z, caminfo, resce=np.array([1, 0, 0])):
@@ -88,6 +72,7 @@ def raw_to_2d(points3, caminfo, resce=np.array([1, 0, 0])):
 
 
 def estimate_z(l3, l2, focal):
+    """ depth can be estimated due to same projective mapping """
     # p3 = np.array([[-12, -54, 456], [22, 63, 456]])
     # # p3 = np.array([[0, 0, 456], [12, 34, 456]])
     # # p3 = np.array([[456, -456, 456], [456, 456, 456]])
@@ -101,6 +86,7 @@ def estimate_z(l3, l2, focal):
 
 
 def proj_cube_to_rect(cube, region_size, caminfo):
+    """ central z-plane of 3D cube --> image plane """
     c3a = np.array([
         np.append(cube.cen[:2] - region_size, cube.cen[2]),
         np.append(cube.cen[:2] + region_size, cube.cen[2])
@@ -143,13 +129,16 @@ def img_to_raw(img, caminfo, crop_lim=None):
 
 
 def normalize_depth(img, caminfo):
+    """ normalization is based on empirical depth range """
     return np.clip(
-        (img.astype(float) - caminfo.z_range[0]) / (caminfo.z_range[1] - caminfo.z_range[0]),
+        (img.astype(float) - caminfo.z_range[0]) /
+        (caminfo.z_range[1] - caminfo.z_range[0]),
         0., 1.
     )
 
 
 def rescale_depth(img, caminfo):
+    """ rescale to fixed cropping size """
     img_rescale = cv2resize(
         img, (caminfo.crop_size, caminfo.crop_size))
     img_rescale = normalize_depth(img_rescale, caminfo)
@@ -175,7 +164,7 @@ def getbm(base_z, caminfo, base_margin=20):
 
 
 def clip_image_border(rect, caminfo):
-    # clip to image border
+    """ clip to image border """
     ctl = rect.cll
     cbr = rect.cll + rect.sidelen
     cen = rect.cll + rect.sidelen / 2
@@ -187,23 +176,35 @@ def clip_image_border(rect, caminfo):
     return rect
 
 
-def voxelize_depth(img, step, caminfo):
+def voxelize_depth(img, pose_raw, step, anchor_num, caminfo):
     halflen = caminfo.crop_range
     points3 = img_to_raw(img, caminfo, halflen)
     grid = regu_grid(
-        np.array([-halflen, -halflen, 0]),
+        np.array([-halflen, -halflen, caminfo.z_range[0]]),
         step, halflen * 2 / step)
-    grid.fill(points3)
-    # grid.show_dims()
-    # print(np.histogram(grid.pcnt))
-    # cube = iso_cube()
-    # cube.build(pose_raw)
-    # resce = np.concatenate((
-    #     cube.dump(),
-    #     np.array([sidelen, step])
-    # ))
-    # resce = cube.dump()
+    pcnt = grid.fill(points3)
+    cube = iso_cube(
+        (np.max(pose_raw, axis=0) + np.min(pose_raw, axis=0)) / 2,
+        caminfo.region_size
+    )
+    grid.step = anchor_num
+    grid.cellen = halflen * 2 / anchor_num
+    anchors = grid.prow_anchor_single(cube.cen, caminfo.region_size)
+    cubecen = grid.fill([cube.cen])
+    cubecen_anchors = np.append(
+        cubecen.flatten(),
+        anchors)
+    resce = cube.dump()
     # mpplot = import_module('matplotlib.pyplot')
+    # print(np.histogram(pcnt))
+    # grid.show_dims()
+    # cube.show_dims()
+    # index = np.array(np.unravel_index(np.argmax(cubecen), cubecen.shape))
+    # print(index)
+    # print(grid.yank_anchor_single(
+    #     index,
+    #     anchors
+    # ))
     # ax = mpplot.subplot(projection='3d')
     # numpts = points3.shape[0]
     # if 1000 < numpts:
@@ -213,17 +214,26 @@ def voxelize_depth(img, step, caminfo):
     #     points3_sam = points3
     # ax.scatter(
     #     points3_sam[:, 0], points3_sam[:, 1], points3_sam[:, 2])
+    # ax.view_init(azim=-90, elev=-60)
+    # ax.set_zlabel('depth (mm)', labelpad=15)
     # corners = cube.get_corners()
     # iso_cube.draw_cube_wire(corners)
-    # print(corners)
-    # cube.show_dims()
+    # from mayavi import mlab
+    # mlab.figure(size=(800, 800))
+    # mlab.pipeline.volume(mlab.pipeline.scalar_field(pcnt))
+    # mlab.pipeline.image_plane_widget(
+    #     mlab.pipeline.scalar_field(pcnt),
+    #     plane_orientation='z_axes',
+    #     slice_index=halflen)
+    # np.set_printoptions(precision=4)
+    # mlab.outline()
     # mpplot.show()
-    return grid.pcnt
+    return pcnt, cubecen_anchors, resce
 
 
-def generate_anchors(img, pose_raw, step, caminfo):
+def generate_anchors_2d(img, pose_raw, anchor_num, caminfo):
     lattice = latice_image(
-        np.array(img.shape).astype(float), caminfo.anchor_num)
+        np.array(img.shape).astype(float), anchor_num)
     cube = iso_cube(
         (np.max(pose_raw, axis=0) + np.min(pose_raw, axis=0)) / 2,
         caminfo.region_size
@@ -292,12 +302,13 @@ def fill_grid(img, pose_raw, step, caminfo):
         (np.max(pose_raw, axis=0) + np.min(pose_raw, axis=0)) / 2,
         caminfo.region_size
     )
-    _, points3_trans = cube.pick(img_to_raw(img, caminfo))
+    points3_trans = cube.pick(img_to_raw(img, caminfo))
+    points3_trans = cube.transform_center_shrink(points3_trans)
     grid = regu_grid()
     grid.from_cube(cube, step)
-    grid.fill(points3_trans)
+    pcnt = grid.fill(points3_trans)
     resce = cube.dump()
-    return grid.pcnt, resce
+    return pcnt, resce
 
 
 def proj_ortho3(img, pose_raw, caminfo):
@@ -305,7 +316,8 @@ def proj_ortho3(img, pose_raw, caminfo):
         (np.max(pose_raw, axis=0) + np.min(pose_raw, axis=0)) / 2,
         caminfo.region_size
     )
-    _, points3_trans = cube.pick(img_to_raw(img, caminfo))
+    points3_trans = cube.pick(img_to_raw(img, caminfo))
+    points3_trans = cube.transform_center_shrink(points3_trans)
     img_l = []
     for spi in range(3):
         coord, depth = cube.project_pca(points3_trans, roll=spi)
@@ -354,7 +366,8 @@ def crop_resize_pca(img, pose_raw, caminfo):
         (np.max(pose_raw, axis=0) + np.min(pose_raw, axis=0)) / 2,
         caminfo.region_size
     )
-    _, points3_trans = cube.pick(img_to_raw(img, caminfo))
+    points3_trans = cube.pick(img_to_raw(img, caminfo))
+    points3_trans = cube.transform_center_shrink(points3_trans)
     coord, depth = cube.project_pca(points3_trans, sort=False)
     # x = np.arange(-1, 1, 0.5)
     # y = np.stack([x, x, -x]).T
@@ -366,22 +379,6 @@ def crop_resize_pca(img, pose_raw, caminfo):
     # mpplot = import_module('matplotlib.pyplot')
     # mpplot.imshow(img_crop_resize, cmap='bone')
     # mpplot.show()
-    # rect = get_rect3(cube, caminfo)
-    # points2, pose_z = raw_to_2dz(points3, caminfo)
-    # rect = iso_rect()
-    # rect.build(points2, 0.5)
-    # rect = clip_image_border(rect, caminfo)
-    # conds = rect.pick(points2)
-    # img_crop = rect.print_image(points2[conds, :], pose_z[conds])
-    # img_crop_resize = cv2resize(img_crop, (caminfo.crop_size, caminfo.crop_size))
-    # img_crop_resize = (img_crop_resize.astype(float) - np.min(img_crop_resize)) /\
-    #     (np.max(img_crop_resize) - np.min(img_crop_resize))
-    # img_crop_resize = img_crop
-    # resce = np.concatenate((
-    #     np.array([float(caminfo.crop_size) / rect.sidelen]),
-    #     rect.cll,
-    #     cube.dump()
-    # ))
     resce = cube.dump()
     return img_crop_resize, resce
 
@@ -424,11 +421,8 @@ def crop_resize(img, pose_raw, caminfo):
         cll_i[1]:cll_i[1] + sizel,
     ]
     img_crop_resize = rescale_depth(img_crop, caminfo)
-    # img_crop_resize = cv2resize(
-    #     img_crop, (caminfo.crop_size, caminfo.crop_size))
-    # img_crop_resize = normalize_depth(img_crop_resize, caminfo)
     resce = np.concatenate((
+        cube.dump(),
         rect.dump(),
-        cube.dump()
     ))
     return img_crop_resize, resce

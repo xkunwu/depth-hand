@@ -5,14 +5,7 @@ from shutil import copyfile
 import numpy as np
 import re
 from train_abc import train_abc
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-BASE_DIR = os.path.abspath(os.path.join(BASE_DIR, os.pardir))
-sys.path.append(BASE_DIR)
-args_holder = getattr(
-    import_module('args_holder'),
-    'args_holder'
-)
+from args_holder import args_holder
 
 
 def run_one(args, mpplot, with_train=False, with_eval=False):
@@ -41,17 +34,19 @@ def draw_compare(args, mpplot, predict_dir=None):
     annot_test = args.data_inst.training_annot_test
     error_l = []
     for predict in predictions:
-        error_l.append(dataeval.compare_error(
+        error = dataeval.compare_error(
             args.data_inst,
             annot_test,
             predict
-        ))
+        )
+        # print(error.shape)
+        error_l.append(error)
     errors = np.stack(error_l, axis=0)
-    mpplot.figure(figsize=(2 * 5, 1 * 5))
+    # mpplot.figure(figsize=(2 * 5, 1 * 5))
     dataeval.draw_error_percentage_curve(
         errors, methods, mpplot.gca())
     mpplot.savefig(os.path.join(predict_dir, 'error_rate.png'))
-    mpplot.gcf().clear()
+    # mpplot.gcf().clear()
     dataeval.draw_error_per_joint(
         errors, methods, mpplot.gca(), args.data_inst.join_name)
     mpplot.savefig(os.path.join(predict_dir, 'error_bar.png'))
@@ -103,13 +98,13 @@ if __name__ == "__main__":
     # python evaluate.py --max_epoch=1 --batch_size=16 --model_name=base_clean
     # import pdb; pdb.set_trace()
 
-    # with_train = True
-    with_train = False
-    # with_eval = True
-    with_eval = False
+    with_train = True
+    # with_train = False
+    with_eval = True
+    # with_eval = False
 
-    # mpl = import_module('matplotlib')
-    # mpl.use('Agg')
+    # # mpl = import_module('matplotlib')
+    # # mpl.use('Agg')
     # mpplot = import_module('matplotlib.pyplot')
     # with args_holder() as argsholder:
     #     argsholder.parse_args()
@@ -131,14 +126,14 @@ if __name__ == "__main__":
     mpplot = import_module('matplotlib.pyplot')
     methlist = [
         # 'localizer2',
-        # 'direc_tsdf',
-        # 'trunc_dist',
-        # 'base_conv3',
-        # 'ortho3view',
+        'direc_tsdf',
+        'trunc_dist',
+        'base_conv3',
+        'ortho3view',
         'base_regre',
-        # 'base_clean',
-        # 'base_regre_inres',
-        # 'base_clean_inres',
+        'base_clean',
+        'base_regre_inres',
+        'base_clean_inres',
     ]
     for meth in methlist:
         with args_holder() as argsholder:

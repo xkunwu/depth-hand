@@ -56,8 +56,8 @@ class regu_grid:
         self.cll = cll
         self.cellen = cellen  # cell side length
         self.step = step
-        self.pcnt = np.zeros(
-            shape=(self.step, self.step, self.step))
+        # self.pcnt = np.zeros(
+        #     shape=(self.step, self.step, self.step))
 
     def dump(self):
         return np.concatenate((
@@ -80,7 +80,7 @@ class regu_grid:
         self.step = step
         # self.cellen = cube.sidelen * 2. / step
         self.cellen = 2. / step
-        self.pcnt = np.zeros(shape=(self.step, self.step, self.step))
+        # self.pcnt = np.zeros(shape=(self.step, self.step, self.step))
 
     # def subdivide(self, volume, step):
     #     self.cll = volume
@@ -92,14 +92,40 @@ class regu_grid:
         return np.floor((points3 - self.cll) / self.cellen).astype(int)
 
     def fill(self, points3):
+        pcnt = np.zeros(shape=(self.step, self.step, self.step))
         indices = self.putit(points3)
         for index in indices:
-            self.pcnt[index[0], index[1], index[2]] += 1.
-        self.pcnt /= np.max(self.pcnt)  # normalized density
-        return self.pcnt
+            pcnt[index[0], index[1], index[2]] += 1.
+        pcnt /= np.max(pcnt)  # normalized density
+        return pcnt
+
+    def prow_anchor_single(self, points3, wsizes):
+        scale_base = self.cellen * self.step
+        anchors = np.empty((self.step, self.step, self.step, 4))
+        for rr in np.arange(self.step):
+            for cc in np.arange(self.step):
+                for dd in np.arange(self.step):
+                    cen = self.voxen(np.array((rr, cc, dd)))
+                    anchors[rr, cc, dd, 0:3] = (points3 - cen) / scale_base
+                    anchors[rr, cc, dd, 3] = np.log(wsizes / scale_base)
+        return anchors.flatten()
+
+    def yank_anchor_single(self, index, anchors):
+        anchors_res = anchors.reshape(self.step, self.step, self.step, 4)
+        anchors = anchors_res[index[0], index[1], index[2], :]
+        centre = self.voxen(index)
+        delta = anchors[0:3]
+        scale = anchors[3]
+        scale_base = self.cellen * self.step
+        points3 = (delta * scale_base) + centre
+        if 1. < scale or -10. > scale:
+            print('Warning - localizer window looks bad: {}'.format(scale))
+            scale = 0.
+        wsizes = np.exp(scale) * scale_base
+        return points3, wsizes
 
     def voxen(self, index):
-        return self.cll + self.cellen * (float(index) + 0.5)
+        return self.cll + self.cellen * (index.astype(float) + 0.5)
 
     def fetch(self, index):
         cen = float(index) - self.cll
@@ -113,7 +139,7 @@ class latice_image:
     def __init__(self, image_size=np.array((6, 8)), step=2):
         self.cellen = image_size / step  # cell side length
         self.step = step
-        self.pcnt = np.zeros(shape=(self.step, self.step))
+        # self.pcnt = np.zeros(shape=(self.step, self.step))
 
     def dump(self):
         return np.concatenate((
@@ -123,7 +149,7 @@ class latice_image:
     def load(self, args):
         self.step = int(args[0])
         self.cellen = args[1:3]
-        self.pcnt = np.zeros(shape=(self.step, self.step))
+        # self.pcnt = np.zeros(shape=(self.step, self.step))
 
     def show_dims(self):
         print(self.step, self.cellen)
@@ -134,16 +160,17 @@ class latice_image:
         ).astype(int)
 
     def fill(self, points2):
+        pcnt = np.zeros(shape=(self.step, self.step))
         num_p = points2.shape[0]
         indices = self.putit(points2)
         for index in indices:
-            self.pcnt[index[0], index[1]] += 1.
-        self.pcnt /= num_p  # probability
-        # p50 = np.where(0.5 < self.pcnt)
-        pmax = np.where(np.max(self.pcnt) == self.pcnt)
-        self.pcnt = np.zeros(shape=(self.step, self.step))
-        self.pcnt[pmax] = 1.
-        return self.pcnt
+            pcnt[index[0], index[1]] += 1.
+        pcnt /= num_p  # probability
+        # p50 = np.where(0.5 < pcnt)
+        pmax = np.where(np.max(pcnt) == pcnt)
+        pcnt = np.zeros(shape=(self.step, self.step))
+        pcnt[pmax] = 1.
+        return pcnt
 
     def prow_anchor_single(self, points2, wsizes):
         # centre = self.voxen(self.putit(points2))

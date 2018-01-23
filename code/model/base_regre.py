@@ -1,30 +1,14 @@
 import os
-import sys
-from importlib import import_module
+# from importlib import import_module
 import numpy as np
 import tensorflow as tf
-from tensorflow.contrib import slim
 import progressbar
 import h5py
 import matplotlib.pyplot as mpplot
 from cv2 import resize as cv2resize
-from train.batch_allot import batch_allot
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-BASE_DIR = os.path.abspath(os.path.join(BASE_DIR, os.pardir))
-sys.path.append(BASE_DIR)
-file_pack = getattr(
-    import_module('utils.coder'),
-    'file_pack'
-)
-iso_rect = getattr(
-    import_module('utils.iso_boxes'),
-    'iso_rect'
-)
-iso_aabb = getattr(
-    import_module('utils.iso_boxes'),
-    'iso_aabb'
-)
+from model.batch_allot import batch_allot
+from utils.coder import file_pack
+from utils.iso_boxes import iso_rect
 
 
 class base_regre(object):
@@ -36,7 +20,7 @@ class base_regre(object):
         self.name_desc = self.__class__.__name__ + args.model_desc
         self.crop_size = 128
         self.anchor_num = 16
-        self.crop_range = 800.
+        self.crop_range = 480.
         self.num_channel = 1
         self.num_appen = 7
         self.batch_allot = batch_allot
@@ -115,14 +99,14 @@ class base_regre(object):
         )
 
     def end_evaluate(self, thedata, args):
-        mpplot.figure(figsize=(2 * 5, 1 * 5))
-        args.data_draw.draw_prediction_poses(
+        mpplot.figure(figsize=(2 * 5, 2 * 5))
+        img_id = args.data_draw.draw_prediction_poses(
             thedata,
             thedata.training_images,
             thedata.training_annot_test,
             self.predict_file
         )
-        fname = 'detection_{}.png'.format(self.name_desc)
+        fname = 'detection_{}_{:d}.png'.format(self.name_desc, img_id)
         mpplot.savefig(os.path.join(self.predict_dir, fname))
         error_maxj = self.evaluater.evaluate_poses(
             self.caminfo, self.name_desc,
@@ -252,18 +236,19 @@ class base_regre(object):
             frame_h5 = np.squeeze(h5file['frame'][frame_id, ...], -1)
             poses_h5 = h5file['poses'][frame_id, ...].reshape(-1, 3)
             resce_h5 = h5file['resce'][frame_id, ...]
-            print(np.min(frame_h5), np.max(frame_h5))
-            print(np.histogram(frame_h5, range=(1e-4, np.max(frame_h5))))
-            print(np.min(poses_h5, axis=0), np.max(poses_h5, axis=0))
-            print(resce_h5)
 
-        print('[{}] drawing image #{:d}'.format(self.name_desc, img_id))
-        resce2 = resce_h5[0:3]
-        resce3 = resce_h5[3:7]
+        print('[{}] drawing image #{:d} ...'.format(self.name_desc, img_id))
+        print(np.min(frame_h5), np.max(frame_h5))
+        print(np.histogram(frame_h5, range=(1e-4, np.max(frame_h5))))
+        print(np.min(poses_h5, axis=0), np.max(poses_h5, axis=0))
+        print(resce_h5)
+        resce3 = resce_h5[0:4]
+        resce2 = resce_h5[4:7]
         mpplot.subplots(nrows=2, ncols=2, figsize=(2 * 5, 2 * 5))
 
         mpplot.subplot(2, 2, 3)
         mpplot.gca().set_title('test storage read')
+        # resize the cropped resion for eazier pose drawing in the commen frame
         sizel = np.floor(resce2[0]).astype(int)
         resce_cp = np.copy(resce2)
         resce_cp[0] = 1
@@ -291,7 +276,7 @@ class base_regre(object):
         rect.draw()
 
         mpplot.subplot(2, 2, 1)
-        mpplot.gca().set_title('test input')
+        mpplot.gca().set_title('test input #{:d}'.format(img_id))
         annot_line = args.data_io.get_line(
             thedata.training_annot_cleaned, img_id)
         img_name, pose_raw = args.data_io.parse_line_annot(annot_line)
@@ -314,8 +299,8 @@ class base_regre(object):
             print(np.linalg.norm(frame_h5 - frame))
             print(np.linalg.norm(poses_h5 - poses))
             print('ERROR - h5 storage corrupted!')
-        resce2 = resce[0:3]
-        resce3 = resce[3:7]
+        resce3 = resce[0:4]
+        resce2 = resce[4:7]
         sizel = np.floor(resce2[0]).astype(int)
         resce_cp = np.copy(resce2)
         resce_cp[0] = 1
@@ -328,10 +313,13 @@ class base_regre(object):
             args.data_ops.raw_to_2d(pose_raw, thedata, resce_cp)
         )
 
+        mpplot.tight_layout()
         mpplot.savefig(os.path.join(
             args.predict_dir,
             'draw_{}.png'.format(self.name_desc)))
         mpplot.show()
+        print('[{}] drawing image #{:d} - done.'.format(
+            self.name_desc, img_id))
 
     def get_model(
             self, input_tensor, is_training,
@@ -342,10 +330,57 @@ class base_regre(object):
         end_points = {}
         self.end_point_list = []
 
+        # tf_util = import_module('utils.tf_util')
+        # bn_decay = 0.9997
+        # net = tf_util.conv2d(
+        #     input_tensor, 16, [5, 5], stride=[1, 1], scope='conv1',
+        #     padding='VALID', is_training=is_training, bn=True, bn_decay=bn_decay)
+        # self.end_point_list.append('conv1')
+        # end_points['conv1'] = net
+        # net = tf_util.max_pool2d(
+        #     net, [4, 4], scope='maxpool1', padding='VALID')
+        # self.end_point_list.append('maxpool1')
+        # end_points['maxpool1'] = net
+        # net = tf_util.conv2d(
+        #     net, 32, [3, 3], stride=[1, 1], scope='conv2',
+        #     padding='VALID', is_training=is_training, bn=True, bn_decay=bn_decay)
+        # self.end_point_list.append('conv2')
+        # end_points['conv2'] = net
+        # net = tf_util.max_pool2d(
+        #     net, [2, 2], scope='maxpool2', padding='VALID')
+        # self.end_point_list.append('maxpool2')
+        # end_points['maxpool2'] = net
+        # net = tf_util.conv2d(
+        #     net, 64, [3, 3], stride=[1, 1], scope='conv3',
+        #     padding='VALID', is_training=is_training, bn=True, bn_decay=bn_decay)
+        # self.end_point_list.append('conv3')
+        # end_points['conv3'] = net
+        # net = tf_util.max_pool2d(
+        #     net, [2, 2], scope='maxpool3', padding='VALID')
+        # self.end_point_list.append('maxpool3')
+        # end_points['maxpool3'] = net
+        #
+        # # net = tf.reshape(net, [self.batch_size, -1])
+        # net = tf.contrib.layers.flatten(net)
+        # net = tf_util.fully_connected(
+        #     net, 1024, scope='fullconn1',
+        #     is_training=is_training, bn=True, bn_decay=bn_decay)
+        # self.end_point_list.append('fullconn1')
+        # end_points['fullconn1'] = net
+        # net = tf_util.dropout(
+        #     net, keep_prob=0.5, scope='dropout1', is_training=is_training)
+        # self.end_point_list.append('dropout1')
+        # end_points['dropout1'] = net
+        # net = tf_util.fully_connected(
+        #     net, self.out_dim, scope='fullconn3', activation_fn=None)
+        # self.end_point_list.append('fullconn3')
+        # end_points['fullconn3'] = net
+
         def add_and_check_final(name, net):
             end_points[name] = net
             return name == final_endpoint
 
+        from tensorflow.contrib import slim
         with tf.variable_scope(
                 scope, self.name_desc, [input_tensor]):
             with slim.arg_scope(
@@ -428,40 +463,11 @@ class base_regre(object):
 
         raise ValueError('final_endpoint (%s) not recognized', final_endpoint)
 
-        # batch_size = input_tensor.get_shape()[0].value
-        # tf_util = import_module('utils.tf_util')
-        # bn_decay = 0.9997
-        # net = tf_util.conv2d(
-        #     input_tensor, 16, [5, 5], stride=[1, 1], scope='conv1',
-        #     padding='VALID', is_training=is_training, bn=True, bn_decay=bn_decay)
-        # net = tf_util.max_pool2d(
-        #     net, [4, 4], scope='maxpool1', padding='VALID')
-        # net = tf_util.conv2d(
-        #     net, 32, [3, 3], stride=[1, 1], scope='conv2',
-        #     padding='VALID', is_training=is_training, bn=True, bn_decay=bn_decay)
-        # net = tf_util.max_pool2d(
-        #     net, [2, 2], scope='maxpool2', padding='VALID')
-        # net = tf_util.conv2d(
-        #     net, 64, [3, 3], stride=[1, 1], scope='conv3',
-        #     padding='VALID', is_training=is_training, bn=True, bn_decay=bn_decay)
-        # net = tf_util.max_pool2d(
-        #     net, [2, 2], scope='maxpool3', padding='VALID')
-        # # print(net.shape)
-        #
-        # net = tf.reshape(net, [self.batch_size, -1])
-        # net = tf_util.fully_connected(
-        #     net, 1024, scope='fullconn1',
-        #     is_training=is_training, bn=True, bn_decay=bn_decay)
-        # net = tf_util.dropout(
-        #     net, keep_prob=0.5, scope='dropout1', is_training=is_training)
-        # net = tf_util.fully_connected(
-        #     net, self.out_dim, scope='fullconn3', activation_fn=None)
-
         return net, end_points
 
     def placeholder_inputs(self, batch_size=None):
-        if batch_size is None:
-            batch_size = self.batch_size
+        # if batch_size is None:
+        #     batch_size = self.batch_size
         frames_tf = tf.placeholder(
             tf.float32, shape=(
                 batch_size,

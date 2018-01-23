@@ -1,22 +1,10 @@
 import os
-import sys
-from importlib import import_module
 import numpy as np
 from itertools import islice
 from . import ops as dataops
 from . import io as dataio
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-BASE_DIR = os.path.abspath(os.path.join(BASE_DIR, os.pardir))
-sys.path.append(BASE_DIR)
-iso_cube = getattr(
-    import_module('utils.iso_boxes'),
-    'iso_cube'
-)
-latice_image = getattr(
-    import_module('utils.regu_grid'),
-    'latice_image'
-)
+from utils.iso_boxes import iso_cube
+from utils.regu_grid import latice_image
 
 
 def prow_dirtsdf(line, image_dir, caminfo):
@@ -57,8 +45,8 @@ def prow_localizer2(line, image_dir, caminfo):
     img_name, pose_raw = dataio.parse_line_annot(line)
     img = dataio.read_image(os.path.join(image_dir, img_name))
     img_rescale = dataops.rescale_depth(img, caminfo)
-    anchors, resce = dataops.generate_anchors(
-        img, pose_raw, caminfo.crop_size, caminfo)
+    anchors, resce = dataops.generate_anchors_2d(
+        img, pose_raw, caminfo.anchor_num, caminfo)
     return (img_name,
             np.expand_dims(img_rescale, axis=-1),
             anchors.T, resce)
@@ -99,29 +87,16 @@ def yank_localizer2(pose_local, resce, caminfo):
 def prow_localizer3(line, image_dir, caminfo):
     img_name, pose_raw = dataio.parse_line_annot(line)
     img = dataio.read_image(os.path.join(image_dir, img_name))
-    pcnt = dataops.voxelize_depth(
-        img, caminfo.crop_size, caminfo)
-    cube = iso_cube()
-    cube.build(pose_raw)
-    halflen = caminfo.crop_range
-    resce = np.concatenate((
-        cube.dump(),
-        np.array([halflen, caminfo.crop_size])
-    ))
-    centre = resce[1:4]
-    centre01 = np.append(
-        centre[:2] / halflen,
-        (centre[2] - halflen) / halflen)
+    pcnt, anchors, resce = dataops.voxelize_depth(
+        img, pose_raw, caminfo.crop_size, caminfo.anchor_num, caminfo)
     return (img_name, np.expand_dims(pcnt, axis=-1),
-            centre01.T, resce)
+            anchors.T, resce)
 
 
 def yank_localizer3(pose_local, resce, caminfo):
-    halflen = resce[4]
-    centre = np.append(
-        pose_local[:2] * halflen,
-        pose_local[2] * halflen + halflen,
-    )
+    cube = iso_cube()
+    cube.load(resce)
+    centre = cube.cen
     return centre
 
 
@@ -178,14 +153,14 @@ def prow_cropped(line, image_dir, caminfo):
     img = dataio.read_image(os.path.join(image_dir, img_name))
     img_crop_resize, resce = dataops.crop_resize(
         img, pose_raw, caminfo)
-    resce3 = resce[3:7]
+    resce3 = resce[0:4]
     pose_local = dataops.raw_to_local(pose_raw, resce3)
     return (img_name, np.expand_dims(img_crop_resize, axis=-1),
             pose_local.flatten().T, resce)
 
 
 def yank_cropped(pose_local, resce, caminfo):
-    resce3 = resce[3:7]
+    resce3 = resce[0:4]
     return dataops.local_to_raw(pose_local, resce3)
 
 

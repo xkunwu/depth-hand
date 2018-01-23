@@ -1,25 +1,12 @@
 import os
-import sys
-from importlib import import_module
+# import sys
+# from importlib import import_module
 import numpy as np
 import h5py
 from .base_regre import base_regre
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-BASE_DIR = os.path.abspath(os.path.join(BASE_DIR, os.pardir))
-sys.path.append(BASE_DIR)
-file_pack = getattr(
-    import_module('utils.coder'),
-    'file_pack'
-)
-iso_rect = getattr(
-    import_module('utils.iso_boxes'),
-    'iso_rect'
-)
-iso_cube = getattr(
-    import_module('utils.iso_boxes'),
-    'iso_cube'
-)
+# from utils.coder import file_pack
+# from utils.iso_boxes import iso_rect
+from utils.iso_boxes import iso_cube
 
 
 class base_clean(base_regre):
@@ -48,7 +35,7 @@ class base_clean(base_regre):
         # corners = cube.get_corners()
         # ax = mpplot.subplot(projection='3d')
         # cube.draw_cube_wire(corners)
-        # pose_trans = cube.transform(points3)
+        # pose_trans = cube.transform_to_center(points3)
         # ax.scatter(
         #     pose_trans[:, 0], pose_trans[:, 1], pose_trans[:, 2],
         #     color=Color('lightsteelblue').rgb)
@@ -62,11 +49,11 @@ class base_clean(base_regre):
             frame_h5 = np.squeeze(h5file['frame'][frame_id, ...], -1)
             poses_h5 = h5file['poses'][frame_id, ...].reshape(-1, 3)
             resce_h5 = h5file['resce'][frame_id, ...]
-            print(np.min(frame_h5), np.max(frame_h5))
-            print(np.histogram(frame_h5, range=(1e-4, np.max(frame_h5))))
-            print(np.min(poses_h5, axis=0), np.max(poses_h5, axis=0))
 
-        print('[{}] drawing image #{:d}'.format(self.name_desc, img_id))
+        print('[{}] drawing image #{:d} ...'.format(self.name_desc, img_id))
+        print(np.min(frame_h5), np.max(frame_h5))
+        print(np.histogram(frame_h5, range=(1e-4, np.max(frame_h5))))
+        print(np.min(poses_h5, axis=0), np.max(poses_h5, axis=0))
         from colour import Color
         colors = [Color('orange').rgb, Color('red').rgb, Color('lime').rgb]
         mpplot.subplots(nrows=2, ncols=2, figsize=(2 * 5, 2 * 5))
@@ -76,11 +63,13 @@ class base_clean(base_regre):
         resce3 = resce_h5[0:4]
         cube = iso_cube()
         cube.load(resce3)
+        # need to maintain both image and poses at the same scale
         sizel = np.floor(resce3[0]).astype(int)
         mpplot.imshow(
             cv2resize(frame_h5, (sizel, sizel)),
             cmap='bone')
-        pose2d, _ = cube.project_pca(poses_h5, roll=0, sort=False)
+        pose3d = cube.trans_scale_to(poses_h5)
+        pose2d, _ = cube.project_pca(pose3d, roll=0, sort=False)
         pose2d *= sizel
         args.data_draw.draw_pose2d(
             thedata,
@@ -134,7 +123,8 @@ class base_clean(base_regre):
         mpplot.imshow(
             cv2resize(frame, (sizel, sizel)),
             cmap='bone')
-        pose2d, _ = cube.project_pca(poses, roll=0, sort=False)
+        pose3d = cube.trans_scale_to(poses)
+        pose2d, _ = cube.project_pca(pose3d, roll=0, sort=False)
         pose2d *= sizel
         args.data_draw.draw_pose2d(
             thedata,
@@ -145,3 +135,5 @@ class base_clean(base_regre):
             args.predict_dir,
             'draw_{}.png'.format(self.name_desc)))
         mpplot.show()
+        print('[{}] drawing image #{:d} - done.'.format(
+            self.name_desc, img_id))

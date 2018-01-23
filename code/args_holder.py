@@ -5,16 +5,16 @@ import argparse
 import logging
 
 model_map = {
-    'direc_tsdf': 'train.direc_tsdf',
-    'trunc_dist': 'train.trunc_dist',
-    'base_conv3': 'train.base_conv3',
-    'ortho3view': 'train.ortho3view',
-    'base_clean': 'train.base_clean',
-    'base_regre': 'train.base_regre',
-    'base_clean_inres': 'train.base_inres',
-    'base_regre_inres': 'train.base_inres',
-    'localizer3': 'train.localizer3',
-    'localizer2': 'train.localizer2',
+    'direc_tsdf': 'model.direc_tsdf',
+    'trunc_dist': 'model.trunc_dist',
+    'base_conv3': 'model.base_conv3',
+    'ortho3view': 'model.ortho3view',
+    'base_clean': 'model.base_clean',
+    'base_regre': 'model.base_regre',
+    'base_clean_inres': 'model.base_inres',
+    'base_regre_inres': 'model.base_inres',
+    'localizer3': 'model.localizer3',
+    'localizer2': 'model.localizer2',
 }
 
 
@@ -156,6 +156,7 @@ class args_holder:
                 writer.write('--{}={}\n'.format(arg, att))
                 # print(arg, getattr(args, arg))
 
+    # parse arguments, and only perform very basic managements
     def parse_args(self):
         self.args = self.parser.parse_args()
         self.args.data_dir = os.path.join(
@@ -197,7 +198,9 @@ class args_holder:
             sys.exit()
         return self
 
+    # this is called after hard coded parameter tweakings
     def create_instance(self):
+        # logging system
         self.make_new_log()
         if not os.path.exists(os.path.join(
                 self.args.log_dir_t, 'model.ckpt.meta')):
@@ -206,6 +209,8 @@ class args_holder:
         self.args.logger.info('######## {} [{}] ########'.format(
             self.args.data_name,
             self.args.model_name + self.args.model_desc))
+
+        # create model instance now
         # self.args.localizer_class = getattr(
         #     import_module(model_map[self.args.localizer_name]),
         #     self.args.localizer_name
@@ -225,8 +230,11 @@ class args_holder:
             self.args.model_inst = self.args.model_class(self.args)
         else:
             raise ValueError('mode (%s) not recognized', self.args.mode)
+        # model instance has a chance to tweak parameters if necessary
         self.args.model_inst.tweak_arguments(self.args)
         self.args.decay_step //= self.args.batch_size
+
+        # create data instance
         self.args.data_module = import_module(
             'data.' + self.args.data_name)
         self.args.data_provider = import_module(
@@ -245,8 +253,11 @@ class args_holder:
         )
         self.args.data_inst = self.args.data_class(self.args)
         self.args.data_inst.init_data()
+
+        # bind data instance to model instance
         self.args.model_inst.receive_data(self.args.data_inst, self.args)
         self.args.model_inst.check_dir(self.args.data_inst, self.args)
+
         self.write_args(self.args)
 
 

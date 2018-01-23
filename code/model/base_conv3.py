@@ -153,10 +153,10 @@ class base_conv3(base_regre):
             frame_h5 = np.squeeze(h5file['frame'][frame_id, ...], -1)
             poses_h5 = h5file['poses'][frame_id, ...].reshape(-1, 3)
             resce_h5 = h5file['resce'][frame_id, ...]
-            print(np.min(frame_h5), np.max(frame_h5))
-            print(np.histogram(frame_h5, range=(1e-4, np.max(frame_h5))))
 
-        print('[{}] drawing image #{:d}'.format(self.name_desc, img_id))
+        print('[{}] drawing image #{:d} ...'.format(self.name_desc, img_id))
+        print(np.min(frame_h5), np.max(frame_h5))
+        print(np.histogram(frame_h5, range=(1e-4, np.max(frame_h5))))
         colors = [Color('orange').rgb, Color('red').rgb, Color('lime').rgb]
         mpplot.subplots(nrows=2, ncols=2, figsize=(2 * 5, 2 * 5))
         mpplot.subplot(2, 2, 1)
@@ -175,7 +175,8 @@ class base_conv3(base_regre):
         cube.load(resce3)
         cube.show_dims()
         points3 = args.data_ops.img_to_raw(img, self.caminfo)
-        _, points3_trans = cube.pick(points3)
+        points3_trans = cube.pick(points3)
+        points3_trans = cube.transform_to_center(points3_trans)
         numpts = points3_trans.shape[0]
         if 1000 < numpts:
             points3_trans = points3_trans[
@@ -184,7 +185,7 @@ class base_conv3(base_regre):
             points3_trans[:, 0], points3_trans[:, 1], points3_trans[:, 2],
             color=Color('lightsteelblue').rgb)
         args.data_draw.draw_raw3d_pose(thedata, poses_h5)
-        corners = cube.transform(cube.get_corners())
+        corners = cube.transform_to_center(cube.get_corners())
         cube.draw_cube_wire(corners)
         ax.view_init(azim=-120, elev=-150)
 
@@ -220,14 +221,13 @@ class base_conv3(base_regre):
         iso_cube.draw_cube_wire(corners)
 
         # mlab.figure(size=(800, 800))
-        # points3_trans = cube.transform(points3_sam)
+        # points3_trans = cube.transform_to_center(points3_sam)
         # mlab.points3d(
         #     points3_trans[:, 0], points3_trans[:, 1], points3_trans[:, 2],
         #     scale_factor=8,
         #     color=Color('lightsteelblue').rgb)
         # mlab.outline()
 
-        mlab.figure(size=(800, 800))
         img_name, frame, poses, resce = self.provider_worker(
             annot_line, self.image_dir, self.caminfo)
         frame = np.squeeze(frame, axis=-1)
@@ -253,20 +253,24 @@ class base_conv3(base_regre):
         cube = iso_cube()
         cube.load(resce3)
         cube.show_dims()
-        # mlab.contour3d(frame)
-        mlab.pipeline.volume(mlab.pipeline.scalar_field(frame))
-        mlab.pipeline.image_plane_widget(
-            mlab.pipeline.scalar_field(frame),
-            plane_orientation='z_axes',
-            slice_index=self.crop_size / 2)
-        np.set_printoptions(precision=4)
-        # print(frame[12:20, 12:20, 16])
-        mlab.outline()
+
+        # mlab.figure(size=(800, 800))
+        # # mlab.contour3d(frame)
+        # mlab.pipeline.volume(mlab.pipeline.scalar_field(frame))
+        # mlab.pipeline.image_plane_widget(
+        #     mlab.pipeline.scalar_field(frame),
+        #     plane_orientation='z_axes',
+        #     slice_index=self.crop_size / 2)
+        # np.set_printoptions(precision=4)
+        # # print(frame[12:20, 12:20, 16])
+        # mlab.outline()
 
         mpplot.savefig(os.path.join(
             args.predict_dir,
             'draw_{}.png'.format(self.name_desc)))
         mpplot.show()
+        print('[{}] drawing image #{:d} - done.'.format(
+            self.name_desc, img_id))
 
     def get_model(
             self, input_tensor, is_training,

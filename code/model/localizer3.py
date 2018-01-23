@@ -7,7 +7,7 @@ import tensorflow as tf
 from tensorflow.contrib import slim
 # import progressbar
 import h5py
-from train.base_conv3 import base_conv3
+from model.base_conv3 import base_conv3
 import matplotlib.pyplot as mpplot
 from colour import Color
 
@@ -31,15 +31,19 @@ regu_grid = getattr(
 class localizer3(base_conv3):
     def __init__(self, args):
         super(localizer3, self).__init__(args)
+        self.net_type = 'locor'
         self.crop_size = 32
-        self.num_appen = 6
+        self.anchor_num = 8
+        self.num_appen = 4
+        self.predict_file = os.path.join(
+            self.predict_dir, 'detection_{}'.format(
+                self.name_desc))
+        self.loss_lambda = 1.
 
     def receive_data(self, thedata, args):
         """ Receive parameters specific to the data """
         super(localizer3, self).receive_data(thedata, args)
-        self.out_dim = 3
-        self.predict_file = os.path.join(
-            self.predict_dir, 'detection_{}'.format(self.name_desc))
+        self.out_dim = self.anchor_num ** 3 * 5
         self.provider_worker = self.provider.prow_localizer3
         self.yanker = self.provider.yank_localizer3
 
@@ -73,6 +77,9 @@ class localizer3(base_conv3):
         cube = iso_cube(centre, self.region_size)
         return cube
 
+    def _debug_draw_prediction(self, frame_h5, resce_h5, pred_val):
+        pass
+
     def draw_prediction(self, thedata, args):
         import linecache
         import re
@@ -84,7 +91,7 @@ class localizer3(base_conv3):
             # poses_h5 = h5file['poses'][frame_id, ...].reshape(-1, 3)
             resce_h5 = h5file['resce'][frame_id, ...]
 
-        print('[{}] drawing image #{:d}'.format(self.name_desc, img_id))
+        print('[{}] drawing image #{:d} ...'.format(self.name_desc, img_id))
         resce3 = resce_h5[0:4]
         cube = iso_cube()
         cube.load(resce3)
@@ -128,6 +135,8 @@ class localizer3(base_conv3):
         mpplot.gca().set_title('Prediction')
 
         # mpplot.show()
+        print('[{}] drawing image #{:d} - done.'.format(
+            self.name_desc, img_id))
 
     def draw_random(self, thedata, args):
         from mayavi import mlab
@@ -135,14 +144,15 @@ class localizer3(base_conv3):
             store_size = h5file['index'].shape[0]
             frame_id = np.random.choice(store_size)
             img_id = h5file['index'][frame_id, 0]
-            frame_h5 = np.squeeze(h5file['frame'][frame_id, ...], -1)
-            poses_h5 = h5file['poses'][frame_id, ...].reshape(-1, 3)
+            frame_h5 = np.squeeze(h5file['frame'][frame_id, ...], axis=-1)
+            poses_h5 = h5file['poses'][frame_id, ...]
             resce_h5 = h5file['resce'][frame_id, ...]
 
-        print('[{}] drawing image #{:d}'.format(self.name_desc, img_id))
-        colors = [Color('orange').rgb, Color('red').rgb, Color('lime').rgb]
+        print('[{}] drawing image #{:d} ...'.format(self.name_desc, img_id))
+        # colors = [Color('orange').rgb, Color('red').rgb, Color('lime').rgb]
         mpplot.subplots(nrows=2, ncols=2, figsize=(2 * 5, 2 * 5))
         mpplot.subplot(2, 2, 1)
+        mpplot.gca().set_title('test input')
         annot_line = args.data_io.get_line(
             thedata.training_annot_cleaned, img_id)
         img_name, pose_raw = args.data_io.parse_line_annot(annot_line)
@@ -152,31 +162,36 @@ class localizer3(base_conv3):
             thedata,
             args.data_ops.raw_to_2d(pose_raw, self.caminfo))
 
-        ax = mpplot.subplot(2, 2, 4)
-        img_name = args.data_io.index2imagename(img_id)
-        img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
-        mpplot.imshow(img, cmap='bone')
-
         ax = mpplot.subplot(2, 2, 3, projection='3d')
+        mpplot.gca().set_title('test storage read')
         resce3 = resce_h5[0:4]
         cube = iso_cube()
         cube.load(resce3)
         cube.show_dims()
         points3 = args.data_ops.img_to_raw(img, self.caminfo)
-        _, points3_trans = cube.pick(points3)
-        numpts = points3_trans.shape[0]
+        numpts = points3.shape[0]
         if 1000 < numpts:
-            points3_trans = points3_trans[
+            points3_sam = points3[
                 np.random.choice(numpts, 1000, replace=False), :]
+        else:
+            points3_sam = points3
         ax.scatter(
-            points3_trans[:, 0], points3_trans[:, 1], points3_trans[:, 2],
+            points3_sam[:, 0], points3_sam[:, 1], points3_sam[:, 2],
             color=Color('lightsteelblue').rgb)
-        args.data_draw.draw_raw3d_pose(thedata, poses_h5)
-        corners = cube.transform(cube.get_corners())
+        ax.view_init(azim=-90, elev=-60)
+        ax.set_zlabel('depth (mm)', labelpad=15)
+        args.data_draw.draw_raw3d_pose(thedata, pose_raw)
+        corners = cube.get_corners()
         iso_cube.draw_cube_wire(corners)
-        ax.view_init(azim=-120, elev=-150)
+
+        ax = mpplot.subplot(2, 2, 4)
+        mpplot.gca().set_title('test output')
+        img_name = args.data_io.index2imagename(img_id)
+        img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
+        mpplot.imshow(img, cmap='bone')
 
         ax = mpplot.subplot(2, 2, 2, projection='3d')
+        mpplot.gca().set_title('test storage write')
         numpts = points3.shape[0]
         if 1000 < numpts:
             samid = np.random.choice(numpts, 1000, replace=False)
@@ -196,7 +211,6 @@ class localizer3(base_conv3):
         img_name, frame, poses, resce = self.provider_worker(
             annot_line, self.image_dir, self.caminfo)
         frame = np.squeeze(frame, axis=-1)
-        poses = poses.reshape(-1, 3)
         if (
                 (1e-4 < np.linalg.norm(frame_h5 - frame)) or
                 (1e-4 < np.linalg.norm(poses_h5 - poses))
@@ -217,6 +231,7 @@ class localizer3(base_conv3):
         resce3 = resce_h5[0:4]
         cube = iso_cube()
         cube.load(resce3)
+        cube.show_dims()
         # mlab.contour3d(frame)
         mlab.pipeline.volume(mlab.pipeline.scalar_field(frame))
         mlab.pipeline.image_plane_widget(
@@ -231,6 +246,8 @@ class localizer3(base_conv3):
             args.predict_dir,
             'draw_{}.png'.format(self.name_desc)))
         mpplot.show()
+        print('[{}] drawing image #{:d} - done.'.format(
+            self.name_desc, img_id))
 
     def get_model(
             self, input_tensor, is_training,

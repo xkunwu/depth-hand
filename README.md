@@ -3,6 +3,7 @@
 ## Table of Contents
  - [arXiv Papers](#arxiv-papers)
  - [Conference Papers](#conference-papers)
+   - [2017 ICCV](#2017-iccv)
    - [2017 CVPR](#2017-cvpr)
    - [2017 Others](#2017-others)
    - [2016 ECCV](#2016-eccv)
@@ -21,6 +22,17 @@
 See folder [``evaluation``] to get more details about performance evaluation for hand pose estimation.
 
 ## arXiv Papers
+##### [\[arXiv:1712.03917\]](https://arxiv.org/abs/1712.03917) 3D Hand Pose Estimation: From Current Achievements to Future Goals. [\[PDF\]](https://arxiv.org/pdf/1712.03917.pdf)
+_Shanxin Yuan, Guillermo Garcia-Hernando, Bjorn Stenger, Gyeongsik Moon, Ju Yong Chang, Kyoung Mu Lee, Pavlo Molchanov, Jan Kautz, Sina Honari, Liuhao Ge, Junsong Yuan, Xinghao Chen, Guijin Wang, Fan Yang, Kai Akiyama, Yang Wu, Qingfu Wan, Meysam Madadi, Sergio Escalera, Shile Li, Dongheui Lee, Iason Oikonomidis, Antonis Argyros, Tae-Kyun Kim_
+![Alt text](media/arxiv1712.03917-estimation-survey.png?raw=true "Optional Title")
+-   3D volumetric representation used with a 3D CNN shows high performance
+-   Detection-based methods tend to outperform regression-based methods, however, regression-based methods can achieve good performance using explicit spatial constraints. Regression-based methods perform better in extreme view point cases, where severe occlusion occurs.
+-   explicit modeling of structure constraints and spatial relation between joints can significantly narrow the gap between errors on visible and occluded joints.
+-   Discriminative methods still generalize poorly to unseen hand shapes. Data augmentation and scale estimation can only solve proportional hand shape change, but struggles with per-phalange variations. Integrating hand models with better generative capability may be a promising direction.
+-   However, it is far from being solved for extreme view points, e.g. view point range of \[0, 10\], where the hand is facing away from the camera.
+-   In hand tracking, current discriminative methods divide the problem into two sub-tasks: detection and pose estimation, without using the hand shape provided in the first frame. Hybrid methods may work better by using the provided hand shape.
+-   The current methods perform well on single hand pose estimation when trained on a million-scale dataset, but have difficulty in generalizing to hand-object interaction. Two directions seem promising, (a) designing better hand segmentation methods (e.g. along with modeling object) and (b) training the model with large datasets containing hand-object interaction.
+
 ##### [\[arXiv:1708.03416\]](https://arxiv.org/abs/1708.03416) Pose Guided Structured Region Ensemble Network for Cascaded Hand Pose Estimation. [\[PDF\]](https://arxiv.org/pdf/1708.03416.pdf)
 _Xinghao Chen, Guijin Wang, Hengkai Guo, Cairong Zhang_
 ![Alt text](media/arxiv1708-structured-region-ensemble.png?raw=true "Optional Title")
@@ -77,6 +89,32 @@ _Yu Zhang, Chi Xu, Li Cheng_
 
 
 ## Conference Papers
+
+### 2017 ICCV
+##### Learning to Estimate 3D Hand Pose from Single RGB Images. [\[PDF\]](https://arxiv.org/pdf/1705.01389.pdf)  [\[Project Page\]](https://lmb.informatik.uni-freiburg.de/projects/hand3d/)   [\[Code\]](https://github.com/lmb-freiburg/hand3d)
+_Christian Zimmermann, Thomas Brox_
+![Alt text](media/iccv17-single-rgb.png?raw=true "Optional Title")
+
+##### Real-time Hand Tracking under Occlusion from an Egocentric RGB-D Sensor. [\[PDF\]](http://handtracker.mpi-inf.mpg.de/projects/OccludedHands/content/OccludedHands_ICCV2017.pdf) [\[Project Page\]](http://handtracker.mpi-inf.mpg.de/projects/OccludedHands/)
+*Franziska Mueller, Dushyant Mehta, Oleksandr Sotnychenko, Srinath Sridhar, Dan Casas, Christian Theobalt*
+
+##### Robust Hand Pose Estimation during the Interaction with an Unknown Object. [\[PDF\]](http://openaccess.thecvf.com/content_ICCV_2017/papers/Choi_Robust_Hand_Pose_ICCV_2017_paper.pdf) [\[Supp\]](http://openaccess.thecvf.com/content_ICCV_2017/supplemental/Choi_Robust_Hand_Pose_ICCV_2017_supplemental.pdf) [\[Project Page\]](https://engineering.purdue.edu/cdesign/wp/robust-hand-pose-estimation-during-the-interaction-with-an-unknown-object/)
+*Chiho Choi, Sang Ho Yoon, Chin-Ning Chen, Karthik Ramani*
+
+##### Learning Hand Articulations by Hallucinating Heat Distribution. [\[PDF\]](http://openaccess.thecvf.com/content_ICCV_2017/papers/Choi_Learning_Hand_Articulations_ICCV_2017_paper.pdf) [\[Supp\]](http://openaccess.thecvf.com/content_ICCV_2017/supplemental/Choi_Learning_Hand_Articulations_ICCV_2017_supplemental.pdf)  [\[Project Page\]](https://engineering.purdue.edu/cdesign/wp/learning-hand-articulations-by-hallucinating-heat-distribution/)
+*Chiho Choi, Sangpil Kim, Karthik Ramani*
+
+##### \[2017 ICCV\] Low-Dimensionality Calibration through Local Anisotropic Scaling for Robust Hand Model Personalization. [\[PDF\]](http://lgg.epfl.ch/publications/2017/LocalAnisotropicScaling/paper.pdf)  [\[Project Page\]](http://lgg.epfl.ch/publications/2017/LocalAnisotropicScaling/index.php) [\[Code\]](https://github.com/edoRemelli/hadjust)
+_Edoardo Remelli*, Anastasia Tkach*, Andrea Tagliasacchi, Mark Pauly_
+
+##### [Hands17 Workshop] Back to RGB: 3D tracking of hands and hand-object interactions based on short-baseline stereo. [\[PDF\]](https://arxiv.org/pdf/1705.05301.pdf)
+_Paschalis Panteleris, Antonis Argyros_
+
+##### [Hands17 Workshop] DeepPrior++: Improving Fast and Accurate 3D Hand Pose Estimation. [\[PDF\]](https://www.tugraz.at/fileadmin/user_upload/Institute/ICG/Images/team_lepetit/publications/oberweger_iccvw17.pdf) [\[Project Page\]](https://www.tugraz.at/institute/icg/teams/teamlepetit/research/hand-detection-and-3d-pose-estimation/) [\[Code\]](https://github.com/moberweger/deep-prior-pp)
+*Markus Oberweger and Vincent Lepetit*
+
+##### [Hands17 Workshop] Hand Pose Estimation Using Deep Stereovision and Markov-chain Monte Carlo. [\[PDF\]](http://openaccess.city.ac.uk/18087/1/BasaruICCVW2017_MCMC.pdf)
+*Rilwan Remilekun Basaru, Chris Child, Eduardo Alonso, Greg Slabaugh*
 
 ### 2017 CVPR
 ##### Hand Keypoint Detection in Single Images using Multiview Bootstrapping. [\[PDF\]](https://arxiv.org/pdf/1704.07809) [\[Project Page\]](http://www.cs.cmu.edu/~tsimon/projects/mvbs.html) [\[Code\]](https://github.com/CMU-Perceptual-Computing-Lab/openpose)

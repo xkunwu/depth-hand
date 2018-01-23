@@ -29,14 +29,14 @@ iso_cube = getattr(
 class capture:
     class caminfo_ir:
         image_size = [480, 640]
-        z_range = (1e-4, 1600.)
+        z_range = (100., 1060.)
+        region_size = 120
+        anchor_num = 8
         # intrinsic paramters of Intel Realsense SR300
         # self.fx, self.fy = 463.889, 463.889
         # self.cx, self.cy = 320, 240
         focal = (463.889, 463.889)
         centre = (320, 240)
-        region_size = 150
-        anchor_num = 8
 
         def __init__():
             pass

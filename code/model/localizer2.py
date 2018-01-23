@@ -5,12 +5,10 @@ from importlib import import_module
 import numpy as np
 import tensorflow as tf
 from tensorflow.contrib import slim
-import progressbar
 import h5py
-from train.base_regre import base_regre
+from model.base_regre import base_regre
 import matplotlib.pyplot as mpplot
 from colour import Color
-from train.batch_allot import batch_allot_loc2
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 BASE_DIR = os.path.abspath(os.path.join(BASE_DIR, os.pardir))
@@ -34,115 +32,17 @@ regu_grid = getattr(
 
 
 class localizer2(base_regre):
+    """ this is the 2D version of attention model """
     def __init__(self, args):
         super(localizer2, self).__init__(args)
         self.net_type = 'locor'
         self.crop_size = 256
         self.anchor_num = 8
         self.num_appen = 4
-        self.batch_allot = batch_allot_loc2
         self.predict_file = os.path.join(
             self.predict_dir, 'detection_{}'.format(
                 self.name_desc))
         self.loss_lambda = 1.
-
-    def prepare_data(self, thedata, args, batchallot, file_annot, name_appen):
-        num_line = int(sum(1 for line in file_annot))
-        file_annot.seek(0)
-        batchallot.allot(num_line)
-        store_size = batchallot.store_size
-        num_stores = int(np.ceil(float(num_line) / store_size))
-        self.logger.debug(
-            'preparing data [{}]: {:d} lines (producing {:.4f} GB for store size {:d}) ...'.format(
-                self.__class__.__name__, num_line,
-                float(batchallot.store_bytes) / (2 << 30), store_size))
-        timerbar = progressbar.ProgressBar(
-            maxval=num_stores,
-            widgets=[
-                progressbar.Percentage(),
-                ' ', progressbar.Bar('=', '[', ']'),
-                ' ', progressbar.ETA()]
-        ).start()
-        crop_size = self.caminfo.crop_size
-        out_dim = batchallot.out_dim
-        num_channel = batchallot.num_channel
-        num_appen = batchallot.num_appen
-        with h5py.File(os.path.join(self.prepare_dir, name_appen), 'w') as h5file:
-            h5file.create_dataset(
-                'index',
-                (num_line, 1),
-                compression='lzf',
-                dtype=np.int32
-            )
-            h5file.create_dataset(
-                'frame',
-                (num_line,
-                    crop_size, crop_size,
-                    num_channel),
-                chunks=(1,
-                        crop_size, crop_size,
-                        num_channel),
-                compression='lzf',
-                # dtype=np.float32)
-                dtype=float)
-            h5file.create_dataset(
-                'poses',
-                (num_line, out_dim),
-                compression='lzf',
-                # dtype=np.float32)
-                dtype=float)
-            h5file.create_dataset(
-                'resce',
-                (num_line, num_appen),
-                compression='lzf',
-                # dtype=np.float32)
-                dtype=float)
-            bi = 0
-            store_beg = 0
-            while True:
-                resline = self.provider.puttensor_mt(
-                    file_annot, self.provider_worker,
-                    self.image_dir, thedata, batchallot
-                )
-                if 0 > resline:
-                    break
-                h5file['index'][store_beg:store_beg + resline, ...] = \
-                    batchallot.batch_index[0:resline, ...]
-                h5file['frame'][store_beg:store_beg + resline, ...] = \
-                    batchallot.batch_frame[0:resline, ...]
-                h5file['poses'][store_beg:store_beg + resline, ...] = \
-                    batchallot.batch_poses[0:resline, ...]
-                h5file['resce'][store_beg:store_beg + resline, ...] = \
-                    batchallot.batch_resce[0:resline, ...]
-                timerbar.update(bi)
-                bi += 1
-                store_beg += resline
-        timerbar.finish()
-
-    def check_dir(self, thedata, args):
-        first_run = False
-        if (
-                (not os.path.exists(self.appen_train)) or
-                (not os.path.exists(self.appen_test))
-        ):
-            first_run = True
-        if not first_run:
-            return
-        from timeit import default_timer as timer
-        from datetime import timedelta
-        time_s = timer()
-        batchallot = self.batch_allot(
-            self.batch_size, self.caminfo.crop_size, self.out_dim,
-            self.num_channel, self.num_appen)
-        with file_pack() as filepack:
-            file_annot = filepack.push_file(thedata.training_annot_train)
-            self.prepare_data(thedata, args, batchallot, file_annot, self.appen_train)
-        with file_pack() as filepack:
-            file_annot = filepack.push_file(thedata.training_annot_test)
-            self.prepare_data(thedata, args, batchallot, file_annot, self.appen_test)
-        time_e = str(timedelta(seconds=timer() - time_s))
-        self.logger.info('data prepared [{}], time: {}'.format(
-            self.__class__.__name__, time_e))
 
     def receive_data(self, thedata, args):
         """ Receive parameters specific to the data """
@@ -209,21 +109,6 @@ class localizer2(base_regre):
         pr, rc, _ = precision_recall_curve(
             label, pred_conf)
         avg_ps = average_precision_score(label, pred_conf)
-        # prInv = np.fliplr([pr])[0]
-        # rcInv = np.fliplr([rc])[0]
-        # j = rc.shape[0] - 2
-        # while 0 <= j:
-        #     if prInv[j + 1] > prInv[j]:
-        #         prInv[j] = prInv[j + 1]
-        #     j -= 1
-        # decreasing_max_pr = np.maximum.accumulate(
-        #     prInv[::-1][::-1]
-        # )
-        # mpplot.plot(
-        #     rcInv, decreasing_max_pr)
-        # mpplot.fill_between(
-        #     rcInv, decreasing_max_pr, step='post', alpha=0.2,
-        #     color='b')
         mpplot.step(rc, pr, color='b', alpha=0.2, where='post')
         mpplot.fill_between(rc, pr, step='post', color='b', alpha=0.2)
         mpplot.ylim([0., 1.01])
@@ -247,7 +132,9 @@ class localizer2(base_regre):
         cube = iso_cube(centre.flatten(), self.region_size)
         return cube, index, confidence
 
-    def _draw_prediction(self, frame_h5, resce_h5, pred_val):
+    def _debug_draw_prediction(self, frame_h5, resce_h5, pred_val):
+        import matplotlib.pyplot as mpplot
+        mpplot.figure(figsize=(2 * 5, 1 * 5))
         frame_h5 = self.args.data_ops.rescale_depth_inv(
             frame_h5, self.caminfo)
         colors = [Color('orange').rgb, Color('red').rgb, Color('lime').rgb]
@@ -274,7 +161,10 @@ class localizer2(base_regre):
         )
         for ii, rect in enumerate(rects):
             rect.draw(colors[ii])
+        mpplot.tight_layout()
         mpplot.gca().set_title('Prediction')
+        fname = 'debug_train_{}.png'.format(self.name_desc)
+        mpplot.savefig(os.path.join(self.predict_dir, fname))
 
     def draw_prediction(self, thedata, args):
         import linecache
@@ -289,7 +179,7 @@ class localizer2(base_regre):
             frame_h5 = args.data_ops.rescale_depth_inv(
                 frame_h5, self.caminfo)
 
-        print('[{}] drawing image #{:d}'.format(self.name_desc, img_id))
+        print('[{}] drawing image #{:d} ...'.format(self.name_desc, img_id))
         colors = [Color('orange').rgb, Color('red').rgb, Color('lime').rgb]
         mpplot.subplot(1, 2, 1)
         annot_line = args.data_io.get_line(
@@ -336,7 +226,7 @@ class localizer2(base_regre):
             frame_h5 = args.data_ops.rescale_depth_inv(
                 frame_h5, self.caminfo)
 
-        print('[{}] drawing image #{:d}'.format(self.name_desc, img_id))
+        print('[{}] drawing image #{:d} ...'.format(self.name_desc, img_id))
         colors = [Color('orange').rgb, Color('red').rgb, Color('lime').rgb]
         mpplot.subplots(nrows=2, ncols=2, figsize=(2 * 5, 2 * 5))
         mpplot.subplot(2, 2, 1)
@@ -359,8 +249,8 @@ class localizer2(base_regre):
         points3 = args.data_ops.img_to_raw(frame_h5, thedata)
         numpts = points3.shape[0]
         if 1000 < numpts:
-            samid = np.random.choice(numpts, 1000, replace=False)
-            points3_sam = points3[samid, :]
+            points3_sam = points3[
+                np.random.choice(numpts, 1000, replace=False), :]
         else:
             points3_sam = points3
         ax.scatter(
@@ -426,6 +316,8 @@ class localizer2(base_regre):
             args.predict_dir,
             'draw_{}.png'.format(self.name_desc)))
         mpplot.show()
+        print('[{}] drawing image #{:d} - done.'.format(
+            self.name_desc, img_id))
 
     def get_model(
             self, input_tensor, is_training,
