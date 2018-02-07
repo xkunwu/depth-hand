@@ -1,6 +1,6 @@
 import os
-import sys
-from importlib import import_module
+# import sys
+# from importlib import import_module
 # from psutil import virtual_memory
 import numpy as np
 import tensorflow as tf
@@ -9,26 +9,8 @@ import h5py
 from model.base_regre import base_regre
 import matplotlib.pyplot as mpplot
 from colour import Color
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-BASE_DIR = os.path.abspath(os.path.join(BASE_DIR, os.pardir))
-sys.path.append(BASE_DIR)
-file_pack = getattr(
-    import_module('utils.coder'),
-    'file_pack'
-)
-iso_cube = getattr(
-    import_module('utils.iso_boxes'),
-    'iso_cube'
-)
-iso_rect = getattr(
-    import_module('utils.iso_boxes'),
-    'iso_rect'
-)
-regu_grid = getattr(
-    import_module('utils.regu_grid'),
-    'regu_grid'
-)
+from utils.iso_boxes import iso_rect
+from utils.iso_boxes import iso_cube
 
 
 class localizer2(base_regre):
@@ -36,7 +18,7 @@ class localizer2(base_regre):
     def __init__(self, args):
         super(localizer2, self).__init__(args)
         self.net_type = 'locor'
-        self.crop_size = 256
+        self.crop_size = 256  # resized to this squared
         self.anchor_num = 8
         self.num_appen = 4
         self.predict_file = os.path.join(
@@ -51,20 +33,21 @@ class localizer2(base_regre):
         self.provider_worker = self.provider.prow_localizer2
         self.yanker = self.provider.yank_localizer2
 
-    def evaluate_batch(self, writer, batch_data, pred_val):
+    def evaluate_batch(self, writer, pred_val):
         self.provider.write_region2(
             writer, self.yanker, self.caminfo,
-            batch_data['batch_index'], batch_data['batch_resce'],
+            self.batch_data['batch_index'], self.batch_data['batch_resce'],
             pred_val
         )
 
     def end_evaluate(self, thedata, args):
         self.batchallot = None
-        mpplot.figure(figsize=(2 * 5, 1 * 5))
+        fig = mpplot.figure(figsize=(2 * 5, 1 * 5))
         self.draw_prediction(thedata, args)
         mpplot.tight_layout()
         fname = 'detection_{}.png'.format(self.name_desc)
         mpplot.savefig(os.path.join(self.predict_dir, fname))
+        mpplot.close(fig)
         print('figures saved: {}'.format(fname))
 
         from sklearn.metrics import precision_recall_curve
@@ -132,10 +115,49 @@ class localizer2(base_regre):
         cube = iso_cube(centre.flatten(), self.region_size)
         return cube, index, confidence
 
-    def _debug_draw_prediction(self, frame_h5, resce_h5, pred_val):
+    def debug_compare(self, batch_pred, logger):
+        batch_echt = self.batch_data['batch_poses']
+        np.set_printoptions(
+            threshold=np.nan,
+            formatter={'float_kind': lambda x: "%.2f" % x})
+        anchor_num_sub = self.anchor_num
+        anchor_num = anchor_num_sub ** 2
+        pcnt_echt = batch_echt[0, :anchor_num].reshape(
+            anchor_num_sub, anchor_num_sub)
+        index_echt = np.array(np.unravel_index(
+            np.argmax(pcnt_echt), pcnt_echt.shape))
+        pcnt_pred = batch_pred[0, :anchor_num].reshape(
+            anchor_num_sub, anchor_num_sub)
+        index_pred = np.array(np.unravel_index(
+            np.argmax(pcnt_pred), pcnt_pred.shape))
+        logger.info(
+            [index_echt, np.max(pcnt_echt), np.sum(pcnt_echt)])
+        logger.info(
+            [index_pred, np.max(pcnt_pred), np.sum(pcnt_pred)])
+        anchors_echt = batch_echt[0, anchor_num:].reshape(
+            anchor_num_sub, anchor_num_sub, 3)
+        anchors_pred = batch_pred[0, anchor_num:].reshape(
+            anchor_num_sub, anchor_num_sub, 3)
+        logger.info([
+            anchors_echt[index_echt[0], index_echt[1], :],
+            # anchors_echt[index_pred[0], index_pred[1], :],
+        ])
+        logger.info([
+            # anchors_pred[index_echt[0], index_echt[1], :],
+            anchors_pred[index_pred[0], index_pred[1], :],
+        ])
+        logger.info('\n{}'.format(pcnt_pred))
+        # logger.info('\n{}'.format(
+        #     np.fabs(anchors_echt[..., 0:2] - anchors_pred[..., 0:2])))
+        logger.info('\n{}'.format(
+            np.fabs(anchors_echt[..., 2] - anchors_pred[..., 2])))
+
+    def _debug_draw_prediction(self, did, pred_val):
+        frame_h5 = np.squeeze(self.batch_data['batch_frame'][did, ...], -1)
+        resce_h5 = self.batch_data['batch_resce'][did, ...]
         import matplotlib.pyplot as mpplot
-        mpplot.figure(figsize=(2 * 5, 1 * 5))
-        frame_h5 = self.args.data_ops.rescale_depth_inv(
+        fig = mpplot.figure(figsize=(2 * 5, 1 * 5))
+        frame_h5 = self.args.data_ops.frame_size_localizer(
             frame_h5, self.caminfo)
         colors = [Color('orange').rgb, Color('red').rgb, Color('lime').rgb]
         mpplot.subplot(1, 2, 1)
@@ -165,6 +187,7 @@ class localizer2(base_regre):
         mpplot.gca().set_title('Prediction')
         fname = 'debug_train_{}.png'.format(self.name_desc)
         mpplot.savefig(os.path.join(self.predict_dir, fname))
+        mpplot.close(fig)
 
     def draw_prediction(self, thedata, args):
         import linecache
@@ -176,7 +199,7 @@ class localizer2(base_regre):
             frame_h5 = np.squeeze(h5file['frame'][frame_id, ...], -1)
             # poses_h5 = h5file['poses'][frame_id, ...]
             resce_h5 = h5file['resce'][frame_id, ...]
-            frame_h5 = args.data_ops.rescale_depth_inv(
+            frame_h5 = args.data_ops.frame_size_localizer(
                 frame_h5, self.caminfo)
 
         print('[{}] drawing image #{:d} ...'.format(self.name_desc, img_id))
@@ -223,7 +246,7 @@ class localizer2(base_regre):
             frame_h5 = np.squeeze(h5file['frame'][frame_id, ...], -1)
             poses_h5 = h5file['poses'][frame_id, ...]
             resce_h5 = h5file['resce'][frame_id, ...]
-            frame_h5 = args.data_ops.rescale_depth_inv(
+            frame_h5 = args.data_ops.frame_size_localizer(
                 frame_h5, self.caminfo)
 
         print('[{}] drawing image #{:d} ...'.format(self.name_desc, img_id))
@@ -292,7 +315,7 @@ class localizer2(base_regre):
         mpplot.gca().set_title('test storage write')
         img_name, frame, poses, resce = self.provider_worker(
             annot_line, self.image_dir, thedata)
-        frame = args.data_ops.rescale_depth_inv(
+        frame = args.data_ops.frame_size_localizer(
             frame, self.caminfo)
         if (
                 (1e-4 < np.linalg.norm(frame_h5 - frame)) or
@@ -320,7 +343,7 @@ class localizer2(base_regre):
             self.name_desc, img_id))
 
     def get_model(
-            self, input_tensor, is_training,
+            self, input_tensor, is_training, bn_decay,
             scope=None, final_endpoint='stage_out'):
         """ input_tensor: BxHxWxC
             out_dim: BxJ, where J is flattened 3D locations

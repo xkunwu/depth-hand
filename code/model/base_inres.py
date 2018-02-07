@@ -15,7 +15,7 @@ class base_regre_inres(base_regre):
             'test_{}'.format(self.__class__.__base__.__name__))
 
     def get_model(
-            self, input_tensor, is_training,
+            self, input_tensor, is_training, bn_decay,
             scope=None, final_endpoint='stage_out'):
         """ input_tensor: BxHxWxC
             out_dim: BxJ, where J is flattened 3D locations
@@ -37,7 +37,7 @@ class base_clean_inres(base_clean):
             'test_{}'.format(self.__class__.__base__.__name__))
 
     def get_model(
-            self, input_tensor, is_training,
+            self, input_tensor, is_training, bn_decay,
             scope=None, final_endpoint='stage_out'):
         """ input_tensor: BxHxWxC
             out_dim: BxJ, where J is flattened 3D locations

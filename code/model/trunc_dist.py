@@ -1,4 +1,4 @@
-from base_conv3 import base_conv3
+from model.base_conv3 import base_conv3
 
 
 class trunc_dist(base_conv3):

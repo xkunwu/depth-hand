@@ -44,10 +44,10 @@ class hands17holder:
     #         color=colors[ii]
     #     )
     image_size = (480, 640)
-    region_size = 120  # empirical cropping size
+    region_size = 120  # empirical spacial cropping radius
     crop_size = 128  # input image size to models (may changed)
     anchor_num = 16  # for attention model
-    crop_range = 480.  # +/- limit
+    crop_range = 480.  # +/- spacial capture range
     z_range = (100., 1060.)  # empirical valid depth range
     z_max = 9999.  # max distance set to 10m
     # camera info
@@ -149,12 +149,13 @@ class hands17holder:
                 #     os.path.join(self.evaluate_cropped, name))
                 f.write(line)
 
-    def next_split_range(self):
+    def next_valid_split(self):
+        """ split range for validation set """
+        # split_beg = self.portion * self.split_id
+        # self.split_id = (self.split_id + 1) % self.split_num
+        # split_end = self.portion * self.split_id
         split_beg = self.portion * self.split_id
-        self.split_id = (self.split_id + 1) % self.split_num
-        split_end = self.portion * self.split_id
-        # split_all = self.portion * self.split_num
-        # return split_beg, split_end, split_all
+        split_end = 0
         return split_beg, split_end
 
     def init_data(self):
@@ -174,11 +175,14 @@ class hands17holder:
             self.num_training = int(sum(
                 1 for line in open(self.training_annot_cleaned, 'r')))
 
-        split_num = int(16)
+        # split the data into 10 portions
+        split_num = int(10)
         portion = int(np.ceil(float(self.num_training) / split_num))
+        # the last portion is used for test (compare models)
         self.train_test_split = int(portion * (split_num - 1))
         self.split_num = split_num - 1
         self.portion = portion
+        # 1 out of (10 - 1) portions is picked out for validation
         self.split_id = -1 % self.split_num
 
         if ((not os.path.exists(self.training_annot_train)) or

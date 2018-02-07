@@ -14,7 +14,7 @@ class incept_resnet:
             with tf.variable_scope('branch1'):
                 tower1 = slim.conv2d(net, 8, 1, scope='conv1_1x1')
                 tower1 = slim.conv2d(tower1, 8, 3, scope='conv1_3x3')
-            with tf.variable_scope('branch2'):
+            with tf.variable_scope('branch2'):  # equavalent to 5x5
                 tower2 = slim.conv2d(net, 8, 1, scope='conv2_1x1')
                 tower2 = slim.conv2d(tower2, 12, 3, scope='conv2_3x3_a')
                 tower2 = slim.conv2d(tower2, 16, 3, scope='conv2_3x3_b')
@@ -36,7 +36,7 @@ class incept_resnet:
         with tf.variable_scope(scope, 'block16', [net], reuse=reuse):
             with tf.variable_scope('branch0'):
                 tower0 = slim.conv2d(net, 32, 1, scope='conv0_1x1')
-            with tf.variable_scope('branch1'):
+            with tf.variable_scope('branch1'):  # equavalent to 7x7
                 tower1 = slim.conv2d(net, 32, 1, scope='conv1_1x1')
                 tower1 = slim.conv2d(tower1, 32, [1, 7], scope='conv1_1x7')
                 tower1 = slim.conv2d(tower1, 32, [7, 1], scope='conv1_7x1')
@@ -58,7 +58,7 @@ class incept_resnet:
         with tf.variable_scope(scope, 'block8', [net], reuse=reuse):
             with tf.variable_scope('branch0'):
                 tower0 = slim.conv2d(net, 64, 1, scope='conv0_1x1')
-            with tf.variable_scope('branch1'):
+            with tf.variable_scope('branch1'):  # equavalent to 3x3
                 tower1 = slim.conv2d(net, 64, 1, scope='conv1_1x1')
                 tower1 = slim.conv2d(tower1, 64, [1, 3], scope='conv1_1x3')
                 tower1 = slim.conv2d(tower1, 64, [3, 1], scope='conv1_3x1')
@@ -73,31 +73,60 @@ class incept_resnet:
         return net
 
     @staticmethod
+    def residual3(net, num_out=None, scale=1.0, activation_fn=tf.nn.relu,
+                  scope=None, reuse=None):
+        """ general residual model """
+        num = int(net.shape[-1].value)
+        if num_out is None:
+            num_out = num
+        num2 = (num_out >> 1)
+        sc_current = 'residual{}'.format(num2)
+        with tf.variable_scope(scope, sc_current, [net], reuse=reuse):
+            with tf.variable_scope('branch0'):
+                tower0 = slim.conv2d(net, num2, 1, scope='conv0_1x1')
+            with tf.variable_scope('branch1'):  # equavalent to 3x3
+                tower1 = slim.conv2d(net, num2, 1, scope='conv1_1x1')
+                tower1 = slim.conv2d(tower1, num2, [1, 3], scope='conv1_1x3')
+                tower1 = slim.conv2d(tower1, num2, [3, 1], scope='conv1_3x1')
+            mixed = tf.concat(axis=3, values=[tower0, tower1])
+            mixup = slim.conv2d(
+                mixed, net.get_shape()[3], 1,
+                normalizer_fn=None, activation_fn=None,
+                scope='mixup')
+            net += mixup * scale
+        if activation_fn is not None:
+            net = activation_fn(net)
+        return net
+
+    @staticmethod
     def reduce_net(net, scope=None, reuse=None):
-        num = (int(net.shape[3]) >> 1)
-        num2 = (num >> 1)
-        sc_current = 'reduce_net{}'.format(num)
+        """ reduce scale by one-half, while double feature size """
+        num2 = (int(net.shape[-1].value) >> 1)
+        num4 = (num2 >> 1)
+        sc_current = 'reduce_net{}'.format(num2)
         # with tf.variable_scope(scope, sc_current, [net], reuse=reuse):
         #     net = slim.conv2d(
-        #         net, 4 * num, 3, stride=2, scope='conv_3x3_2')
-        #     net = slim.max_pool2d(net, 3, scope='maxpool_3x3_1')
+        #         net, 4 * num2, 3, scope='conv_3x3_1')
+        #     net = slim.max_pool2d(
+        #         net, 3, stride=2, scope='maxpool_3x3_2')
         # return net
         with tf.variable_scope(scope, sc_current, [net], reuse=reuse):
             with tf.variable_scope('branch0'):
                 tower0 = slim.max_pool2d(net, 3, stride=2, scope='maxpool0_3x3_2')
             with tf.variable_scope('branch1'):
-                tower1 = slim.conv2d(net, num2, 1, scope='conv1_1x1_1')
-                tower1 = slim.conv2d(tower1, num, 3, stride=2, scope='conv1_3x3_2')
+                tower1 = slim.conv2d(net, num4, 1, scope='conv1_1x1_1')
+                tower1 = slim.conv2d(tower1, num2, 3, stride=2, scope='conv1_3x3_2')
             with tf.variable_scope('branch2'):
-                tower2 = slim.conv2d(net, num2, 1, scope='conv2_1x1_1')
-                tower2 = slim.conv2d(tower2, num2, 3, scope='conv2_3x3_1')
-                tower2 = slim.conv2d(tower2, num, 3, stride=2, scope='conv2_3x3_2')
+                tower2 = slim.conv2d(net, num4, 1, scope='conv2_1x1_1')
+                tower2 = slim.conv2d(tower2, num4, 3, scope='conv2_3x3_1')
+                tower2 = slim.conv2d(tower2, num2, 3, stride=2, scope='conv2_3x3_2')
             net = tf.concat(axis=3, values=[tower0, tower1, tower2])
         return net
 
     @staticmethod
     def pullout(net, out_dim, is_training,
                 scope=None, reuse=None):
+        """ supposed to work best with 8x8 input """
         with tf.variable_scope(scope, 'pullout', [net], reuse=reuse):
             net = slim.avg_pool2d(
                 net, 5, stride=3, padding='VALID',
@@ -110,7 +139,9 @@ class incept_resnet:
             net = slim.dropout(
                 net, 0.5, scope='dropout8')
             net = slim.fully_connected(
-                net, out_dim, scope='output8')
+                net, out_dim,
+                activation_fn=None, normalizer_fn=None,
+                scope='output8')
         return net
 
     @staticmethod
@@ -129,26 +160,41 @@ class incept_resnet:
 
         with tf.variable_scope(
                 scope, 'incept_resnet', [input_tensor]):
-            with slim.arg_scope(
-                    [slim.batch_norm, slim.dropout],
+            with \
+                slim.arg_scope(
+                    [slim.batch_norm],
+                    is_training=is_training,
+                    # # Make sure updates happen automatically
+                    # updates_collections=None,
+                    # exponential moving average is actually alpha filter in signal processing,
+                    # the time to converge is approximately 1/(1-decay) steps of train.
+                    # For decay=0.999, you need 1/0.001=1000 steps to converge.
+                    # Lower `decay` value (recommend trying `decay`=0.9) if model experiences
+                    # reasonably good training performance but poor validation and/or test performance.
+                    # Try zero_debias_moving_mean=True for improved stability.
+                    # zero_debias_moving_mean=True,
+                    decay=0.999), \
+                slim.arg_scope(
+                    [slim.dropout],
                     is_training=is_training), \
                 slim.arg_scope(
                     [slim.fully_connected],
                     weights_regularizer=slim.l2_regularizer(0.00004),
                     biases_regularizer=slim.l2_regularizer(0.00004),
-                    activation_fn=None, normalizer_fn=None), \
+                    activation_fn=tf.nn.relu,
+                    normalizer_fn=slim.batch_norm), \
                 slim.arg_scope(
                     [slim.max_pool2d, slim.avg_pool2d],
                     stride=1, padding='SAME'), \
                 slim.arg_scope(
                     [slim.conv2d],
                     stride=1, padding='SAME',
-                    activation_fn=tf.nn.relu,
                     weights_regularizer=slim.l2_regularizer(0.00004),
                     biases_regularizer=slim.l2_regularizer(0.00004),
+                    activation_fn=tf.nn.relu,
                     normalizer_fn=slim.batch_norm):
                 with tf.variable_scope('stage128'):
-                    sc = 'stage128_1'
+                    sc = 'stage128'
                     net = slim.conv2d(
                         input_tensor, 16, 3, scope='conv128_3x3_1')
                     net = slim.conv2d(
@@ -158,20 +204,20 @@ class incept_resnet:
                     end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points
-                    sc = 'stage128_2'
+                    sc = 'stage64'
                     net = incept_resnet.reduce_net(
                         net, scope=sc)
                     end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points
                 with tf.variable_scope('stage32'):
-                    # sc = 'stage32_1'
-                    # net = slim.repeat(
-                    #     net, block_rep[0], incept_resnet.block32,
-                    #     scale=block_scale[0], scope=sc)
-                    # end_point_list.append(sc)
-                    # if add_and_check_final(sc, net):
-                    #     return net, end_points
+                    sc = 'stage32_1'
+                    net = slim.repeat(
+                        net, block_rep[0], incept_resnet.block32,
+                        scale=block_scale[0], scope=sc)
+                    end_point_list.append(sc)
+                    if add_and_check_final(sc, net):
+                        return net, end_points
                     sc = 'stage32_2'
                     net = incept_resnet.reduce_net(
                         net, scope=sc)
@@ -179,13 +225,13 @@ class incept_resnet:
                     if add_and_check_final(sc, net):
                         return net, end_points
                 with tf.variable_scope('stage16'):
-                    # sc = 'stage16_1'
-                    # net = slim.repeat(
-                    #     net, block_rep[1], incept_resnet.block16,
-                    #     scale=block_scale[1], scope=sc)
-                    # end_point_list.append(sc)
-                    # if add_and_check_final(sc, net):
-                    #     return net, end_points
+                    sc = 'stage16_1'
+                    net = slim.repeat(
+                        net, block_rep[1], incept_resnet.block16,
+                        scale=block_scale[1], scope=sc)
+                    end_point_list.append(sc)
+                    if add_and_check_final(sc, net):
+                        return net, end_points
                     sc = 'stage16_2'
                     net = incept_resnet.reduce_net(
                         net, scope=sc)
@@ -193,15 +239,15 @@ class incept_resnet:
                     if add_and_check_final(sc, net):
                         return net, end_points
                 with tf.variable_scope('stage8'):
-                    # sc = 'stage8'
-                    # net = slim.repeat(
-                    #     net, block_rep[2], incept_resnet.block8,
-                    #     scale=block_scale[2], scope=sc)
-                    # net = incept_resnet.block8(
-                    #     net, activation_fn=None, scope=sc)
-                    # end_point_list.append(sc)
-                    # if add_and_check_final(sc, net):
-                    #     return net, end_points
+                    sc = 'stage8'
+                    net = slim.repeat(
+                        net, block_rep[2], incept_resnet.block8,
+                        scale=block_scale[2], scope=sc)
+                    net = incept_resnet.block8(
+                        net, activation_fn=None, scope=sc)
+                    end_point_list.append(sc)
+                    if add_and_check_final(sc, net):
+                        return net, end_points
                     sc = 'stage_out'
                     net = incept_resnet.pullout(
                         net, out_dim, is_training,

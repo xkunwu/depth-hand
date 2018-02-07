@@ -6,7 +6,7 @@ import tensorflow as tf
 from tensorflow.contrib import slim
 import h5py
 import matplotlib.pyplot as mpplot
-from base_regre import base_regre
+from model.base_regre import base_regre
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 BASE_DIR = os.path.abspath(os.path.join(BASE_DIR, os.pardir))
@@ -133,7 +133,7 @@ class ortho3view(base_regre):
         mpplot.show()
 
     def get_model(
-            self, input_tensor, is_training,
+            self, input_tensor, is_training, bn_decay,
             scope=None, final_endpoint='stage_out'):
         """ frames_tf: BxHxWxC
             out_dim: BxJ, where J is flattened 3D locations

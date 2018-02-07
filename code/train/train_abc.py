@@ -1,25 +1,13 @@
 import os
 import sys
-from importlib import import_module
+# from importlib import import_module
 import logging
 import numpy as np
 import tensorflow as tf
-# from tensorflow.contrib import slim
 import progressbar
 from functools import reduce
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-BASE_DIR = os.path.abspath(os.path.join(BASE_DIR, os.pardir))
-sys.path.append(BASE_DIR)
-args_holder = getattr(
-    import_module('args_holder'),
-    'args_holder'
-)
-sys.path.append(os.path.join(BASE_DIR, 'utils'))
-file_pack = getattr(
-    import_module('utils.coder'),
-    'file_pack'
-)
+from args_holder import args_holder
+from utils.coder import file_pack
 
 
 class train_abc():
@@ -51,17 +39,18 @@ class train_abc():
         from timeit import default_timer as timer
         from datetime import timedelta
         with file_pack() as filepack:
+            epoch = 0
             time_all_s = timer()
             self.args.model_inst.start_train(filepack)
-            for epoch in range(self.args.max_epoch):
+            while epoch < self.args.max_epoch:
+                epoch += 1
                 self.logger.info(
                     '**** Epoch #{:03d} ****'.format(epoch))
                 sys.stdout.flush()
 
                 split_beg, split_end = \
-                    self.args.data_inst.next_split_range()
-                # print(split_beg, split_end, split_all)
-                # continue
+                    self.args.data_inst.next_valid_split()
+                # print(split_beg, split_end)
 
                 time_s = timer()
                 self.logger.info('** Training **')
@@ -78,37 +67,43 @@ class train_abc():
                 self.args.logger.info(
                     'Epoch #{:03d} processing time: {}'.format(
                         epoch, time_e))
-                if mean_loss > valid_loss:
+                if mean_loss > (valid_loss * 1.1):
                     self.args.logger.info(
                         'Break due to validation loss starts to grow: {} --> {}'.format(
                             valid_loss, mean_loss))
                     break
-                valid_loss = mean_loss
-                save_path = saver.save(sess, model_path)
-                self.logger.info(
-                    'Model saved in file: {}'.format(save_path))
+                elif mean_loss > valid_loss:
+                    self.args.logger.info(
+                        'NOTE: validation loss starts to grow: {} --> {}'.format(
+                            valid_loss, mean_loss))
+                else:
+                    # only save model when validation loss decrease
+                    valid_loss = mean_loss
+                    save_path = saver.save(sess, model_path)
+                    self.logger.info(
+                        'Model saved in file: {}'.format(save_path))
             self.args.model_inst.end_train()
-            time_all_e = str(timedelta(
-                seconds=(timer() - time_all_s)))
+            time_all_e = timer() - time_all_s
             self.args.logger.info(
-                'Total training time: {}'.format(
-                    time_all_e))
+                'Total training time: {} for {:d} epoches, average: {}.'.format(
+                    str(timedelta(seconds=time_all_e)), epoch,
+                    str(timedelta(seconds=(time_all_e / epoch)))))
 
     def train(self):
         self.logger.info('######## Training ########')
         tf.reset_default_graph()
         with tf.Graph().as_default(), \
                 tf.device('/gpu:' + str(self.args.gpu_id)):
-            frames_tf, poses_tf = \
+            frames_op, poses_op = \
                 self.args.model_inst.placeholder_inputs()
             is_training_tf = tf.placeholder(
-                tf.bool, name='is_training')
+                tf.bool, shape=(), name='is_training')
 
             global_step = tf.train.create_global_step()
 
-            pred, end_points = self.args.model_inst.get_model(
-                frames_tf, is_training_tf)
-            shapestr = 'input: {}'.format(frames_tf.shape)
+            pred_op, end_points = self.args.model_inst.get_model(
+                frames_op, is_training_tf, self.args.bn_decay)
+            shapestr = 'input: {}'.format(frames_op.shape)
             for ends in self.args.model_inst.end_point_list:
                 net = end_points[ends]
                 shapestr += '\n{}: {} = ({}, {})'.format(
@@ -122,18 +117,31 @@ class train_abc():
                         ends, self.transform_image_summary(net))
             self.args.logger.info(
                 'network structure:\n{}'.format(shapestr))
-            loss = self.args.model_inst.get_loss(
-                pred, poses_tf, end_points)
-            # regre_error = tf.sqrt(loss * 2)
-            regre_error = loss
+            loss_op = self.args.model_inst.get_loss(
+                pred_op, poses_op, end_points)
+            # regre_error = tf.sqrt(loss_op * 2)
+            regre_error = loss_op
             tf.summary.scalar('regression_error', regre_error)
 
             learning_rate = self.get_learning_rate(global_step)
             tf.summary.scalar('learning_rate', learning_rate)
 
             optimizer = tf.train.AdamOptimizer(learning_rate)
-            train_op = optimizer.minimize(
-                loss, global_step=global_step)
+            # train_op = optimizer.minimize(
+            #     loss_op, global_step=global_step)
+            from tensorflow.contrib import slim
+            train_op = slim.learning.create_train_op(
+                loss_op, optimizer,
+                update_ops=tf.get_collection(tf.GraphKeys.UPDATE_OPS),
+                global_step=global_step)
+            # from tensorflow.python.ops import control_flow_ops
+            # train_op = slim.learning.create_train_op(
+            #     loss_op, optimizer, global_step=global_step)
+            # update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+            # if update_ops:
+            #     updates = tf.group(*update_ops)
+            #     loss_op = control_flow_ops.with_dependencies(
+            #         [updates], loss_op)
 
             saver = tf.train.Saver(max_to_keep=4)
 
@@ -152,7 +160,7 @@ class train_abc():
                         'model restored from: {}.'.format(
                             model_path))
 
-                merged = tf.summary.merge_all()
+                summary_op = tf.summary.merge_all()
                 train_writer = tf.summary.FileWriter(
                     os.path.join(self.args.log_dir_t, 'train'),
                     sess.graph)
@@ -160,113 +168,18 @@ class train_abc():
                     os.path.join(self.args.log_dir_t, 'valid'))
 
                 ops = {
-                    'batch_frame': frames_tf,
-                    'batch_poses': poses_tf,
+                    'batch_frame': frames_op,
+                    'batch_poses': poses_op,
                     'is_training': is_training_tf,
-                    'merged': merged,
+                    'summary_op': summary_op,
                     'step': global_step,
                     'train_op': train_op,
-                    'loss': loss,
-                    'pred': pred
+                    'loss_op': loss_op,
+                    'pred_op': pred_op
                 }
                 self._train_iter(
                     sess, ops, saver,
                     model_path, train_writer, valid_writer)
-
-    def debug_locat_3d(self, batch_echt, batch_pred):
-        np.set_printoptions(
-            threshold=np.nan,
-            formatter={'float_kind': lambda x: "%.2f" % x})
-        anchor_num_sub = self.args.model_inst.anchor_num
-        anchor_num = anchor_num_sub ** 3
-        pcnt_echt = batch_echt[0, :anchor_num].reshape(
-            anchor_num_sub, anchor_num_sub, anchor_num_sub)
-        index_echt = np.array(np.unravel_index(
-            np.argmax(pcnt_echt), pcnt_echt.shape))
-        pcnt_pred = batch_pred[0, :anchor_num].reshape(
-            anchor_num_sub, anchor_num_sub, anchor_num_sub)
-        index_pred = np.array(np.unravel_index(
-            np.argmax(pcnt_pred), pcnt_pred.shape))
-        self.logger.info(
-            [index_echt, np.max(pcnt_echt), np.sum(pcnt_echt)])
-        self.logger.info(
-            [index_pred, np.max(pcnt_pred), np.sum(pcnt_pred)])
-        anchors_echt = batch_echt[0, anchor_num:].reshape(
-            anchor_num_sub, anchor_num_sub, anchor_num_sub, 4)
-        anchors_pred = batch_pred[0, anchor_num:].reshape(
-            anchor_num_sub, anchor_num_sub, anchor_num_sub, 4)
-        self.logger.info([
-            anchors_echt[index_echt[0], index_echt[1], index_echt[2], :],
-        ])
-        self.logger.info([
-            anchors_pred[index_pred[0], index_pred[1], index_echt[2], :],
-        ])
-        z_echt = index_echt[2]
-        self.logger.info('\n{}'.format(pcnt_pred[..., z_echt]))
-        anchors_diff = np.fabs(
-            anchors_echt[..., z_echt, 0:3] -
-            anchors_pred[..., z_echt, 0:3])
-        self.logger.info('\n{}'.format(
-            np.sum(anchors_diff, axis=-1)))
-        self.logger.info('\n{}'.format(
-            np.fabs(anchors_echt[..., z_echt, 3] - anchors_pred[..., z_echt, 3])))
-
-    def debug_locat_2d(self, batch_echt, batch_pred):
-        np.set_printoptions(
-            threshold=np.nan,
-            formatter={'float_kind': lambda x: "%.2f" % x})
-        anchor_num_sub = self.args.model_inst.anchor_num
-        anchor_num = anchor_num_sub ** 2
-        pcnt_echt = batch_echt[0, :anchor_num].reshape(
-            anchor_num_sub, anchor_num_sub)
-        index_echt = np.array(np.unravel_index(
-            np.argmax(pcnt_echt), pcnt_echt.shape))
-        pcnt_pred = batch_pred[0, :anchor_num].reshape(
-            anchor_num_sub, anchor_num_sub)
-        index_pred = np.array(np.unravel_index(
-            np.argmax(pcnt_pred), pcnt_pred.shape))
-        self.logger.info(
-            [index_echt, np.max(pcnt_echt), np.sum(pcnt_echt)])
-        self.logger.info(
-            [index_pred, np.max(pcnt_pred), np.sum(pcnt_pred)])
-        anchors_echt = batch_echt[0, anchor_num:].reshape(
-            anchor_num_sub, anchor_num_sub, 3)
-        anchors_pred = batch_pred[0, anchor_num:].reshape(
-            anchor_num_sub, anchor_num_sub, 3)
-        self.logger.info([
-            anchors_echt[index_echt[0], index_echt[1], :],
-            # anchors_echt[index_pred[0], index_pred[1], :],
-        ])
-        self.logger.info([
-            # anchors_pred[index_echt[0], index_echt[1], :],
-            anchors_pred[index_pred[0], index_pred[1], :],
-        ])
-        self.logger.info('\n{}'.format(pcnt_pred))
-        self.logger.info('\n{}'.format(
-            np.fabs(anchors_echt[..., 0:2] - anchors_pred[..., 0:2])))
-        self.logger.info('\n{}'.format(
-            np.fabs(anchors_echt[..., 2] - anchors_pred[..., 2])))
-
-    def debug_detec_2d(self, batch_echt, batch_pred):
-        np.set_printoptions(
-            threshold=np.nan,
-            formatter={'float_kind': lambda x: "%.2f" % x})
-        pcnt_echt = batch_echt[0, :].reshape(21, 3)
-        pcnt_pred = batch_pred[0, :].reshape(21, 3)
-        self.logger.info(np.concatenate(
-            (np.max(pcnt_echt, axis=0), np.min(pcnt_echt, axis=0))
-        ))
-        self.logger.info(np.concatenate(
-            (np.max(pcnt_pred, axis=0), np.min(pcnt_pred, axis=0))
-        ))
-        self.logger.info('\n{}'.format(pcnt_echt))
-        self.logger.info('\n{}'.format(pcnt_pred))
-        self.logger.info('\n{}'.format(
-            np.fabs(pcnt_echt - pcnt_pred)))
-
-    def debug_prediction(self, frame_h5, resce_h5, pred_val):
-        self.args.model_inst._debug_draw_prediction(
-            frame_h5, resce_h5, pred_val)
 
     def train_one_epoch(self, sess, ops, train_writer):
         """ ops: dict mapping from string to tf ops """
@@ -282,24 +195,21 @@ class train_abc():
                 ops['is_training']: True
             }
             summary, step, _, loss_val, pred_val = sess.run(
-                [ops['merged'], ops['step'], ops['train_op'],
-                    ops['loss'], ops['pred']],
+                [ops['summary_op'], ops['step'], ops['train_op'],
+                    ops['loss_op'], ops['pred_op']],
                 feed_dict=feed_dict)
             loss_sum += loss_val / self.args.batch_size
             if batch_count % 10 == 0:
                 if 'locor' == self.args.model_inst.net_type:
-                    if 2 == self.args.model_inst.net_rank:
-                        self.debug_locat_2d(batch_data['batch_poses'], pred_val)
-                    elif 3 == self.args.model_inst.net_rank:
-                        self.debug_locat_3d(batch_data['batch_poses'], pred_val)
+                    self.args.model_inst.debug_compare(
+                        pred_val, self.logger)
                     did = np.random.randint(0, self.args.batch_size)
-                    self.debug_prediction(
-                        np.squeeze(batch_data['batch_frame'][did, ...], -1),
-                        batch_data['batch_resce'][did, ...],
-                        pred_val[did, ...]
+                    self.args.model_inst._debug_draw_prediction(
+                        did, pred_val[did, ...]
                     )
                 # elif 'poser' == self.args.model_inst.net_type:
-                #     self.debug_detec_2d(batch_data['batch_poses'], pred_val)
+                #     self.args.model_inst.debug_compare(
+                #         pred_val, self.logger)
                 train_writer.add_summary(summary, step)
                 self.logger.info(
                     'batch {} training loss: {}'.format(
@@ -322,24 +232,20 @@ class train_abc():
             feed_dict = {
                 ops['batch_frame']: batch_data['batch_frame'],
                 ops['batch_poses']: batch_data['batch_poses'],
-                # HACK: somehow TF use different strategy
-                ops['is_training']: True
+                ops['is_training']: False
             }
             summary, step, loss_val, pred_val = sess.run(
-                [ops['merged'], ops['step'],
-                    ops['loss'], ops['pred']],
+                [ops['summary_op'], ops['step'],
+                    ops['loss_op'], ops['pred_op']],
                 feed_dict=feed_dict)
             loss_sum += loss_val / self.args.batch_size
             if batch_count % 10 == 0:
                 if 'locor' == self.args.model_inst.net_type:
-                    if 2 == self.args.model_inst.net_rank:
-                        self.debug_locat_2d(
-                            batch_data['batch_poses'], pred_val)
-                    elif 3 == self.args.model_inst.net_rank:
-                        self.debug_locat_3d(
-                            batch_data['batch_poses'], pred_val)
+                    self.args.model_inst.debug_compare(
+                        pred_val, self.logger)
                 # elif 'poser' == self.args.model_inst.net_type:
-                #     self.debug_detec_2d(batch_data['batch_poses'], pred_val)
+                #     self.args.model_inst.debug_compare(
+                #         pred_val, self.logger)
                 valid_writer.add_summary(summary, step)
                 self.logger.info(
                     'batch {} validate loss: {}'.format(
@@ -357,15 +263,15 @@ class train_abc():
         with tf.Graph().as_default(), \
                 tf.device('/gpu:' + str(self.args.gpu_id)):
             # sequential evaluate, suited for streaming
-            frames_tf, poses_tf = \
-                self.args.model_inst.placeholder_inputs()
+            frames_op, poses_op = \
+                self.args.model_inst.placeholder_inputs(1)
             is_training_tf = tf.placeholder(
-                tf.bool, name='is_training')
+                tf.bool, shape=(), name='is_training')
 
-            pred, end_points = self.args.model_inst.get_model(
-                frames_tf, is_training_tf)
-            loss = self.args.model_inst.get_loss(
-                pred, poses_tf, end_points)
+            pred_op, end_points = self.args.model_inst.get_model(
+                frames_op, is_training_tf, self.args.bn_decay)
+            loss_op = self.args.model_inst.get_loss(
+                pred_op, poses_op, end_points)
 
             saver = tf.train.Saver()
 
@@ -381,11 +287,11 @@ class train_abc():
                 self.logger.info('model restored.')
 
                 ops = {
-                    'batch_frame': frames_tf,
-                    'batch_poses': poses_tf,
+                    'batch_frame': frames_op,
+                    'batch_poses': poses_op,
                     'is_training': is_training_tf,
-                    'loss': loss,
-                    'pred': pred
+                    'loss_op': loss_op,
+                    'pred_op': pred_op
                 }
 
                 with file_pack() as filepack:
@@ -407,20 +313,19 @@ class train_abc():
                 ' ', progressbar.ETA()]
         ).start()
         while True:
-            batch_data = self.args.model_inst.fetch_batch()
+            batch_data = self.args.model_inst.fetch_batch(1)
             if batch_data is None:
                 break
             feed_dict = {
                 ops['batch_frame']: batch_data['batch_frame'],
                 ops['batch_poses']: batch_data['batch_poses'],
-                # HACK: somehow TF use different strategy
-                ops['is_training']: True
+                ops['is_training']: False
             }
             loss_val, pred_val = sess.run(
-                [ops['loss'], ops['pred']],
+                [ops['loss_op'], ops['pred_op']],
                 feed_dict=feed_dict)
             self.args.model_inst.evaluate_batch(
-                writer, batch_data, pred_val
+                writer, pred_val
             )
             loss_sum += loss_val
             timerbar.update(batch_count)
@@ -440,7 +345,7 @@ class train_abc():
             self.args.decay_rate,
             staircase=True
         )
-        # learning_rate = tf.maximum(learning_rate, 1e-6)
+        learning_rate = tf.maximum(learning_rate, 1e-6)
         return learning_rate
 
     def __init__(self, args, new_log=True):

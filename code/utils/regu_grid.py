@@ -160,6 +160,7 @@ class latice_image:
         ).astype(int)
 
     def fill(self, points2):
+        """ here only one-shot """
         pcnt = np.zeros(shape=(self.step, self.step))
         num_p = points2.shape[0]
         indices = self.putit(points2)
@@ -173,6 +174,10 @@ class latice_image:
         return pcnt
 
     def prow_anchor_single(self, points2, wsizes):
+        """ collect 3 parameters relative to each anchor
+            - center locations: x, y
+            - window size: s
+        """
         # centre = self.voxen(self.putit(points2))
         # scale_base = np.max(self.cellen)
         # delta = (points2 - centre) / scale_base

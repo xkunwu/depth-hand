@@ -212,7 +212,7 @@ class iso_cube:
     def print_image(self, coord, depth, sizel):
         """ expand to required image size """
         img = np.zeros((sizel, sizel))
-        coord *= 0.999999
+        coord *= 0.999999  # simple hack to remove boundary
         img[
             np.floor(coord[:, 0] * sizel).astype(int),
             np.floor(coord[:, 1] * sizel).astype(int),
@@ -363,3 +363,4 @@ if __name__ == "__main__":
     # points3_trans = cube.transform_to_center(points3)
     # ax.scatter(points3_trans[:, 0], points3_trans[:, 1], points3_trans[:, 2])
     mpplot.show()
+    mpplot.close(fig)

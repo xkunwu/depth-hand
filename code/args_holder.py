@@ -65,28 +65,36 @@ class args_holder:
 
         # learning parameters
         self.parser.add_argument(
-            '--max_epoch', type=int, default=2,
+            '--max_epoch', type=int, default=10,
             help='Epoch to run [default: 10]')
         self.parser.add_argument(
-            '--batch_size', type=int, default=128,
-            help='Batch size during training [default: 64]')
+            '--batch_size', type=int, default=50,
+            help='Batch size during training [default: 50]')
         # self.parser.add_argument(
         #     '--optimizer', default='adam',
         #     help='Only using adam currently [default: adam]')
         self.parser.add_argument(
             '--bn_momentum', type=float, default=0.8,
             help='Initial batch normalization momentum [default: 0.8]')
+        # exponential moving average is actually alpha filter in signal processing,
+        # the time to converge is approximately 1/(1-decay) steps of train.
+        # For decay=0.999, you need 1/0.001=1000 steps to converge.
+        # Lower `decay` value (recommend trying `decay`=0.9) if model experiences
+        # reasonably good training performance but poor validation and/or test performance.
+        self.parser.add_argument(
+            '--bn_decay', type=float, default=0.999,
+            help='decay rate during batch normalization [default: 0.999]')
         self.parser.add_argument(
             '--learning_rate', type=float, default=0.01,
             help='Initial learning rate [default: 0.001]')
         self.parser.add_argument(
             '--decay_step', type=int, default=2e6,
-            # twice of 1M (1e6) dataset / batch size
+            # twice of 1M (1e6) dataset, will be divided by batch size below
             help='Decay step for lr decay [default: 2e6]')
         self.parser.add_argument(
             '--decay_rate', type=float, default=0.94,
             # fast decay, as using adaptive optimizer
-            help='Decay rate for lr decay [default: 0.9]')
+            help='Decay rate for lr decay [default: 0.94]')
 
     def make_new_log(self):
         log_dir = os.path.join(self.args.out_dir, 'log')

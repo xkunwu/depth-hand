@@ -4,6 +4,12 @@ import matplotlib.image as mpimg
 import matplotlib.collections as mcoll
 
 
+class cam_info:
+    image_size = (480, 640)
+    focal = (475.065948, 475.065857)
+    centre = (315.944855, 245.287079)
+
+
 def fig2data(fig, show_margin=False):
     """
     @brief Convert a Matplotlib figure to a 3D numpy array with RGBA channels

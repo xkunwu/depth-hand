@@ -44,7 +44,7 @@ def yank_truncdf(pose_local, resce, caminfo):
 def prow_localizer2(line, image_dir, caminfo):
     img_name, pose_raw = dataio.parse_line_annot(line)
     img = dataio.read_image(os.path.join(image_dir, img_name))
-    img_rescale = dataops.rescale_depth(img, caminfo)
+    img_rescale = dataops.resize_localizer(img, caminfo)
     anchors, resce = dataops.generate_anchors_2d(
         img, pose_raw, caminfo.anchor_num, caminfo)
     return (img_name,
@@ -76,6 +76,7 @@ def yank_localizer2(pose_local, resce, caminfo):
     pcnt = pose_local[:anchor_num].reshape(
         caminfo.anchor_num, caminfo.anchor_num)
     index = np.array(np.unravel_index(np.argmax(pcnt), pcnt.shape))
+    # convert logits to probability, due to network design
     logits = pcnt[index[0], index[1]]
     confidence = 1 / (1 + np.exp(-logits))
     anchors = pose_local[anchor_num:]
@@ -128,6 +129,22 @@ def prow_ortho3v(line, image_dir, caminfo):
 
 
 def yank_ortho3v(pose_local, resce, caminfo):
+    resce3 = resce[0:4]
+    return dataops.pca_to_raw(pose_local, resce3)
+
+
+def prow_heatmap(line, image_dir, caminfo):
+    img_name, pose_raw = dataio.parse_line_annot(line)
+    img = dataio.read_image(os.path.join(image_dir, img_name))
+    img_crop_resize, resce = dataops.crop_resize_pca(
+        img, pose_raw, caminfo)
+    resce3 = resce[0:4]
+    # pose_pca = dataops.raw_to_pca(pose_raw, resce3)
+    return (img_name, np.expand_dims(img_crop_resize, axis=-1),
+            pose_pca.flatten().T, resce)
+
+
+def yank_heatmap(pose_local, resce, caminfo):
     resce3 = resce[0:4]
     return dataops.pca_to_raw(pose_local, resce3)
 

@@ -114,7 +114,7 @@ class capture:
         return depth
 
     def detect_region(self, depth, sess, ops):
-        depth_rescale = self.args.data_ops.rescale_depth(
+        depth_rescale = self.args.data_ops.resize_localizer(
             depth, self.args.data_inst)
         feed_dict = {
             ops['batch_frame']: self.args.model_inst.convert_input(
@@ -135,7 +135,7 @@ class capture:
             frames_tf, _ = self.args.model_inst.placeholder_inputs(1)
             is_training_tf = tf.placeholder(tf.bool, shape=())
             pred, end_points = self.args.model_inst.get_model(
-                frames_tf, is_training_tf)
+                frames_tf, is_training_tf, self.args.bn_decay)
             saver = tf.train.Saver()
         config = tf.ConfigProto()
         config.gpu_options.allow_growth = True

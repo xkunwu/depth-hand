@@ -56,11 +56,12 @@ class localizer3(base_conv3):
 
     def end_evaluate(self, thedata, args):
         self.batchallot = None
-        mpplot.figure(figsize=(2 * 5, 1 * 5))
+        fig = mpplot.figure(figsize=(2 * 5, 1 * 5))
         self.draw_prediction(thedata, args)
         mpplot.tight_layout()
         fname = 'detection_{}.png'.format(self.name_desc)
         mpplot.savefig(os.path.join(self.predict_dir, fname))
+        mpplot.close(fig)
         print('figures saved: {}'.format(fname))
 
     def convert_input(self, img, args, caminfo):
@@ -77,7 +78,46 @@ class localizer3(base_conv3):
         cube = iso_cube(centre, self.region_size)
         return cube
 
-    def _debug_draw_prediction(self, frame_h5, resce_h5, pred_val):
+    def debug_compare(self, batch_pred, logger):
+        batch_echt = self.batch_data['batch_poses']
+        np.set_printoptions(
+            threshold=np.nan,
+            formatter={'float_kind': lambda x: "%.2f" % x})
+        anchor_num_sub = self.anchor_num
+        anchor_num = anchor_num_sub ** 3
+        pcnt_echt = batch_echt[0, :anchor_num].reshape(
+            anchor_num_sub, anchor_num_sub, anchor_num_sub)
+        index_echt = np.array(np.unravel_index(
+            np.argmax(pcnt_echt), pcnt_echt.shape))
+        pcnt_pred = batch_pred[0, :anchor_num].reshape(
+            anchor_num_sub, anchor_num_sub, anchor_num_sub)
+        index_pred = np.array(np.unravel_index(
+            np.argmax(pcnt_pred), pcnt_pred.shape))
+        logger.info(
+            [index_echt, np.max(pcnt_echt), np.sum(pcnt_echt)])
+        logger.info(
+            [index_pred, np.max(pcnt_pred), np.sum(pcnt_pred)])
+        anchors_echt = batch_echt[0, anchor_num:].reshape(
+            anchor_num_sub, anchor_num_sub, anchor_num_sub, 4)
+        anchors_pred = batch_pred[0, anchor_num:].reshape(
+            anchor_num_sub, anchor_num_sub, anchor_num_sub, 4)
+        logger.info([
+            anchors_echt[index_echt[0], index_echt[1], index_echt[2], :],
+        ])
+        logger.info([
+            anchors_pred[index_pred[0], index_pred[1], index_echt[2], :],
+        ])
+        z_echt = index_echt[2]
+        logger.info('\n{}'.format(pcnt_pred[..., z_echt]))
+        # anchors_diff = np.fabs(
+        #     anchors_echt[..., z_echt, 0:3] -
+        #     anchors_pred[..., z_echt, 0:3])
+        # logger.info('\n{}'.format(
+        #     np.sum(anchors_diff, axis=-1)))
+        logger.info('\n{}'.format(
+            np.fabs(anchors_echt[..., z_echt, 3] - anchors_pred[..., z_echt, 3])))
+
+    def _debug_draw_prediction(self, did, pred_val):
         pass
 
     def draw_prediction(self, thedata, args):
@@ -250,7 +290,7 @@ class localizer3(base_conv3):
             self.name_desc, img_id))
 
     def get_model(
-            self, input_tensor, is_training,
+            self, input_tensor, is_training, bn_decay,
             scope=None, final_endpoint='stage_out'):
         """ input_tensor: BxHxWxC
             out_dim: BxJ, where J is flattened 3D locations

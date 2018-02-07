@@ -4,3 +4,6 @@
 ![Alt text](detection_base_regre_14.png?raw=true "Optional Title")
 - \[train_abc::evaluate\] due to unknown TF bug, 'is_training' still has to be true while evaluating, otherwise leads to junk result:
 ![Alt text](detection_base_regre_1.png?raw=true "Optional Title")
+    - found to be related to batch_norm:
+        - updates_collections=None, for in place update.
+        - use slim.learning.create_train_op

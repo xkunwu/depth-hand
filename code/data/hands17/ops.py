@@ -3,6 +3,7 @@
 from importlib import import_module
 import numpy as np
 import skfmm
+import scipy.ndimage as ndimage
 from cv2 import resize as cv2resize
 from utils.iso_boxes import iso_rect
 # from utils.iso_boxes import iso_aabb
@@ -71,8 +72,27 @@ def raw_to_2d(points3, caminfo, resce=np.array([1, 0, 0])):
     return pose2d
 
 
+def raw_to_hmap2(points3, cube, hmap_size, caminfo):
+    """ 2d heatmap for each point """
+    points3_trans = cube.transform_center_shrink(points3)
+    coord, depth = cube.project_pca(points3_trans, sort=False)
+    # num_j = points3.shape[0]
+    img_l = []
+    for c, d in zip(coord, depth):
+        img = cube.print_image(
+            [c], [d], hmap_size)
+        img = ndimage.gaussian_filter(img, sigma=0.8)
+        img /= np.max(img)
+        img_l.append(img)
+    img_arr = np.stack(img_l, axis=2)
+    return img_arr
+
+
 def estimate_z(l3, l2, focal):
-    """ depth can be estimated due to same projective mapping """
+    """ depth can be estimated due to:
+        - same projective mapping
+        - fixed region size
+    """
     # p3 = np.array([[-12, -54, 456], [22, 63, 456]])
     # # p3 = np.array([[0, 0, 456], [12, 34, 456]])
     # # p3 = np.array([[456, -456, 456], [456, 456, 456]])
@@ -137,7 +157,7 @@ def normalize_depth(img, caminfo):
     )
 
 
-def rescale_depth(img, caminfo):
+def resize_localizer(img, caminfo):
     """ rescale to fixed cropping size """
     img_rescale = cv2resize(
         img, (caminfo.crop_size, caminfo.crop_size))
@@ -145,8 +165,9 @@ def rescale_depth(img, caminfo):
     return img_rescale
 
 
-def rescale_depth_inv(img, caminfo):
-    img_rescale = img * (caminfo.z_range[1] - caminfo.z_range[0]) + caminfo.z_range[0]
+def frame_size_localizer(img, caminfo):
+    img_rescale = img * (caminfo.z_range[1] - caminfo.z_range[0]) + \
+        caminfo.z_range[0]
     img_rescale = cv2resize(
         img_rescale, (caminfo.image_size[1], caminfo.image_size[0]))
     return img_rescale
@@ -232,6 +253,10 @@ def voxelize_depth(img, pose_raw, step, anchor_num, caminfo):
 
 
 def generate_anchors_2d(img, pose_raw, anchor_num, caminfo):
+    """ two sections concatenated:
+        - positive probability,
+        - parameters
+    """
     lattice = latice_image(
         np.array(img.shape).astype(float), anchor_num)
     cube = iso_cube(
@@ -240,7 +265,7 @@ def generate_anchors_2d(img, pose_raw, anchor_num, caminfo):
     )
     cen2d = raw_to_2d(cube.cen.reshape(1, -1), caminfo)
     rect = proj_cube_to_rect(cube, caminfo.region_size, caminfo)
-    pcnt = lattice.fill(cen2d)
+    pcnt = lattice.fill(cen2d)  # only one-shot here
     anchors = lattice.prow_anchor_single(cen2d, rect.sidelen / 2)
     # import matplotlib.pyplot as mpplot
     # print(cen2d, rect.sidelen / 2)
@@ -302,8 +327,8 @@ def fill_grid(img, pose_raw, step, caminfo):
         (np.max(pose_raw, axis=0) + np.min(pose_raw, axis=0)) / 2,
         caminfo.region_size
     )
-    points3_trans = cube.pick(img_to_raw(img, caminfo))
-    points3_trans = cube.transform_center_shrink(points3_trans)
+    points3_pick = cube.pick(img_to_raw(img, caminfo))
+    points3_trans = cube.transform_center_shrink(points3_pick)
     grid = regu_grid()
     grid.from_cube(cube, step)
     pcnt = grid.fill(points3_trans)
@@ -316,8 +341,8 @@ def proj_ortho3(img, pose_raw, caminfo):
         (np.max(pose_raw, axis=0) + np.min(pose_raw, axis=0)) / 2,
         caminfo.region_size
     )
-    points3_trans = cube.pick(img_to_raw(img, caminfo))
-    points3_trans = cube.transform_center_shrink(points3_trans)
+    points3_pick = cube.pick(img_to_raw(img, caminfo))
+    points3_trans = cube.transform_center_shrink(points3_pick)
     img_l = []
     for spi in range(3):
         coord, depth = cube.project_pca(points3_trans, roll=spi)
@@ -359,6 +384,15 @@ def get_rect3(cube, caminfo):
     return rect
 
 
+def collect_heatmap(pose_raw, resce):
+    cube = iso_cube()
+    cube.load(resce)
+    points3_trans = cube.transform_center_shrink(pose_raw)
+    coord, depth = cube.project_pca(points3_trans, sort=False)
+    img_crop_resize = cube.print_image(
+        coord, depth, caminfo.crop_size)
+
+
 def crop_resize_pca(img, pose_raw, caminfo):
     # cube = iso_cube()
     # cube.build(pose_raw, 0.6)
@@ -366,8 +400,8 @@ def crop_resize_pca(img, pose_raw, caminfo):
         (np.max(pose_raw, axis=0) + np.min(pose_raw, axis=0)) / 2,
         caminfo.region_size
     )
-    points3_trans = cube.pick(img_to_raw(img, caminfo))
-    points3_trans = cube.transform_center_shrink(points3_trans)
+    points3_pick = cube.pick(img_to_raw(img, caminfo))
+    points3_trans = cube.transform_center_shrink(points3_pick)
     coord, depth = cube.project_pca(points3_trans, sort=False)
     # x = np.arange(-1, 1, 0.5)
     # y = np.stack([x, x, -x]).T
@@ -375,7 +409,8 @@ def crop_resize_pca(img, pose_raw, caminfo):
     # coord, depth = cube.project_pca(y)
     # print(coord)
     # print(depth)
-    img_crop_resize = cube.print_image(coord, depth, caminfo.crop_size)
+    img_crop_resize = cube.print_image(
+        coord, depth, caminfo.crop_size)
     # mpplot = import_module('matplotlib.pyplot')
     # mpplot.imshow(img_crop_resize, cmap='bone')
     # mpplot.show()
@@ -420,7 +455,7 @@ def crop_resize(img, pose_raw, caminfo):
         cll_i[0]:cll_i[0] + sizel,
         cll_i[1]:cll_i[1] + sizel,
     ]
-    img_crop_resize = rescale_depth(img_crop, caminfo)
+    img_crop_resize = resize_localizer(img_crop, caminfo)
     resce = np.concatenate((
         cube.dump(),
         rect.dump(),

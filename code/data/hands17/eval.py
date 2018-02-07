@@ -34,7 +34,6 @@ def compare_error(thedata, fname_echt, fname_pred):
 
 def draw_mean_error_distribution(errors, ax):
     """ errors: FxJ """
-    mpplot.figure(figsize=(2 * 5, 1 * 5))
     err_mean = np.mean(errors, axis=1)
     mpplot.hist(
         err_mean, 100,
@@ -49,7 +48,6 @@ def draw_mean_error_distribution(errors, ax):
 
 def draw_error_percentage_curve(errors, methods, ax):
     """ errors: MxFxJ """
-    mpplot.figure(figsize=(2 * 5, 1 * 5))
     err_max = np.max(errors, axis=-1)
     num_v = err_max.shape[1]
     num_m = err_max.shape[0]
@@ -86,7 +84,6 @@ def draw_error_percentage_curve(errors, methods, ax):
 
 def draw_error_per_joint(errors, methods, ax, join_name=None, draw_std=False):
     """ errors: MxFxJ """
-    mpplot.figure(figsize=(2 * 5, 1 * 5))
     err_mean = np.mean(errors, axis=1)
     err_max = np.max(errors, axis=1)
     err_min = np.min(errors, axis=1)
@@ -156,21 +153,27 @@ def evaluate_poses(thedata, model_name, predict_dir, predict_file):
         predict_file
     )
     # mpplot.gcf().clear()
+    fig = mpplot.figure(figsize=(2 * 5, 1 * 5))
     draw_mean_error_distribution(
         errors, mpplot.gca())
     fname = '{}_error_dist.png'.format(model_name)
     mpplot.savefig(os.path.join(predict_dir, fname))
+    mpplot.close(fig)
     errors = np.expand_dims(errors, axis=0)
     # mpplot.gcf().clear()
+    fig = mpplot.figure(figsize=(2 * 5, 1 * 5))
     draw_error_percentage_curve(
         errors, [model_name], mpplot.gca())
     fname = '{}_error_rate.png'.format(model_name)
     mpplot.savefig(os.path.join(predict_dir, fname))
+    mpplot.close(fig)
     # mpplot.gcf().clear()
+    fig = mpplot.figure(figsize=(2 * 5, 1 * 5))
     draw_error_per_joint(
         errors, [model_name], mpplot.gca(), thedata.join_name)
     fname = '{}_error_bar.png'.format(model_name)
     mpplot.savefig(os.path.join(predict_dir, fname))
+    mpplot.close(fig)
 
     print('figures saved: {}'.format(fname))
     return np.max(np.mean(errors, axis=1))

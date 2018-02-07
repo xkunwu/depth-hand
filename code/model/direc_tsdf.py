@@ -4,7 +4,7 @@ import sys
 from importlib import import_module
 import numpy as np
 import h5py
-from base_conv3 import base_conv3
+from model.base_conv3 import base_conv3
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 BASE_DIR = os.path.abspath(os.path.join(BASE_DIR, os.pardir))

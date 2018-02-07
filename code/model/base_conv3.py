@@ -6,8 +6,8 @@ import tensorflow as tf
 from tensorflow.contrib import slim
 import progressbar
 import h5py
-from base_regre import base_regre
-from batch_allot import batch_allot_conv3
+from model.base_regre import base_regre
+from model.batch_allot import batch_allot_conv3
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 BASE_DIR = os.path.abspath(os.path.join(BASE_DIR, os.pardir))
@@ -273,7 +273,7 @@ class base_conv3(base_regre):
             self.name_desc, img_id))
 
     def get_model(
-            self, input_tensor, is_training,
+            self, input_tensor, is_training, bn_decay,
             scope=None, final_endpoint='stage_out'):
         """ frames_tf: BxHxWxDx1
             out_dim: BxJ, where J is flattened 3D locations

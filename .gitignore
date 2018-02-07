@@ -10,3 +10,5 @@ CTestTestfile.cmake
 .ipynb_checkpoints
 log/*
 output/*
+*.aux
+*.synctex.gz

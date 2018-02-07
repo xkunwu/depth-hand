@@ -1,16 +1,13 @@
 import os
-import sys
 from importlib import import_module
 from shutil import copyfile
 import numpy as np
 import re
-from train_abc import train_abc
-from args_holder import args_holder
 
 
 def run_one(args, mpplot, with_train=False, with_eval=False):
     predict_file = args.model_inst.predict_file
-    trainer = train_abc(args, False)
+    trainer = args.model_inst.get_trainer(args, new_log=False)
     if with_train or (not os.path.exists(os.path.join(
             args.log_dir_t, 'model.ckpt.meta'))):
         trainer.train()
@@ -42,14 +39,17 @@ def draw_compare(args, mpplot, predict_dir=None):
         # print(error.shape)
         error_l.append(error)
     errors = np.stack(error_l, axis=0)
-    # mpplot.figure(figsize=(2 * 5, 1 * 5))
+    fig = mpplot.figure(figsize=(2 * 5, 1 * 5))
     dataeval.draw_error_percentage_curve(
         errors, methods, mpplot.gca())
     mpplot.savefig(os.path.join(predict_dir, 'error_rate.png'))
+    mpplot.close(fig)
     # mpplot.gcf().clear()
+    fig = mpplot.figure(figsize=(2 * 5, 1 * 5))
     dataeval.draw_error_per_joint(
         errors, methods, mpplot.gca(), args.data_inst.join_name)
     mpplot.savefig(os.path.join(predict_dir, 'error_bar.png'))
+    mpplot.close(fig)
 
     maxmean = np.max(np.mean(errors, axis=1), axis=1)
     idx = np.argsort(maxmean)
@@ -95,9 +95,10 @@ def test_dataops(args):
 
 
 if __name__ == "__main__":
-    # python evaluate.py --max_epoch=1 --batch_size=16 --model_name=base_clean
+    # python -m train.evaluate --max_epoch=1 --batch_size=20 --model_name=base_clean
     # import pdb; pdb.set_trace()
 
+    from args_holder import args_holder
     with_train = True
     # with_train = False
     with_eval = True
@@ -142,9 +143,9 @@ if __name__ == "__main__":
             args.model_name = meth
             argsholder.create_instance()
             test_dataops(args)
-            # run_one(args, mpplot, with_train, with_eval)
+            run_one(args, mpplot, with_train, with_eval)
             # run_one(args, mpplot, True, True)
-            run_one(args, mpplot, False, False)
+            # run_one(args, mpplot, False, False)
     draw_compare(args, mpplot)
     copyfile(
         os.path.join(args.out_dir, 'log', 'univue.log'),

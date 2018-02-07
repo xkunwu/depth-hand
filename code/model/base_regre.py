@@ -1,5 +1,4 @@
 import os
-# from importlib import import_module
 import numpy as np
 import tensorflow as tf
 import progressbar
@@ -14,6 +13,12 @@ from utils.iso_boxes import iso_rect
 class base_regre(object):
     """ This class holds baseline training approach using plain regression.
     """
+
+    @staticmethod
+    def get_trainer(args, new_log):
+        from train.train_abc import train_abc
+        return train_abc(args, new_log)
+
     def __init__(self, args):
         self.net_rank = 2
         self.net_type = 'poser'
@@ -24,6 +29,8 @@ class base_regre(object):
         self.num_channel = 1
         self.num_appen = 7
         self.batch_allot = batch_allot
+        self.store_file = None
+        self.batch_data = None
         # receive arguments
         self.args = args
         self.prepare_dir = args.prepare_dir
@@ -52,8 +59,9 @@ class base_regre(object):
         self.store_size = self.store_file['index'].shape[0]
 
     def start_epoch_train(self, split_beg, split_end):
+        # new round starting from next portion of data
         self.batch_beg = split_end
-        self.split_end = split_beg + self.store_size
+        self.split_end = split_beg  # + self.store_size
 
     def start_epoch_valid(self, split_beg, split_end):
         self.batch_beg = split_beg
@@ -72,14 +80,14 @@ class base_regre(object):
         # print(self.batch_beg, batch_end, self.split_end)
         if batch_end >= self.split_end:
             return None
-        batch_data = {
+        self.batch_data = {
             'batch_index': self.store_file['index'][self.batch_beg:batch_end, ...],
             'batch_frame': self.store_file['frame'][self.batch_beg:batch_end, ...],
             'batch_poses': self.store_file['poses'][self.batch_beg:batch_end, ...],
             'batch_resce': self.store_file['resce'][self.batch_beg:batch_end, ...]
         }
         self.batch_beg = batch_end
-        return batch_data
+        return self.batch_data
 
     def end_train(self):
         pass
@@ -91,15 +99,15 @@ class base_regre(object):
         self.split_end = self.store_size
         return filepack.write_file(self.predict_file)
 
-    def evaluate_batch(self, writer, batch_data, pred_val):
+    def evaluate_batch(self, writer, pred_val):
         self.provider.write2d(
             writer, self.yanker, self.caminfo,
-            batch_data['batch_index'], batch_data['batch_resce'],
+            self.batch_data['batch_index'], self.batch_data['batch_resce'],
             pred_val
         )
 
     def end_evaluate(self, thedata, args):
-        mpplot.figure(figsize=(2 * 5, 2 * 5))
+        fig = mpplot.figure(figsize=(2 * 5, 2 * 5))
         img_id = args.data_draw.draw_prediction_poses(
             thedata,
             thedata.training_images,
@@ -108,6 +116,7 @@ class base_regre(object):
         )
         fname = 'detection_{}_{:d}.png'.format(self.name_desc, img_id)
         mpplot.savefig(os.path.join(self.predict_dir, fname))
+        mpplot.close(fig)
         error_maxj = self.evaluater.evaluate_poses(
             self.caminfo, self.name_desc,
             self.predict_dir, self.predict_file)
@@ -227,6 +236,24 @@ class base_regre(object):
         self.provider_worker = self.provider.prow_cropped
         self.yanker = self.provider.yank_cropped
 
+    def debug_compare(self, batch_pred, logger):
+        batch_echt = self.batch_data['batch_poses']
+        np.set_printoptions(
+            threshold=np.nan,
+            formatter={'float_kind': lambda x: "%.2f" % x})
+        pcnt_echt = batch_echt[0, :].reshape(21, 3)
+        pcnt_pred = batch_pred[0, :].reshape(21, 3)
+        logger.info(np.concatenate(
+            (np.max(pcnt_echt, axis=0), np.min(pcnt_echt, axis=0))
+        ))
+        logger.info(np.concatenate(
+            (np.max(pcnt_pred, axis=0), np.min(pcnt_pred, axis=0))
+        ))
+        logger.info('\n{}'.format(pcnt_echt))
+        logger.info('\n{}'.format(pcnt_pred))
+        logger.info('\n{}'.format(
+            np.fabs(pcnt_echt - pcnt_pred)))
+
     def draw_random(self, thedata, args):
         with h5py.File(self.appen_train, 'r') as h5file:
             store_size = h5file['index'].shape[0]
@@ -322,7 +349,7 @@ class base_regre(object):
             self.name_desc, img_id))
 
     def get_model(
-            self, input_tensor, is_training,
+            self, input_tensor, is_training, bn_decay,
             scope=None, final_endpoint='stage_out'):
         """ input_tensor: BxHxWxC
             out_dim: BxJ, where J is flattened 3D locations
@@ -330,8 +357,8 @@ class base_regre(object):
         end_points = {}
         self.end_point_list = []
 
+        # from importlib import import_module
         # tf_util = import_module('utils.tf_util')
-        # bn_decay = 0.9997
         # net = tf_util.conv2d(
         #     input_tensor, 16, [5, 5], stride=[1, 1], scope='conv1',
         #     padding='VALID', is_training=is_training, bn=True, bn_decay=bn_decay)
@@ -379,27 +406,37 @@ class base_regre(object):
         def add_and_check_final(name, net):
             end_points[name] = net
             return name == final_endpoint
-
         from tensorflow.contrib import slim
+        # ~/anaconda2/lib/python2.7/site-packages/tensorflow/contrib/layers/
         with tf.variable_scope(
                 scope, self.name_desc, [input_tensor]):
-            with slim.arg_scope(
-                    [slim.batch_norm, slim.dropout],
+            with \
+                slim.arg_scope(
+                    [slim.batch_norm],
+                    is_training=is_training,
+                    # # Make sure updates happen automatically
+                    # updates_collections=None,
+                    # Try zero_debias_moving_mean=True for improved stability.
+                    # zero_debias_moving_mean=True,
+                    decay=bn_decay), \
+                slim.arg_scope(
+                    [slim.dropout],
                     is_training=is_training), \
                 slim.arg_scope(
                     [slim.fully_connected],
                     weights_regularizer=slim.l2_regularizer(0.00004),
                     biases_regularizer=slim.l2_regularizer(0.00004),
-                    activation_fn=None, normalizer_fn=None), \
+                    activation_fn=tf.nn.relu,
+                    normalizer_fn=slim.batch_norm), \
                 slim.arg_scope(
                     [slim.max_pool2d, slim.avg_pool2d],
                     stride=1, padding='SAME'), \
                 slim.arg_scope(
                     [slim.conv2d],
                     stride=1, padding='SAME',
-                    activation_fn=tf.nn.relu,
                     weights_regularizer=slim.l2_regularizer(0.00004),
                     biases_regularizer=slim.l2_regularizer(0.00004),
+                    activation_fn=tf.nn.relu,
                     normalizer_fn=slim.batch_norm):
                 with tf.variable_scope('stage128'):
                     sc = 'stage128_image'
@@ -409,6 +446,10 @@ class base_regre(object):
                         net, 16, 3, stride=2, scope='conv128_3x3_2')
                     net = slim.max_pool2d(
                         net, 3, scope='maxpool128_3x3_1')
+                    self.end_point_list.append(sc)
+                    if add_and_check_final(sc, net):
+                        return net, end_points
+                    sc = 'stage64_image'
                     net = slim.conv2d(
                         net, 32, 3, scope='conv64_3x3_1')
                     net = slim.max_pool2d(
@@ -452,20 +493,22 @@ class base_regre(object):
                     self.end_point_list.append('fullconn8')
                     if add_and_check_final('fullconn8', net):
                         return net, end_points
+                    net = slim.flatten(net)
                     net = slim.dropout(
                         net, 0.5, scope='dropout8')
-                    net = slim.flatten(net)
                     net = slim.fully_connected(
-                        net, self.out_dim, scope='output8')
+                        net, self.out_dim,
+                        activation_fn=None, normalizer_fn=None,
+                        scope='output8')
                     self.end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points
-
         raise ValueError('final_endpoint (%s) not recognized', final_endpoint)
 
         return net, end_points
 
     def placeholder_inputs(self, batch_size=None):
+        # using different batch size for evaluation and streaming
         # if batch_size is None:
         #     batch_size = self.batch_size
         frames_tf = tf.placeholder(
