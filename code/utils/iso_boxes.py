@@ -206,7 +206,7 @@ class iso_cube:
         coord = ps3_pca[:, cid]
         cll = - np.ones(2)
         coord = (coord - cll) / 2
-        depth = (ps3_pca[:, did] + 1) / 2
+        depth = (ps3_pca[:, did] + 1) / 2  # [0, 1] as image
         return coord[:, ::-1], depth
 
     def print_image(self, coord, depth, sizel):

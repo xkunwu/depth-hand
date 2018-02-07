@@ -100,8 +100,8 @@ class base_regre(object):
         return filepack.write_file(self.predict_file)
 
     def evaluate_batch(self, writer, pred_val):
-        self.provider.write2d(
-            writer, self.yanker, self.caminfo,
+        self.write_pred(
+            writer, self.caminfo,
             self.batch_data['batch_index'], self.batch_data['batch_resce'],
             pred_val
         )
@@ -117,12 +117,52 @@ class base_regre(object):
         fname = 'detection_{}_{:d}.png'.format(self.name_desc, img_id)
         mpplot.savefig(os.path.join(self.predict_dir, fname))
         mpplot.close(fig)
-        error_maxj = self.evaluater.evaluate_poses(
+        error_maxj = self.data_module.eval.evaluate_poses(
             self.caminfo, self.name_desc,
             self.predict_dir, self.predict_file)
         self.logger.info('maximal per-joint mean error: {}'.format(
             error_maxj
         ))
+
+    def provider_worker(self, line, image_dir, caminfo):
+        img_name, pose_raw = self.data_module.io.parse_line_annot(line)
+        img = self.data_module.io.read_image(os.path.join(image_dir, img_name))
+        img_crop_resize, resce = self.data_module.ops.crop_resize(
+            img, pose_raw, caminfo)
+        resce3 = resce[0:4]
+        pose_local = self.data_module.ops.raw_to_local(pose_raw, resce3)
+        index = self.data_module.io.imagename2index(img_name)
+        return (index, np.expand_dims(img_crop_resize, axis=-1),
+                pose_local.flatten().T, resce)
+
+    def yanker(self, pose_local, resce, caminfo):
+        resce3 = resce[0:4]
+        return self.data_module.ops.local_to_raw(pose_local, resce3)
+
+    @staticmethod
+    def put_worker(
+        args, image_dir, model_inst,
+            caminfo, data_module, batchallot):
+        bi = args[0]
+        line = args[1]
+        index, frame, poses, resce = model_inst.provider_worker(
+            line, image_dir, caminfo)
+        batchallot.batch_index[bi, :] = index
+        batchallot.batch_frame[bi, ...] = frame
+        batchallot.batch_poses[bi, :] = poses
+        batchallot.batch_resce[bi, :] = resce
+
+    def write_pred(self, fanno, caminfo,
+                   batch_index, batch_resce, batch_poses):
+        for ii in range(batch_index.shape[0]):
+            img_name = self.data_module.io.index2imagename(batch_index[ii, 0])
+            pose_local = batch_poses[ii, :].reshape(-1, 3)
+            resce = batch_resce[ii, :]
+            pose_raw = self.yanker(pose_local, resce, caminfo)
+            fanno.write(
+                img_name +
+                '\t' + '\t'.join("%.4f" % x for x in pose_raw.flatten()) +
+                '\n')
 
     def prepare_data(self, thedata, args,
                      batchallot, file_annot, name_appen):
@@ -180,9 +220,9 @@ class base_regre(object):
             bi = 0
             store_beg = 0
             while True:
-                resline = self.provider.puttensor_mt(
-                    file_annot, self.provider_worker,
-                    self.image_dir, thedata, batchallot
+                resline = self.data_module.provider.puttensor_mt(
+                    file_annot, self.put_worker, self.image_dir,
+                    self, thedata, self.data_module, batchallot
                 )
                 if 0 > resline:
                     break
@@ -227,14 +267,11 @@ class base_regre(object):
     def receive_data(self, thedata, args):
         """ Receive parameters specific to the data """
         self.logger = args.logger
+        self.data_module = args.data_module
         self.out_dim = thedata.join_num * 3
         self.image_dir = thedata.training_images
         self.caminfo = thedata
         self.region_size = thedata.region_size
-        self.provider = args.data_provider
-        self.evaluater = args.data_eval
-        self.provider_worker = self.provider.prow_cropped
-        self.yanker = self.provider.yank_cropped
 
     def debug_compare(self, batch_pred, logger):
         batch_echt = self.batch_data['batch_poses']
@@ -293,7 +330,8 @@ class base_regre(object):
         img_name = args.data_io.index2imagename(img_id)
         img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
         mpplot.imshow(img, cmap='bone')
-        pose_raw = self.yanker(poses_h5, resce_h5, self.caminfo)
+        pose_raw = self.yanker(
+            poses_h5, resce_h5, self.caminfo)
         args.data_draw.draw_pose2d(
             thedata,
             args.data_ops.raw_to_2d(pose_raw, thedata)

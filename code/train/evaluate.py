@@ -1,4 +1,5 @@
 import os
+import sys
 from importlib import import_module
 from shutil import copyfile
 import numpy as np
@@ -99,42 +100,42 @@ if __name__ == "__main__":
     # import pdb; pdb.set_trace()
 
     from args_holder import args_holder
-    with_train = True
-    # with_train = False
+    # with_train = True
+    with_train = False
     with_eval = True
     # with_eval = False
 
-    # # mpl = import_module('matplotlib')
-    # # mpl.use('Agg')
-    # mpplot = import_module('matplotlib.pyplot')
-    # with args_holder() as argsholder:
-    #     argsholder.parse_args()
-    #     args = argsholder.args
-    #     argsholder.create_instance()
-    #     # import shutil
-    #     # shutil.rmtree(args.out_dir)
-    #     # os.makedirs(args.out_dir)
-    #
-    #     test_dataops(args)
-    #
-    #     run_one(args, mpplot, with_train, with_eval)
-    #
-    #     # draw_compare(args, mpplot)
-    # sys.exit()
+    # mpl = import_module('matplotlib')
+    # mpl.use('Agg')
+    mpplot = import_module('matplotlib.pyplot')
+    with args_holder() as argsholder:
+        argsholder.parse_args()
+        args = argsholder.args
+        argsholder.create_instance()
+        # import shutil
+        # shutil.rmtree(args.out_dir)
+        # os.makedirs(args.out_dir)
+
+        test_dataops(args)
+
+        run_one(args, mpplot, with_train, with_eval)
+
+        # draw_compare(args, mpplot)
+    sys.exit()
 
     mpl = import_module('matplotlib')
     mpl.use('Agg')
     mpplot = import_module('matplotlib.pyplot')
     methlist = [
-        # 'localizer2',
-        'direc_tsdf',
-        'trunc_dist',
-        'base_conv3',
-        'ortho3view',
+        # # 'localizer2',
+        # 'direc_tsdf',
+        # 'trunc_dist',
+        # 'base_conv3',
+        # 'ortho3view',
         'base_regre',
-        'base_clean',
-        'base_regre_inres',
-        'base_clean_inres',
+        # 'base_clean',
+        # 'base_regre_inres',
+        # 'base_clean_inres',
     ]
     for meth in methlist:
         with args_holder() as argsholder:

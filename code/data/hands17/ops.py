@@ -72,11 +72,10 @@ def raw_to_2d(points3, caminfo, resce=np.array([1, 0, 0])):
     return pose2d
 
 
-def raw_to_hmap2(points3, cube, hmap_size, caminfo):
-    """ 2d heatmap for each point """
-    points3_trans = cube.transform_center_shrink(points3)
+def raw_to_heatmap2(pose_raw, cube, hmap_size, caminfo):
+    """ 2d heatmap for each joint """
+    points3_trans = cube.transform_center_shrink(pose_raw)
     coord, depth = cube.project_pca(points3_trans, sort=False)
-    # num_j = points3.shape[0]
     img_l = []
     for c, d in zip(coord, depth):
         img = cube.print_image(
@@ -86,6 +85,11 @@ def raw_to_hmap2(points3, cube, hmap_size, caminfo):
         img_l.append(img)
     img_arr = np.stack(img_l, axis=2)
     return img_arr
+
+
+def raw_to_offset(pose_raw, cube, hmap_size, caminfo):
+    """ offset map from depth to each joint """
+    points3_trans = cube.transform_center_shrink(pose_raw)
 
 
 def estimate_z(l3, l2, focal):
