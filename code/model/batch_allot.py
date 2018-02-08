@@ -3,28 +3,28 @@ from psutil import virtual_memory
 
 
 class batch_allot(object):
-    def __init__(self, batch_size, image_size, out_dim, num_channel, num_appen):
-        self.batch_size = batch_size
-        self.image_size = image_size
-        self.out_dim = out_dim
-        self.num_channel = num_channel
-        self.num_appen = num_appen
+    def __init__(self, model_inst):
+        self.batch_size = model_inst.batch_size
+        self.crop_size = model_inst.crop_size
+        self.out_dim = model_inst.out_dim
+        self.num_channel = model_inst.num_channel
+        self.num_appen = model_inst.num_appen
         batch_data = {
             'batch_index': np.empty(
-                shape=(batch_size, 1), dtype=np.int32),
+                shape=(self.batch_size, 1), dtype=np.int32),
             'batch_frame': np.empty(
                 shape=(
-                    batch_size,
-                    image_size, image_size,
-                    num_channel),
+                    self.batch_size,
+                    self.crop_size, self.crop_size,
+                    self.num_channel),
                 # dtype=np.float32),
                 dtype=float),
             'batch_poses': np.empty(
-                shape=(batch_size, out_dim),
+                shape=(self.batch_size, self.out_dim),
                 # dtype=np.float32),
                 dtype=float),
             'batch_resce': np.empty(
-                shape=(batch_size, num_appen),
+                shape=(self.batch_size, self.num_appen),
                 # dtype=np.float32),
                 dtype=float),
         }
@@ -47,7 +47,7 @@ class batch_allot(object):
         self.batch_frame = np.empty(
             shape=(
                 self.store_size,
-                self.image_size, self.image_size,
+                self.crop_size, self.crop_size,
                 self.num_channel),
             # dtype=np.float32)
             dtype=float)
@@ -62,28 +62,28 @@ class batch_allot(object):
 
 
 class batch_allot_conv3(batch_allot):
-    def __init__(self, batch_size, image_size, out_dim, num_channel, num_appen):
-        self.batch_size = batch_size
-        self.image_size = image_size
-        self.out_dim = out_dim
-        self.num_channel = num_channel
-        self.num_appen = num_appen
+    def __init__(self, model_inst):
+        self.batch_size = model_inst.batch_size
+        self.crop_size = model_inst.crop_size
+        self.out_dim = model_inst.out_dim
+        self.num_channel = model_inst.num_channel
+        self.num_appen = model_inst.num_appen
         batch_data = {
             'batch_index': np.empty(
-                shape=(batch_size, 1), dtype=np.int32),
+                shape=(self.batch_size, 1), dtype=np.int32),
             'batch_frame': np.empty(
                 shape=(
-                    batch_size,
-                    image_size, image_size, image_size,
-                    num_channel),
+                    self.batch_size,
+                    self.crop_size, self.crop_size, self.crop_size,
+                    self.num_channel),
                 # dtype=np.float32),
                 dtype=float),
             'batch_poses': np.empty(
-                shape=(batch_size, out_dim),
+                shape=(self.batch_size, self.out_dim),
                 # dtype=np.float32),
                 dtype=float),
             'batch_resce': np.empty(
-                shape=(batch_size, num_appen),
+                shape=(self.batch_size, self.num_appen),
                 # dtype=np.float32),
                 dtype=float),
         }
@@ -106,7 +106,7 @@ class batch_allot_conv3(batch_allot):
         self.batch_frame = np.empty(
             shape=(
                 self.store_size,
-                self.image_size, self.image_size, self.image_size,
+                self.crop_size, self.crop_size, self.crop_size,
                 self.num_channel),
             # dtype=np.float32)
             dtype=float)

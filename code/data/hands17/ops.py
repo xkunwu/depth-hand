@@ -2,6 +2,7 @@
 # import sys
 from importlib import import_module
 import numpy as np
+import matplotlib.pyplot as mpplot
 import skfmm
 import scipy.ndimage as ndimage
 from cv2 import resize as cv2resize
@@ -79,17 +80,60 @@ def raw_to_heatmap2(pose_raw, cube, hmap_size, caminfo):
     img_l = []
     for c, d in zip(coord, depth):
         img = cube.print_image(
-            [c], [d], hmap_size)
+            c.reshape(1, -1), np.array([d]), hmap_size)
         img = ndimage.gaussian_filter(img, sigma=0.8)
         img /= np.max(img)
+        # mpplot = import_module('matplotlib.pyplot')
+        # mpplot.imshow(img, cmap='bone')
+        # mpplot.show()
         img_l.append(img)
     img_arr = np.stack(img_l, axis=2)
     return img_arr
 
 
-def raw_to_offset(pose_raw, cube, hmap_size, caminfo):
+def raw_to_offset(img, pose_raw, cube, hmap_size, caminfo, theta=50):
     """ offset map from depth to each joint """
-    points3_trans = cube.transform_center_shrink(pose_raw)
+    from numpy import linalg
+    depth_raw = cube.pick(img_to_raw(img, caminfo))
+    depth_normed = cube.transform_center_shrink(depth_raw)
+    coord = depth_normed[:, :2]  # (x, y) fixed to depth locations
+    coord = (coord + np.ones(2)) / 2
+    # pose_normed = cube.transform_center_shrink(pose_raw)
+    omap_l = []
+    hmap_l = []
+    umap_l = []
+    for joint in pose_raw:
+        offset = joint - depth_raw  # offset in raw 3d
+        dist = linalg.norm(offset, axis=1)  # offset norm
+        valid_id = np.where(np.logical_and(
+            1e-1 < dist,  # remove sigular point
+            theta > dist  # limit support within theta
+        ))
+        offset = offset[valid_id]
+        dist = dist[valid_id]
+        unit_off = offset / np.tile(dist, [3, 1]).T
+        dist = theta - dist  # inverse propotional
+        coord_valid = coord[valid_id]
+        for dim in range(3):
+            om = cube.print_image(coord_valid, offset[:, dim], hmap_size)
+            omap_l.append(om)
+            um = cube.print_image(coord_valid, unit_off[:, dim], hmap_size)
+            umap_l.append(um)
+            # mpplot.subplot(3, 3, 4 + dim)
+            # mpplot.imshow(om, cmap='bone')
+            # mpplot.subplot(3, 3, 7 + dim)
+            # mpplot.imshow(um, cmap='bone')
+        hm = cube.print_image(coord_valid, dist, hmap_size)
+        hmap_l.append(hm)
+        # mpplot.subplot(3, 3, 1)
+        # mpplot.imshow(hm, cmap='bone')
+        # mpplot.subplot(3, 3, 3)
+        # mpplot.imshow(img, cmap='bone')
+        # mpplot.show()
+    offset_map = np.stack(omap_l, axis=2)
+    hmap3 = np.stack(hmap_l, axis=2)
+    uomap = np.stack(umap_l, axis=2)
+    return offset_map, hmap3, uomap
 
 
 def estimate_z(l3, l2, focal):

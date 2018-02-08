@@ -128,11 +128,12 @@ if __name__ == "__main__":
     mpplot = import_module('matplotlib.pyplot')
     methlist = [
         # # 'localizer2',
+        'dense_regre',
         # 'direc_tsdf',
         # 'trunc_dist',
         # 'base_conv3',
         # 'ortho3view',
-        'base_regre',
+        # 'base_regre',
         # 'base_clean',
         # 'base_regre_inres',
         # 'base_clean_inres',

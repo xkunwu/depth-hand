@@ -15,6 +15,7 @@ model_map = {
     'base_regre_inres': 'model.base_inres',
     'localizer3': 'model.localizer3',
     'localizer2': 'model.localizer2',
+    'dense_regre': 'model.dense_regre.dense_regre',
 }
 
 

@@ -251,9 +251,7 @@ class base_regre(object):
         from timeit import default_timer as timer
         from datetime import timedelta
         time_s = timer()
-        batchallot = self.batch_allot(
-            self.batch_size, self.crop_size, self.out_dim,
-            self.num_channel, self.num_appen)
+        batchallot = self.batch_allot(self)
         with file_pack() as filepack:
             file_annot = filepack.push_file(thedata.training_annot_train)
             self.prepare_data(thedata, args, batchallot, file_annot, self.appen_train)
@@ -268,7 +266,7 @@ class base_regre(object):
         """ Receive parameters specific to the data """
         self.logger = args.logger
         self.data_module = args.data_module
-        self.out_dim = thedata.join_num * 3
+        self.out_dim = thedata.join_num
         self.image_dir = thedata.training_images
         self.caminfo = thedata
         self.region_size = thedata.region_size
