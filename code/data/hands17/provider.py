@@ -203,17 +203,17 @@ def puttensor_mt(
         return -1
     num_line = len(next_n_lines)
 
-    from timeit import default_timer as timer
-    from datetime import timedelta
-    time_s = timer()
+    # from timeit import default_timer as timer
+    # from datetime import timedelta
+    # time_s = timer()
+    # # test_copy = test_puttensor(
+    # #     next_n_lines, worker, image_dir, caminfo, batchallot)
     # test_copy = test_puttensor(
-    #     next_n_lines, worker, image_dir, caminfo, batchallot)
-    test_copy = test_puttensor(
-        next_n_lines, put_worker, image_dir, model_inst,
-        caminfo, data_module, batchallot)
-    time_e = str(timedelta(seconds=timer() - time_s))
-    print('single tread time: {}'.format(time_e))
-    return num_line
+    #     next_n_lines, put_worker, image_dir, model_inst,
+    #     caminfo, data_module, batchallot)
+    # time_e = str(timedelta(seconds=timer() - time_s))
+    # print('single tread time: {}'.format(time_e))
+    # return num_line
 
     from functools import partial
     from multiprocessing.dummy import Pool as ThreadPool

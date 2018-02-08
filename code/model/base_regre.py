@@ -379,7 +379,7 @@ class base_regre(object):
         mpplot.tight_layout()
         mpplot.savefig(os.path.join(
             args.predict_dir,
-            'draw_{}.png'.format(self.name_desc)))
+            'draw_{}_{}.png'.format(self.name_desc, img_id)))
         mpplot.show()
         print('[{}] drawing image #{:d} - done.'.format(
             self.name_desc, img_id))

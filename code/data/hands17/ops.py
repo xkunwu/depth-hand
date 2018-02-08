@@ -91,27 +91,56 @@ def raw_to_heatmap2(pose_raw, cube, hmap_size, caminfo):
     return img_arr
 
 
-def raw_to_offset(img, pose_raw, cube, hmap_size, caminfo, theta=50):
+def raw_to_offset(img, pose_raw, cube, hmap_size, caminfo):
     """ offset map from depth to each joint """
     from numpy import linalg
     depth_raw = cube.pick(img_to_raw(img, caminfo))
-    depth_normed = cube.transform_center_shrink(depth_raw)
-    coord = depth_normed[:, :2]  # (x, y) fixed to depth locations
-    coord = (coord + np.ones(2)) / 2
-    # pose_normed = cube.transform_center_shrink(pose_raw)
+    # depth_normed = cube.transform_center_shrink(depth_raw)
+    # coord, _ = cube.project_pca(depth_normed)
+    # coord, _ = cube.raw_to_unit(depth_raw)
+    coord, depth = cube.raw_to_unit(depth_raw)
+    depth_id = np.argsort(depth)
+    coord = coord[depth_id, :]
+    depth_raw = depth_raw[depth_id, :]
     omap_l = []
     hmap_l = []
     umap_l = []
+    theta = caminfo.region_size * 2  # maximal - cube size
     for joint in pose_raw:
         offset = joint - depth_raw  # offset in raw 3d
+        offset[:, 1] *= -1  # NOTE: projective - reversed y
+        # offset[:, 0], offset[:, 1] = offset[:, 1], offset[:, 0].copy()
         dist = linalg.norm(offset, axis=1)  # offset norm
+        if np.min(dist) > theta:
+            # due to occlution, we cannot use small radius
+            print(np.min(dist))
+            # from colour import Color
+            # ax = mpplot.subplot(projection='3d')
+            # points3 = img_to_raw(img, caminfo)
+            # # points3_trans = cube.pick(points3)
+            # # points3_trans = cube.transform_to_center(points3_trans)
+            # points3_trans = points3
+            # numpts = points3_trans.shape[0]
+            # if 1000 < numpts:
+            #     points3_trans = points3_trans[
+            #         np.random.choice(numpts, 1000, replace=False), :]
+            # ax.scatter(
+            #     points3_trans[:, 0], points3_trans[:, 1], points3_trans[:, 2],
+            #     color=Color('lightsteelblue').rgb)
+            # import data.hands17.draw as data_draw
+            # data_draw.draw_raw3d_pose(caminfo, pose_raw)
+            # corners = cube.transform_to_center(cube.get_corners())
+            # cube.draw_cube_wire(corners)
+            # ax.view_init(azim=-120, elev=-150)
+            # mpplot.show()
+
         valid_id = np.where(np.logical_and(
             1e-1 < dist,  # remove sigular point
             theta > dist  # limit support within theta
         ))
         offset = offset[valid_id]
         dist = dist[valid_id]
-        unit_off = offset / np.tile(dist, [3, 1]).T
+        unit_off = offset / np.tile(dist, [3, 1]).T  # unit offset
         dist = theta - dist  # inverse propotional
         coord_valid = coord[valid_id]
         for dim in range(3):
@@ -125,15 +154,50 @@ def raw_to_offset(img, pose_raw, cube, hmap_size, caminfo, theta=50):
             # mpplot.imshow(um, cmap='bone')
         hm = cube.print_image(coord_valid, dist, hmap_size)
         hmap_l.append(hm)
+        # print(np.histogram(dist, range=(1e-4, np.max(dist))))
         # mpplot.subplot(3, 3, 1)
         # mpplot.imshow(hm, cmap='bone')
         # mpplot.subplot(3, 3, 3)
-        # mpplot.imshow(img, cmap='bone')
+        # mpplot.imshow(img, cmap=mpplot.cm.jet)
         # mpplot.show()
     offset_map = np.stack(omap_l, axis=2)
     hmap3 = np.stack(hmap_l, axis=2)
     uomap = np.stack(umap_l, axis=2)
     return offset_map, hmap3, uomap
+
+
+def hmap3_to_raw(hmap2, hmap3, uomap, depth, cube, hmap_size, caminfo, nn=5):
+    """ recover 3d from weight avarage """
+    num_joint = hmap3.shape[2]
+    theta = caminfo.region_size * 2
+    pose_out = np.empty([num_joint, 3])
+    for joint in range(num_joint):
+        # restore from 3d
+        hm3 = hmap3[..., joint]
+        hm3[np.where(1e-2 > depth)] = 0  # mask out void
+        top_id = hm3.argpartition(-nn, axis=None)[-nn:]  # top elements
+        x3, y3 = np.unravel_index(top_id, hm3.shape)
+        dist = hm3[x3, y3]
+        dist = theta - dist  # inverse propotional
+        unit_off = uomap[x3, y3, 3 * joint:3 * (joint + 1)]
+        offset = unit_off * np.tile(dist, [3, 1]).T
+        offset[:, 1] *= -1  # NOTE: projective - reversed y
+        p0 = cube.unit_to_raw(
+            np.vstack([x3, y3]).astype(float).T / hmap_size,
+            depth[x3, y3])
+        pred3 = p0 + offset
+        # restore from 2d
+        hm2 = hmap2[..., joint]
+        coord, _ = cube.raw_to_unit(pred3)
+        coord = coord.clip(0., 1.)  # pointing out is not good
+        coord *= hmap_size
+        coord *= 0.999999
+        coord = np.floor(coord).astype(int)
+        x2, y2 = coord[:, 0], coord[:, 1]
+        conf = hm2[x2, y2]
+        pred32 = np.sum(pred3 * np.tile(conf, [3, 1]).T, axis=0) / np.sum(conf)
+        pose_out[joint, :] = pred32
+    return pose_out
 
 
 def estimate_z(l3, l2, focal):

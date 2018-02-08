@@ -29,6 +29,10 @@ class dense_regre(base_regre):
                         self.num_channel),
                     # dtype=np.float32),
                     dtype=float),
+                'batch_poses': np.empty(
+                    shape=(self.batch_size, self.out_dim * 3),
+                    # dtype=np.float32),
+                    dtype=float),
                 'batch_hmap2': np.empty(
                     shape=(
                         self.batch_size,
@@ -57,6 +61,7 @@ class dense_regre(base_regre):
             }
             self.batch_bytes = \
                 batch_data['batch_index'].nbytes + batch_data['batch_frame'].nbytes + \
+                batch_data['batch_poses'].nbytes + \
                 batch_data['batch_hmap2'].nbytes + batch_data['batch_hmap3'].nbytes + \
                 batch_data['batch_uomap'].nbytes + batch_data['batch_resce'].nbytes
             self.batch_beg = 0
@@ -78,6 +83,10 @@ class dense_regre(base_regre):
                     self.store_size,
                     self.crop_size, self.crop_size,
                     self.num_channel),
+                # dtype=np.float32)
+                dtype=float)
+            self.batch_poses = np.empty(
+                shape=(self.store_size, self.out_dim * 3),
                 # dtype=np.float32)
                 dtype=float)
             self.batch_hmap2 = np.empty(
@@ -116,6 +125,7 @@ class dense_regre(base_regre):
         resce3 = resce[0:4]
         cube = iso_cube()
         cube.load(resce3)
+        pose_pca = self.data_module.ops.raw_to_pca(pose_raw, resce3)
         hmap2 = self.data_module.ops.raw_to_heatmap2(
             pose_raw, cube, self.hmap_size, caminfo
         )
@@ -124,7 +134,18 @@ class dense_regre(base_regre):
         )
         index = self.data_module.io.imagename2index(img_name)
         return (index, np.expand_dims(img_crop_resize, axis=-1),
-                hmap2, hmap3, uomap, resce)
+                pose_pca.flatten().T, hmap2, hmap3, uomap, resce)
+
+    def yanker(self, pose_local, resce):
+        resce3 = resce[0:4]
+        return self.data_module.ops.pca_to_raw(pose_local, resce3)
+
+    def yanker_hmap(self, resce, hmap2, hmap3, uomap, depth, hmap_size, caminfo):
+        resce3 = resce[0:4]
+        cube = iso_cube()
+        cube.load(resce3)
+        return self.data_module.ops.hmap3_to_raw(
+            hmap2, hmap3, uomap, depth, cube, hmap_size, caminfo)
 
     @staticmethod
     def put_worker(
@@ -132,11 +153,11 @@ class dense_regre(base_regre):
             caminfo, data_module, batchallot):
         bi = args[0]
         line = args[1]
-        index, frame, hmap2, hmap3, uomap, resce = model_inst.provider_worker(
-            line, image_dir, caminfo)
+        index, frame, poses, hmap2, hmap3, uomap, resce = \
+            model_inst.provider_worker(line, image_dir, caminfo)
         batchallot.batch_index[bi, :] = index
         batchallot.batch_frame[bi, ...] = frame
-        # batchallot.batch_poses[bi, :] = poses
+        batchallot.batch_poses[bi, :] = poses
         batchallot.batch_hmap2[bi, :] = hmap2
         batchallot.batch_hmap3[bi, :] = hmap3
         batchallot.batch_uomap[bi, :] = uomap
@@ -156,6 +177,7 @@ class dense_regre(base_regre):
         self.batch_data = {
             'batch_index': self.store_file['index'][self.batch_beg:batch_end, ...],
             'batch_frame': self.store_file['frame'][self.batch_beg:batch_end, ...],
+            'batch_poses': self.store_file['poses'][self.batch_beg:batch_end, ...],
             'batch_hmap2': self.store_file['hmap2'][self.batch_beg:batch_end, ...],
             'batch_hmap3': self.store_file['hmap3'][self.batch_beg:batch_end, ...],
             'batch_uomap': self.store_file['uomap'][self.batch_beg:batch_end, ...],
@@ -207,6 +229,12 @@ class dense_regre(base_regre):
                 # dtype=np.float32)
                 dtype=float)
             h5file.create_dataset(
+                'poses',
+                (num_line, out_dim * 3),
+                compression='lzf',
+                # dtype=np.float32)
+                dtype=float)
+            h5file.create_dataset(
                 'hmap2',
                 (num_line, hmap_size, hmap_size, out_dim),
                 compression='lzf',
@@ -243,8 +271,8 @@ class dense_regre(base_regre):
                     batchallot.batch_index[0:resline, ...]
                 h5file['frame'][store_beg:store_beg + resline, ...] = \
                     batchallot.batch_frame[0:resline, ...]
-                # h5file['poses'][store_beg:store_beg + resline, ...] = \
-                #     batchallot.batch_poses[0:resline, ...]
+                h5file['poses'][store_beg:store_beg + resline, ...] = \
+                    batchallot.batch_poses[0:resline, ...]
                 h5file['hmap2'][store_beg:store_beg + resline, ...] = \
                     batchallot.batch_hmap2[0:resline, ...]
                 h5file['hmap3'][store_beg:store_beg + resline, ...] = \
@@ -262,10 +290,13 @@ class dense_regre(base_regre):
         with h5py.File(self.appen_train, 'r') as h5file:
             store_size = h5file['index'].shape[0]
             frame_id = np.random.choice(store_size)
-            # frame_id = 0
-            img_id = h5file['index'][frame_id, 0]
+            frame_id = 741  # showing pinky
+            img_id = h5file['index'][frame_id, 0]  # img_id = frame_id + 1
             frame_h5 = np.squeeze(h5file['frame'][frame_id, ...], -1)
             poses_h5 = h5file['poses'][frame_id, ...].reshape(-1, 3)
+            hmap2_h5 = h5file['hmap2'][frame_id, ...]
+            hmap3_h5 = h5file['hmap3'][frame_id, ...]
+            uomap_h5 = h5file['uomap'][frame_id, ...]
             resce_h5 = h5file['resce'][frame_id, ...]
 
         print('[{}] drawing image #{:d} ...'.format(self.name_desc, img_id))
@@ -274,41 +305,69 @@ class dense_regre(base_regre):
         print(np.min(poses_h5, axis=0), np.max(poses_h5, axis=0))
         print(resce_h5)
         resce3 = resce_h5[0:4]
-        resce2 = resce_h5[4:7]
-        mpplot.subplots(nrows=2, ncols=2, figsize=(2 * 5, 2 * 5))
+        cube = iso_cube()
+        cube.load(resce3)
+        sizel = np.floor(resce3[0]).astype(int)
+        from mpl_toolkits.axes_grid1 import make_axes_locatable
+        from utils.image_ops import transparent_cmap
+        from colour import Color
+        colors = [Color('orange').rgb, Color('red').rgb, Color('lime').rgb]
+        mpplot.subplots(nrows=2, ncols=3, figsize=(2 * 5, 3 * 5))
+        joint_id = self.out_dim - 1
+        hmap2 = hmap2_h5[..., joint_id]
+        hmap3 = hmap3_h5[..., joint_id]
+        uomap = uomap_h5[..., 3 * joint_id:3 * (joint_id + 1)]
+        depth_hmap = cv2resize(frame_h5, (self.hmap_size, self.hmap_size))
+        depth_crop = cv2resize(frame_h5, (sizel, sizel))
 
-        mpplot.subplot(2, 2, 3)
-        mpplot.gca().set_title('test storage read')
-        # resize the cropped resion for eazier pose drawing in the commen frame
-        sizel = np.floor(resce2[0]).astype(int)
-        resce_cp = np.copy(resce2)
-        resce_cp[0] = 1
-        mpplot.imshow(
-            cv2resize(frame_h5, (sizel, sizel)),
-            cmap='bone')
-        pose_raw = args.data_ops.local_to_raw(poses_h5, resce3)
+        mpplot.subplot(2, 3, 1)
+        mpplot.imshow(depth_crop, cmap='bone')
+        pose3d = cube.trans_scale_to(poses_h5)
+        pose2d, _ = cube.project_pca(pose3d, roll=0, sort=False)
+        pose2d *= sizel
         args.data_draw.draw_pose2d(
             thedata,
-            args.data_ops.raw_to_2d(pose_raw, thedata, resce_cp)
+            pose2d,
         )
 
-        mpplot.subplot(2, 2, 4)
-        mpplot.gca().set_title('test output')
-        img_name = args.data_io.index2imagename(img_id)
-        img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
-        mpplot.imshow(img, cmap='bone')
-        pose_raw = self.yanker(
-            poses_h5, resce_h5, self.caminfo)
+        ax = mpplot.subplot(2, 3, 4)
+        mpplot.imshow(depth_hmap, cmap='bone')
+        img_h2 = mpplot.imshow(hmap2, cmap=transparent_cmap(mpplot.cm.jet))
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        mpplot.colorbar(img_h2, cax=cax)
+
+        mpplot.subplot(2, 3, 5)
+        mpplot.imshow(frame_h5, cmap='bone')
+        xx, yy = np.meshgrid(np.arange(0, 128, 4), np.arange(0, 128, 4))
+        mpplot.quiver(
+            xx, yy,
+            np.squeeze(uomap[..., 0]),
+            np.squeeze(uomap[..., 1]),
+            color='r', width=0.004, scale=20)
+
+        ax = mpplot.subplot(2, 3, 6)
+        mpplot.imshow(depth_hmap, cmap='bone')
+        img_h3 = mpplot.imshow(hmap3, cmap=transparent_cmap(mpplot.cm.jet))
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        mpplot.colorbar(img_h3, cax=cax)
+
+        ax = mpplot.subplot(2, 3, 2)
+        pose_out = self.yanker_hmap(
+            resce_h5, hmap2_h5, hmap3_h5, uomap_h5,
+            depth_hmap, self.hmap_size, self.caminfo)
+        print(pose_out - cube.transform_add_center(poses_h5))
+        mpplot.imshow(depth_crop, cmap='bone')
+        pose3d = cube.transform_center_shrink(pose_out)
+        pose2d, _ = cube.project_pca(pose3d, roll=0, sort=False)
+        pose2d *= sizel
         args.data_draw.draw_pose2d(
             thedata,
-            args.data_ops.raw_to_2d(pose_raw, thedata)
+            pose2d,
         )
-        rect = iso_rect()
-        rect.load(resce2)
-        rect.draw()
 
-        mpplot.subplot(2, 2, 1)
-        mpplot.gca().set_title('test input #{:d}'.format(img_id))
+        ax = mpplot.subplot(2, 3, 3)
         annot_line = args.data_io.get_line(
             thedata.training_annot_cleaned, img_id)
         img_name, pose_raw = args.data_io.parse_line_annot(annot_line)
@@ -317,38 +376,19 @@ class dense_regre(base_regre):
         args.data_draw.draw_pose2d(
             thedata,
             args.data_ops.raw_to_2d(pose_raw, thedata))
-
-        mpplot.subplot(2, 2, 2)
-        mpplot.gca().set_title('test storage write')
-        img_name, frame, poses, resce = self.provider_worker(
-            annot_line, self.image_dir, thedata)
-        frame = np.squeeze(frame, axis=-1)
-        poses = poses.reshape(-1, 3)
-        if (
-                (1e-4 < np.linalg.norm(frame_h5 - frame)) or
-                (1e-4 < np.linalg.norm(poses_h5 - poses))
-        ):
-            print(np.linalg.norm(frame_h5 - frame))
-            print(np.linalg.norm(poses_h5 - poses))
-            print('ERROR - h5 storage corrupted!')
-        resce3 = resce[0:4]
-        resce2 = resce[4:7]
-        sizel = np.floor(resce2[0]).astype(int)
-        resce_cp = np.copy(resce2)
-        resce_cp[0] = 1
-        mpplot.imshow(
-            cv2resize(frame, (sizel, sizel)),
-            cmap='bone')
-        pose_raw = args.data_ops.local_to_raw(poses, resce3)
-        args.data_draw.draw_pose2d(
-            thedata,
-            args.data_ops.raw_to_2d(pose_raw, thedata, resce_cp)
+        rects = cube.proj_rects_3(
+            args.data_ops.raw_to_2d, self.caminfo
+        )
+        for ii, rect in enumerate(rects):
+            rect.draw(colors[ii])
+        offset, hmap3, uomap = self.data_module.ops.raw_to_offset(
+            img, pose_raw, cube, self.hmap_size, self.caminfo
         )
 
         mpplot.tight_layout()
         mpplot.savefig(os.path.join(
             args.predict_dir,
-            'draw_{}.png'.format(self.name_desc)))
+            'draw_{}_{}.png'.format(self.name_desc, img_id)))
         mpplot.show()
         print('[{}] drawing image #{:d} - done.'.format(
             self.name_desc, img_id))

@@ -10,6 +10,13 @@ class cam_info:
     centre = (315.944855, 245.287079)
 
 
+def transparent_cmap(cmap, tmax=0.99, N=255):
+    mycmap = cmap
+    mycmap._init()
+    mycmap._lut[:, -1] = np.linspace(0, tmax, N + 4)
+    return mycmap
+
+
 def fig2data(fig, show_margin=False):
     """
     @brief Convert a Matplotlib figure to a 3D numpy array with RGBA channels

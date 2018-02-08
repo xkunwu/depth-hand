@@ -182,6 +182,9 @@ class iso_cube:
     def transform_center_shrink(self, points3):
         return (points3 - self.cen) / self.sidelen
 
+    def transform_expand_move(self, points3):
+        return (points3 * self.sidelen + self.cen)
+
     def transform_add_center(self, points3):
         # return np.dot(points3, self.evecs.T) + self.cen
         # return np.dot(points3 * self.sidelen, self.evecs.T) + self.cen
@@ -203,11 +206,32 @@ class iso_cube:
         if sort is True:
             idx = np.argsort(ps3_pca[..., did])
             ps3_pca = ps3_pca[idx, ...]
-        coord = ps3_pca[:, cid]
-        cll = - np.ones(2)
-        coord = (coord - cll) / 2
-        depth = (ps3_pca[:, did] + 1) / 2  # [0, 1] as image
+        shifted = (ps3_pca + np.ones(3)) / 2  # shift to [0, 1] range
+        coord = shifted[:, cid]
+        depth = shifted[:, did]
+        # coord = ps3_pca[:, cid]
+        # cll = - np.ones(2)
+        # coord = (coord - cll) / 2
+        # depth = (ps3_pca[:, did] + 1) / 2  # [0, 1] as image
         return coord[:, ::-1], depth
+
+    def raw_to_unit(self, points):
+        normed = self.transform_center_shrink(points)
+        shifted = (normed + np.ones(3)) / 2  # shift to [0, 1] range
+        coord = shifted[:, :2]
+        depth = shifted[:, 2]
+        return coord[:, ::-1], depth
+        # normed = self.transform_center_shrink(points)
+        # coord = normed[:, :2]
+        # coord = (coord + np.ones(2)) / 2  # shift to [0, 1] range
+        # coord = coord[:, ::-1]  # NOTE: projective - reverse x, y
+        # return coord, normed[:, 2]
+
+    def unit_to_raw(self, coord, depth):
+        coord = coord[:, ::-1]  # NOTE: projective - reverse x, y
+        coord = (coord * 2) - np.ones(2)
+        normed = np.hstack((coord, depth.reshape(-1, 1)))
+        return self.transform_expand_move(normed)
 
     def print_image(self, coord, depth, sizel):
         """ expand to required image size """
