@@ -5,16 +5,16 @@ from model.incept_resnet import incept_resnet
 
 class hourglass:
     @staticmethod
-    def _hg_net(net, n):
+    def hg_net(net, n, scope=None, reuse=None):
         sc_current = 'hg_net_{}'.format(n)
-        with tf.variable_scope(sc_current):
+        with tf.variable_scope(scope, sc_current, [net], reuse=reuse):
             upper0 = incept_resnet.residual3(net)
 
-            lower0 = slim.max_pool2d(net, 3, stride=2, scope='maxpool0_3x3_2')
+            lower0 = slim.max_pool2d(net, 3, stride=2)
             lower0 = incept_resnet.residual3(lower0)
 
             if 1 < n:
-                lower1 = hourglass._hg_net(lower0, n - 1)
+                lower1 = hourglass.hg_net(lower0, n - 1)
             else:
                 lower1 = lower0
 

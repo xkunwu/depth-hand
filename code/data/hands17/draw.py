@@ -29,7 +29,7 @@ iso_cube = getattr(
 )
 
 
-def draw_pose2d(thedata, pose2d, show_margin=False):
+def draw_pose2d(thedata, pose2d, show_margin=True):
     """ Draw 2D pose on the image domain.
         Args:
             pose2d: nx2 array, image domain coordinates
@@ -48,12 +48,14 @@ def draw_pose2d(thedata, pose2d, show_margin=False):
         for jj, joint in enumerate(p2joints):
             mpplot.plot(
                 p2joints[jj, 1], p2joints[jj, 0],
+                # p2joints[jj, 0], p2joints[jj, 1],
                 'o',
                 color=color_range[jj + 1]
             )
         p2joints = np.vstack((p2wrist, p2joints))
         mpplot.plot(
             p2joints[:, 1], p2joints[:, 0],
+            # p2joints[:, 0], p2joints[:, 1],
             '-',
             linewidth=2.0,
             color=thedata.join_color[fii + 1].rgb
@@ -72,6 +74,7 @@ def draw_pose2d(thedata, pose2d, show_margin=False):
     # )
     mpplot.plot(
         p2wrist[0, 1], p2wrist[0, 0],
+        # p2wrist[0, 0], p2wrist[0, 1],
         'o',
         color=thedata.join_color[0].rgb
     )

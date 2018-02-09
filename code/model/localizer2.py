@@ -500,4 +500,6 @@ class localizer2(base_regre):
         loss = loss_cls + self.loss_lambda * loss_reg
         # loss = loss_cls
         # loss = loss_reg
-        return loss
+        reg_losses = tf.add_n(tf.get_collection(
+            tf.GraphKeys.REGULARIZATION_LOSSES))
+        return loss + reg_losses

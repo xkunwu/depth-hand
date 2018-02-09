@@ -179,12 +179,6 @@ class iso_cube:
         return (points3 - self.cen)
         # return self.qrot.rotate(points3 - self.cen)
 
-    def transform_center_shrink(self, points3):
-        return (points3 - self.cen) / self.sidelen
-
-    def transform_expand_move(self, points3):
-        return (points3 * self.sidelen + self.cen)
-
     def transform_add_center(self, points3):
         # return np.dot(points3, self.evecs.T) + self.cen
         # return np.dot(points3 * self.sidelen, self.evecs.T) + self.cen
@@ -192,56 +186,77 @@ class iso_cube:
         return (points3) + self.cen
         # return self.qrot.inverse.rotate(points3 - self.cen)
 
+    def transform_center_shrink(self, points3):
+        return (points3 - self.cen) / self.sidelen
+
+    def transform_expand_move(self, points3):
+        return (points3 * self.sidelen + self.cen)
+
     def trans_scale_to(self, points3, sizel=1.):
         # return np.dot(points3 - self.cen, self.evecs) * sizel / self.sidelen
         return points3 * sizel / self.sidelen
 
-    def project_pca(self, ps3_pca, roll=0, sort=True):
+    def project_pca(self, normed, roll=0, sort=True):
         """ produced coordinates in unit range """
         ar3 = np.arange(3)
         if 0 < roll:
             ar3 = np.roll(ar3, roll)
         cid = ar3[:2]
         did = 2
-        if sort is True:
-            idx = np.argsort(ps3_pca[..., did])
-            ps3_pca = ps3_pca[idx, ...]
-        shifted = (ps3_pca + np.ones(3)) / 2  # shift to [0, 1] range
+        if sort is True:  # used for painting images
+            idx = np.argsort(normed[..., did])
+            normed = normed[idx, ...]
+        shifted = (normed + np.ones(3)) / 2  # shift to [0, 1] range
         coord = shifted[:, cid]
         depth = shifted[:, did]
-        # coord = ps3_pca[:, cid]
-        # cll = - np.ones(2)
-        # coord = (coord - cll) / 2
-        # depth = (ps3_pca[:, did] + 1) / 2  # [0, 1] as image
-        return coord[:, ::-1], depth
+        return coord[:, ::-1], depth  # image coordinates: reverse x, y
 
-    def raw_to_unit(self, points):
+    def raw_to_unit(self, points, sort=False):
         normed = self.transform_center_shrink(points)
-        shifted = (normed + np.ones(3)) / 2  # shift to [0, 1] range
-        coord = shifted[:, :2]
-        depth = shifted[:, 2]
-        return coord[:, ::-1], depth
-        # normed = self.transform_center_shrink(points)
-        # coord = normed[:, :2]
-        # coord = (coord + np.ones(2)) / 2  # shift to [0, 1] range
-        # coord = coord[:, ::-1]  # NOTE: projective - reverse x, y
-        # return coord, normed[:, 2]
+        return self.project_pca(normed, sort=sort)
 
     def unit_to_raw(self, coord, depth):
-        coord = coord[:, ::-1]  # NOTE: projective - reverse x, y
         coord = (coord * 2) - np.ones(2)
+        coord = coord[:, ::-1]
         normed = np.hstack((coord, depth.reshape(-1, 1)))
         return self.transform_expand_move(normed)
 
     def print_image(self, coord, depth, sizel):
         """ expand to required image size """
         img = np.zeros((sizel, sizel))
-        coord *= 0.999999  # simple hack to remove boundary
-        img[
-            np.floor(coord[:, 0] * sizel).astype(int),
-            np.floor(coord[:, 1] * sizel).astype(int),
-        ] = depth
+        # coord *= 0.999999  # simple hack to remove boundary
+        xx = np.floor(coord[:, 0] * sizel).astype(int)
+        yy = np.floor(coord[:, 1] * sizel).astype(int)
+        # yy = np.floor((1 - coord[:, 1]) * sizel).astype(int)
+        for x, y, z in zip(xx, yy, depth):
+            if x == sizel or y == sizel:
+                continue
+            if 1e-4 > img[x, y]:  # only write the nearest (sorted depth)
+                img[x, y] = z  # image coordinates: reverse x, y
+        # # painter - slow but consistent
+        # depth_sort = np.argsort(depth)
+        # for sid in depth_sort:
+        #     x = xx[sid]
+        #     y = yy[sid]
+        #     if x == sizel or y == sizel:
+        #         continue
+        #     if 1e-4 > img[y, x]:
+        #         img[y, x] = depth[sid]  # image coordinates: reverse x, y
         return img
+
+    def image_to_unit(self, image):
+        """ recover coordinates in [0, 1] """
+        sizel = image.shape[0]
+        xx, yy = np.meshgrid(  # xx: left --> right
+            np.arange(sizel), np.arange(sizel))
+        valid_id = np.where(1e-4 < image)
+        xx = xx[valid_id].astype(float)
+        yy = yy[valid_id].astype(float)
+        depth = image[valid_id]
+        coord = np.vstack((yy, xx)).T  # xx is the same with 3d, reverse it
+        coord /= sizel
+        # coord[:, 1] = 1 - coord[:, 1]  # make y-axis pointing up
+        return coord, depth
 
     # def proj_rect(self, raw_to_2d_fn, caminfo):
     #     # c3a = np.array([

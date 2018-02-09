@@ -266,7 +266,7 @@ class base_regre(object):
         """ Receive parameters specific to the data """
         self.logger = args.logger
         self.data_module = args.data_module
-        self.out_dim = thedata.join_num
+        self.out_dim = thedata.join_num * 3
         self.image_dir = thedata.training_images
         self.caminfo = thedata
         self.region_size = thedata.region_size
@@ -564,4 +564,6 @@ class base_regre(object):
         # loss = tf.reduce_sum(tf.pow(tf.subtract(pred, anno), 2)) / 2
         loss = tf.nn.l2_loss(pred - anno)  # already divided by 2
         # loss = tf.reduce_mean(tf.squared_difference(pred, anno)) / 2
-        return loss
+        reg_losses = tf.add_n(tf.get_collection(
+            tf.GraphKeys.REGULARIZATION_LOSSES))
+        return loss + reg_losses

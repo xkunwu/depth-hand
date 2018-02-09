@@ -51,7 +51,7 @@ def d2z_to_raw(p2z, caminfo, resce=np.array([1, 0, 0])):
     p2z = p2z.astype(float)
     pose2d = p2z[:, 0:2] / resce[0] + resce[1:3]
     pose_z = np.array(p2z[:, 2]).reshape(-1, 1)
-    pose2d = pose2d[:, ::-1]
+    pose2d = pose2d[:, ::-1]  # image coordinates: reverse x, y
     pose3d = (pose2d - caminfo.centre) / caminfo.focal * pose_z
     return np.hstack((pose3d, pose_z))
 
@@ -64,19 +64,20 @@ def raw_to_2dz(points3, caminfo, resce=np.array([1, 0, 0])):
     points3 = points3.astype(float)
     pose_z = points3[:, 2]
     pose2d = points3[:, 0:2] / pose_z.reshape(-1, 1) * caminfo.focal + caminfo.centre
-    pose2d = pose2d[:, ::-1]
+    pose2d = pose2d[:, ::-1]  # image coordinates: reverse x, y
     return (pose2d - resce[1:3]) * resce[0], pose_z
 
 
 def raw_to_2d(points3, caminfo, resce=np.array([1, 0, 0])):
     pose2d, _ = raw_to_2dz(points3, caminfo, resce)
+    # print(points3)
+    # print(pose2d)
     return pose2d
 
 
 def raw_to_heatmap2(pose_raw, cube, hmap_size, caminfo):
     """ 2d heatmap for each joint """
-    points3_trans = cube.transform_center_shrink(pose_raw)
-    coord, depth = cube.project_pca(points3_trans, sort=False)
+    coord, depth = cube.raw_to_unit(pose_raw)
     img_l = []
     for c, d in zip(coord, depth):
         img = cube.print_image(
@@ -91,25 +92,21 @@ def raw_to_heatmap2(pose_raw, cube, hmap_size, caminfo):
     return img_arr
 
 
-def raw_to_offset(img, pose_raw, cube, hmap_size, caminfo):
-    """ offset map from depth to each joint """
+def raw_to_offset(image_crop, pose_raw, cube, hmap_size, caminfo):
+    """ offset map from depth to each joint
+        Args:
+            img: should be size of 128
+    """
+    image_hmap = image_crop[::4, ::4]  # downsampling to 32x32
+    coord, depth = cube.image_to_unit(image_hmap)
+    depth_raw = cube.unit_to_raw(coord, depth)
     from numpy import linalg
-    depth_raw = cube.pick(img_to_raw(img, caminfo))
-    # depth_normed = cube.transform_center_shrink(depth_raw)
-    # coord, _ = cube.project_pca(depth_normed)
-    # coord, _ = cube.raw_to_unit(depth_raw)
-    coord, depth = cube.raw_to_unit(depth_raw)
-    depth_id = np.argsort(depth)
-    coord = coord[depth_id, :]
-    depth_raw = depth_raw[depth_id, :]
     omap_l = []
     hmap_l = []
     umap_l = []
     theta = caminfo.region_size * 2  # maximal - cube size
     for joint in pose_raw:
         offset = joint - depth_raw  # offset in raw 3d
-        offset[:, 1] *= -1  # NOTE: projective - reversed y
-        # offset[:, 0], offset[:, 1] = offset[:, 1], offset[:, 0].copy()
         dist = linalg.norm(offset, axis=1)  # offset norm
         if np.min(dist) > theta:
             # due to occlution, we cannot use small radius
@@ -141,7 +138,7 @@ def raw_to_offset(img, pose_raw, cube, hmap_size, caminfo):
         offset = offset[valid_id]
         dist = dist[valid_id]
         unit_off = offset / np.tile(dist, [3, 1]).T  # unit offset
-        dist = theta - dist  # inverse propotional
+        dist = (theta - dist) / theta  # inverse propotional
         coord_valid = coord[valid_id]
         for dim in range(3):
             om = cube.print_image(coord_valid, offset[:, dim], hmap_size)
@@ -178,10 +175,9 @@ def hmap3_to_raw(hmap2, hmap3, uomap, depth, cube, hmap_size, caminfo, nn=5):
         top_id = hm3.argpartition(-nn, axis=None)[-nn:]  # top elements
         x3, y3 = np.unravel_index(top_id, hm3.shape)
         dist = hm3[x3, y3]
-        dist = theta - dist  # inverse propotional
+        dist = theta - dist * theta  # inverse propotional
         unit_off = uomap[x3, y3, 3 * joint:3 * (joint + 1)]
         offset = unit_off * np.tile(dist, [3, 1]).T
-        offset[:, 1] *= -1  # NOTE: projective - reversed y
         p0 = cube.unit_to_raw(
             np.vstack([x3, y3]).astype(float).T / hmap_size,
             depth[x3, y3])
@@ -245,10 +241,14 @@ def img_to_raw(img, caminfo, crop_lim=None):
     )
     indx = np.where(conds)
     zval = np.array(img[conds])
-    indz = np.hstack((
-        np.asarray(indx).astype(float).T,
-        zval.reshape(-1, 1))
-    )
+    # indz = np.hstack((
+    #     np.asarray(indx).astype(float).T,
+    #     zval.reshape(-1, 1))
+    # )
+    indz = np.vstack((
+        np.asarray(indx).astype(float),
+        zval
+    )).T
     points3 = d2z_to_raw(indz, caminfo)
     if crop_lim is not None:
         conds = np.logical_and.reduce([
@@ -496,33 +496,29 @@ def get_rect3(cube, caminfo):
     return rect
 
 
-def collect_heatmap(pose_raw, resce):
-    cube = iso_cube()
-    cube.load(resce)
-    points3_trans = cube.transform_center_shrink(pose_raw)
-    coord, depth = cube.project_pca(points3_trans, sort=False)
-    img_crop_resize = cube.print_image(
-        coord, depth, caminfo.crop_size)
-
-
 def crop_resize_pca(img, pose_raw, caminfo):
-    # cube = iso_cube()
-    # cube.build(pose_raw, 0.6)
     cube = iso_cube(
         (np.max(pose_raw, axis=0) + np.min(pose_raw, axis=0)) / 2,
         caminfo.region_size
     )
     points3_pick = cube.pick(img_to_raw(img, caminfo))
     points3_trans = cube.transform_center_shrink(points3_pick)
-    coord, depth = cube.project_pca(points3_trans, sort=False)
-    # x = np.arange(-1, 1, 0.5)
-    # y = np.stack([x, x, -x]).T
-    # print(y)
-    # coord, depth = cube.project_pca(y)
-    # print(coord)
-    # print(depth)
+    coord, depth = cube.project_pca(points3_trans)
     img_crop_resize = cube.print_image(
         coord, depth, caminfo.crop_size)
+    # I0 = np.zeros((8, 8))
+    # I0[0, 1] = 10.
+    # I0[3, 7] = 20.
+    # I0[6, 2] = 30.
+    # I0[7, 3] = 40.
+    # print(I0)
+    # c0, d0 = cube.image_to_unit(I0)
+    # I1 = cube.print_image(
+    #     c0, d0, 8)
+    # print(I1)
+    # c1, d1 = cube.image_to_unit(I1)
+    # from numpy import linalg
+    # print(linalg.norm(c0 - c1), linalg.norm(d0 - d1))
     # mpplot = import_module('matplotlib.pyplot')
     # mpplot.imshow(img_crop_resize, cmap='bone')
     # mpplot.show()
