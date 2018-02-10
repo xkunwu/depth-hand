@@ -210,10 +210,11 @@ class train_abc():
                 # elif 'poser' == self.args.model_inst.net_type:
                 #     self.args.model_inst.debug_compare(
                 #         pred_val, self.logger)
-                train_writer.add_summary(summary, step)
                 self.logger.info(
                     'batch {} training loss: {}'.format(
                         batch_count, loss_val))
+            if batch_count % 100 == 0:
+                train_writer.add_summary(summary, step)
             batch_count += 1
         mean_loss = loss_sum / batch_count
         self.args.logger.info(
@@ -246,10 +247,11 @@ class train_abc():
                 # elif 'poser' == self.args.model_inst.net_type:
                 #     self.args.model_inst.debug_compare(
                 #         pred_val, self.logger)
-                valid_writer.add_summary(summary, step)
                 self.logger.info(
                     'batch {} validate loss: {}'.format(
                         batch_count, loss_val))
+            if batch_count % 100 == 0:
+                valid_writer.add_summary(summary, step)
             batch_count += 1
         mean_loss = loss_sum / batch_count
         self.args.logger.info(

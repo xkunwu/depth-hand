@@ -7,6 +7,7 @@ import tensorflow as tf
 import progressbar
 from functools import reduce
 from utils.coder import file_pack
+from utils.image_ops import tfplot_hmap2, tfplot_hmap3, tfplot_uomap
 
 
 class train_dense_regre():
@@ -88,10 +89,6 @@ class train_dense_regre():
                     net.shape[0],
                     reduce(lambda x, y: x * y, net.shape[1:])
                 )
-                # if (2 == self.args.model_inst.net_rank and
-                #         'image' in ends):
-                #     tf.summary.image(
-                #         ends, self.transform_image_summary(net))
             self.args.logger.info(
                 'network structure:\n{}'.format(shapestr))
             loss_op = self.args.model_inst.get_loss(
@@ -102,6 +99,35 @@ class train_dense_regre():
 
             learning_rate = self.get_learning_rate(global_step)
             tf.summary.scalar('learning_rate', learning_rate)
+
+            num_j = self.args.model_inst.out_dim
+            hmap2_echt_op = tf.expand_dims(tfplot_hmap2(
+                frames_op[0, ..., 0][::4, ::4],
+                poses_op[0, ..., num_j - 1]), axis=0)
+            tf.summary.image('hmap2_echt/', hmap2_echt_op, max_outputs=1)
+            hmap2_pred_op = tf.expand_dims(tfplot_hmap2(
+                frames_op[0, ..., 0][::4, ::4],
+                pred_op[0, ..., num_j - 1]), axis=0)
+            tf.summary.image('hmap2_pred/', hmap2_pred_op, max_outputs=1)
+            num_j *= 2
+            hmap3_echt_op = tf.expand_dims(tfplot_hmap3(
+                frames_op[0, ..., 0][::4, ::4],
+                poses_op[0, ..., num_j - 1]), axis=0)
+            tf.summary.image('hmap3_echt/', hmap3_echt_op, max_outputs=1)
+            hmap3_pred_op = tf.expand_dims(tfplot_hmap3(
+                frames_op[0, ..., 0][::4, ::4],
+                pred_op[0, ..., num_j - 1]), axis=0)
+            tf.summary.image('hmap3_pred/', hmap3_pred_op, max_outputs=1)
+            uomap_echt_op = tf.expand_dims(tfplot_uomap(
+                frames_op[0, ..., 0],
+                poses_op[0, ..., -3:]),
+                axis=0)
+            tf.summary.image('uomap_echt/', uomap_echt_op, max_outputs=1)
+            uomap_pred_op = tf.expand_dims(tfplot_uomap(
+                frames_op[0, ..., 0],
+                pred_op[0, ..., -3:]),
+                axis=0)
+            tf.summary.image('uomap_pred/', uomap_pred_op, max_outputs=1)
 
             optimizer = tf.train.AdamOptimizer(learning_rate)
             # train_op = optimizer.minimize(
@@ -187,10 +213,11 @@ class train_dense_regre():
                 # elif 'poser' == self.args.model_inst.net_type:
                 #     self.args.model_inst.debug_compare(
                 #         pred_val, self.logger)
-                train_writer.add_summary(summary, step)
                 self.logger.info(
                     'batch {} training loss: {}'.format(
                         batch_count, loss_val))
+            if batch_count % 100 == 0:
+                train_writer.add_summary(summary, step)
             batch_count += 1
         mean_loss = loss_sum / batch_count
         self.args.logger.info(
@@ -223,10 +250,11 @@ class train_dense_regre():
                 # elif 'poser' == self.args.model_inst.net_type:
                 #     self.args.model_inst.debug_compare(
                 #         pred_val, self.logger)
-                valid_writer.add_summary(summary, step)
                 self.logger.info(
                     'batch {} validate loss: {}'.format(
                         batch_count, loss_val))
+            if batch_count % 100 == 0:
+                valid_writer.add_summary(summary, step)
             batch_count += 1
         mean_loss = loss_sum / batch_count
         self.args.logger.info(

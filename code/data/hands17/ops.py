@@ -17,31 +17,29 @@ from utils.regu_grid import latice_image
 def raw_to_pca(points3, resce=np.array([1, 0, 0, 0])):
     cube = iso_cube()
     cube.load(resce)
+    # return cube.transform_center_shrink(points3)
     return cube.transform_to_center(points3)
 
 
 def pca_to_raw(points3, resce=np.array([1, 0, 0, 0])):
     cube = iso_cube()
     cube.load(resce)
+    # return cube.transform_expand_move(points3)
     return cube.transform_add_center(points3)
 
 
 def raw_to_local(points3, resce=np.array([1, 0, 0, 0])):
     cube = iso_cube()
     cube.load(resce)
+    # return cube.transform_center_shrink(points3)
     return cube.transform_to_center(points3)
-    # aabb = iso_aabb()
-    # aabb.load(resce)
-    # return aabb.transform_to_center(points3)
 
 
 def local_to_raw(points3, resce=np.array([1, 0, 0, 0])):
     cube = iso_cube()
     cube.load(resce)
+    # return cube.transform_expand_move(points3)
     return cube.transform_add_center(points3)
-    # aabb = iso_aabb()
-    # aabb.load(resce)
-    # return aabb.transform_add_center(points3)
 
 
 def d2z_to_raw(p2z, caminfo, resce=np.array([1, 0, 0])):

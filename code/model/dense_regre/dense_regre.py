@@ -9,6 +9,7 @@ from model.base_regre import base_regre
 from utils.iso_boxes import iso_cube
 from model.incept_resnet import incept_resnet
 from model.hourglass import hourglass
+from utils.image_ops import draw_hmap2, draw_hmap3, draw_uomap
 
 
 class dense_regre(base_regre):
@@ -368,11 +369,9 @@ class dense_regre(base_regre):
         cube = iso_cube()
         cube.load(resce3)
         sizel = np.floor(resce3[0]).astype(int)
-        from mpl_toolkits.axes_grid1 import make_axes_locatable
-        from utils.image_ops import transparent_cmap
         from colour import Color
         colors = [Color('orange').rgb, Color('red').rgb, Color('lime').rgb]
-        mpplot.subplots(nrows=2, ncols=3, figsize=(2 * 5, 3 * 5))
+        fig, _ = mpplot.subplots(nrows=2, ncols=3, figsize=(2 * 5, 3 * 5))
         joint_id = self.out_dim - 1
         hmap2 = hmap2_h5[..., joint_id]
         hmap3 = hmap3_h5[..., joint_id]
@@ -380,8 +379,8 @@ class dense_regre(base_regre):
         depth_hmap = frame_h5[::4, ::4]
         depth_crop = cv2resize(frame_h5, (sizel, sizel))
 
-        mpplot.subplot(2, 3, 1)
-        mpplot.imshow(depth_crop, cmap='bone')
+        ax = mpplot.subplot(2, 3, 1)
+        ax.imshow(depth_crop, cmap='bone')
         pose3d = cube.trans_scale_to(poses_h5)
         pose2d, _ = cube.project_pca(pose3d, roll=0, sort=False)
         pose2d *= sizel
@@ -391,33 +390,36 @@ class dense_regre(base_regre):
         )
 
         ax = mpplot.subplot(2, 3, 4)
-        mpplot.imshow(depth_hmap, cmap='bone')
-        img_h2 = mpplot.imshow(hmap2, cmap=transparent_cmap(mpplot.cm.jet))
-        divider = make_axes_locatable(ax)
-        cax = divider.append_axes("right", size="5%", pad=0.05)
-        mpplot.colorbar(img_h2, cax=cax)
-        # import seaborn as sns; sns.set(); ax = sns.heatmap(hmap2)
+        draw_hmap2(fig, ax, depth_hmap, hmap2)
+        # mpplot.imshow(depth_hmap, cmap='bone')
+        # img_h2 = mpplot.imshow(hmap2, cmap=transparent_cmap(mpplot.cm.jet))
+        # divider = make_axes_locatable(ax)
+        # cax = divider.append_axes("right", size="5%", pad=0.05)
+        # mpplot.colorbar(img_h2, cax=cax)
+        # # import seaborn as sns; sns.set(); ax = sns.heatmap(hmap2)
 
-        mpplot.subplot(2, 3, 5)
-        mpplot.imshow(frame_h5, cmap='bone')
-        xx, yy = np.meshgrid(np.arange(0, 128, 4), np.arange(0, 128, 4))
-        mpplot.quiver(
-            xx, yy,
-            np.squeeze(uomap[..., 0]),
-            -np.squeeze(uomap[..., 1]),
-            color='r', width=0.004, scale=20)
-        # mpplot.quiver(  # quiver is pointing upper-right!
+        ax = mpplot.subplot(2, 3, 5)
+        draw_uomap(fig, ax, frame_h5, uomap)
+        # mpplot.imshow(frame_h5, cmap='bone')
+        # xx, yy = np.meshgrid(np.arange(0, 128, 4), np.arange(0, 128, 4))
+        # mpplot.quiver(
         #     xx, yy,
-        #     np.ones_like(xx),
-        #     np.ones_like(xx),
+        #     np.squeeze(uomap[..., 0]),
+        #     -np.squeeze(uomap[..., 1]),
         #     color='r', width=0.004, scale=20)
+        # # mpplot.quiver(  # quiver is pointing upper-right!
+        # #     xx, yy,
+        # #     np.ones_like(xx),
+        # #     np.ones_like(xx),
+        # #     color='r', width=0.004, scale=20)
 
         ax = mpplot.subplot(2, 3, 6)
-        mpplot.imshow(depth_hmap, cmap='bone')
-        img_h3 = mpplot.imshow(hmap3, cmap=transparent_cmap(mpplot.cm.jet))
-        divider = make_axes_locatable(ax)
-        cax = divider.append_axes("right", size="5%", pad=0.05)
-        mpplot.colorbar(img_h3, cax=cax)
+        draw_hmap3(fig, ax, depth_hmap, hmap3)
+        # mpplot.imshow(depth_hmap, cmap='bone')
+        # img_h3 = mpplot.imshow(hmap3, cmap=transparent_cmap(mpplot.cm.jet))
+        # divider = make_axes_locatable(ax)
+        # cax = divider.append_axes("right", size="5%", pad=0.05)
+        # mpplot.colorbar(img_h3, cax=cax)
 
         ax = mpplot.subplot(2, 3, 2)
         pose_out = self.yanker_hmap(
@@ -426,7 +428,7 @@ class dense_regre(base_regre):
         print('reprojection error: {}'.format(
             np.sum(np.abs(pose_out - cube.transform_add_center(poses_h5))))
         )
-        mpplot.imshow(depth_crop, cmap='bone')
+        ax.imshow(depth_crop, cmap='bone')
         pose3d = cube.transform_center_shrink(pose_out)
         pose2d, _ = cube.project_pca(pose3d, roll=0, sort=False)
         pose2d *= sizel
@@ -440,7 +442,7 @@ class dense_regre(base_regre):
             thedata.training_annot_cleaned, img_id)
         img_name, pose_raw = args.data_io.parse_line_annot(annot_line)
         img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
-        mpplot.imshow(img, cmap='bone')
+        ax.imshow(img, cmap='bone')
         args.data_draw.draw_pose2d(
             thedata,
             args.data_ops.raw_to_2d(pose_raw, thedata))
@@ -457,7 +459,8 @@ class dense_regre(base_regre):
         mpplot.savefig(os.path.join(
             args.predict_dir,
             'draw_{}_{}.png'.format(self.name_desc, img_id)))
-        mpplot.show()
+        if self.args.show_draw:
+            mpplot.show()
         print('[{}] drawing image #{:d} - done.'.format(
             self.name_desc, img_id))
 

@@ -2,12 +2,8 @@ import numpy as np
 import matplotlib.pyplot as mpplot
 import matplotlib.image as mpimg
 import matplotlib.collections as mcoll
-
-
-class cam_info:
-    image_size = (480, 640)
-    focal = (475.065948, 475.065857)
-    centre = (315.944855, 245.287079)
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+import tfplot
 
 
 def transparent_cmap(cmap, tmax=0.99, N=255):
@@ -15,6 +11,71 @@ def transparent_cmap(cmap, tmax=0.99, N=255):
     mycmap._init()
     mycmap._lut[:, -1] = np.linspace(0, tmax, N + 4)
     return mycmap
+
+
+def draw_hmap2(fig, ax, depth_hmap, hmap2):
+    ax.imshow(depth_hmap, cmap='bone')
+    img_h2 = ax.imshow(
+        hmap2, cmap=transparent_cmap(mpplot.cm.jet))
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    fig.colorbar(img_h2, cax=cax)
+
+
+def draw_hmap3(fig, ax, depth_hmap, hmap3):
+    ax.imshow(depth_hmap, cmap='bone')
+    img_h3 = ax.imshow(
+        hmap3, cmap=transparent_cmap(mpplot.cm.jet))
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    fig.colorbar(img_h3, cax=cax)
+
+
+def draw_uomap(fig, ax, depth_crop, uomap):
+    ax.imshow(depth_crop, cmap='bone')
+    xx, yy = np.meshgrid(
+        np.arange(0, 128, 4), np.arange(0, 128, 4))
+    ax.quiver(
+        xx, yy,
+        np.squeeze(uomap[..., 0]),
+        -np.squeeze(uomap[..., 1]),
+        color='r', width=0.004, scale=20)
+    # ax.quiver(  # quiver is pointing upper-right!
+    #     xx, yy,
+    #     np.ones_like(xx),
+    #     np.ones_like(xx),
+    #     color='r', width=0.004, scale=20)
+
+
+def figure_hmap2(depth_hmap, hmap2):
+    fig, ax = tfplot.subplots(figsize=(4, 4))
+    draw_hmap2(fig, ax, depth_hmap, hmap2)
+    # ax.axis('off')
+    return fig
+
+
+def figure_hmap3(depth_hmap, hmap3):
+    fig, ax = tfplot.subplots(figsize=(4, 4))
+    draw_hmap3(fig, ax, depth_hmap, hmap3)
+    # ax.axis('off')
+    return fig
+
+
+def figure_uomap(depth_crop, uomap):
+    fig, ax = tfplot.subplots(figsize=(4, 4))
+    draw_uomap(fig, ax, depth_crop, uomap)
+    # ax.axis('off')
+    return fig
+
+tfplot_hmap2 = tfplot.wrap(figure_hmap2, batch=False)
+tfplot_hmap3 = tfplot.wrap(figure_hmap3, batch=False)
+tfplot_uomap = tfplot.wrap(figure_uomap, batch=False)
+
+
+class cam_info:
+    image_size = (480, 640)
+    focal = (475.065948, 475.065857)
+    centre = (315.944855, 245.287079)
 
 
 def fig2data(fig, show_margin=False):

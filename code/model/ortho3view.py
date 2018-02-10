@@ -139,7 +139,10 @@ class ortho3view(base_regre):
         mpplot.savefig(os.path.join(
             args.predict_dir,
             'draw_{}.png'.format(self.__class__.__name__)))
-        mpplot.show()
+        if self.args.show_draw:
+            mpplot.show()
+        print('[{}] drawing image #{:d} - done.'.format(
+            self.name_desc, img_id))
 
     def get_model(
             self, input_tensor, is_training, bn_decay,

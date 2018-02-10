@@ -9,7 +9,14 @@ from . import io as dataio
 
 
 class hands17holder:
-    """ Pose class for Hands17 dataset """
+    """ Pose class for Hands17 dataset
+        wired coordinate system:
+            ---> x
+            |
+            |y
+        which is the same as image space.
+        BUT np use row-major, so remember exchange (x, y) for each mapping
+    """
 
     # # dataset info
     # data_dir = ''

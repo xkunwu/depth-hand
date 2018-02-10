@@ -146,7 +146,7 @@ class incept_resnet:
 
     @staticmethod
     def get_net(
-            input_tensor, out_dim, is_training, end_point_list,
+            input_tensor, out_dim, is_training, bn_decay, end_point_list,
             block_rep=[2, 2, 1], block_scale=[0.5, 0.5, 0.5],
             scope=None, final_endpoint='stage_out'):
         """ input_tensor: BxHxWxC
@@ -173,7 +173,7 @@ class incept_resnet:
                     # reasonably good training performance but poor validation and/or test performance.
                     # Try zero_debias_moving_mean=True for improved stability.
                     # zero_debias_moving_mean=True,
-                    decay=0.999), \
+                    decay=bn_decay), \
                 slim.arg_scope(
                     [slim.dropout],
                     is_training=is_training), \

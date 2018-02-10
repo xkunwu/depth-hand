@@ -79,7 +79,6 @@ def draw_error_percentage_curve(errors, methods, ax):
     mpplot.legend(methods, loc='lower right')
     mpplot.tight_layout()
     # ax.set_xlim(right=50)
-    # mpplot.show()
 
 
 def draw_error_per_joint(errors, methods, ax, join_name=None, draw_std=False):
@@ -135,7 +134,6 @@ def draw_error_per_joint(errors, methods, ax, join_name=None, draw_std=False):
     mpplot.margins(0.1)
     mpplot.tight_layout()
     mpplot.legend(methods, loc='upper left')
-    # mpplot.show()
 
 
 def evaluate_detection(thedata, model_name, predict_dir, predict_file):
@@ -191,7 +189,6 @@ def evaluate_poses(thedata, model_name, predict_dir, predict_file):
     # mpplot.subplot(1, draw_sum, draw_i)
     # draw_mean_error_distribution(errors, mpplot.gca())
     # draw_i += 1
-    # mpplot.show()
 
 
 def evaluate_hands(thedata, model_name, predict_dir, predict_file):

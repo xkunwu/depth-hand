@@ -22,7 +22,8 @@ class base_regre_inres(base_regre):
         """
         self.end_point_list = []
         return incept_resnet.get_net(
-            input_tensor, self.out_dim, is_training, self.end_point_list
+            input_tensor, self.out_dim,
+            is_training, bn_decay, self.end_point_list
         )
 
 
@@ -44,5 +45,6 @@ class base_clean_inres(base_clean):
         """
         self.end_point_list = []
         return incept_resnet.get_net(
-            input_tensor, self.out_dim, is_training, self.end_point_list
+            input_tensor, self.out_dim,
+            is_training, bn_decay, self.end_point_list
         )

@@ -101,7 +101,6 @@ class localizer2(base_regre):
         mpplot.title('Hand detection: AP={0:0.2f}'.format(
             avg_ps))
         mpplot.tight_layout()
-        # mpplot.show()
         fname = 'evaluate_pr_{}.png'.format(self.name_desc)
         mpplot.savefig(os.path.join(self.predict_dir, fname))
         print('figures saved: {}'.format(fname))
@@ -236,8 +235,6 @@ class localizer2(base_regre):
             rect.draw(colors[ii])
         mpplot.gca().set_title('Prediction')
 
-        # mpplot.show()
-
     def draw_random(self, thedata, args):
         with h5py.File(self.appen_train, 'r') as h5file:
             store_size = h5file['index'].shape[0]
@@ -338,7 +335,8 @@ class localizer2(base_regre):
         mpplot.savefig(os.path.join(
             args.predict_dir,
             'draw_{}.png'.format(self.name_desc)))
-        mpplot.show()
+        if self.args.show_draw:
+            mpplot.show()
         print('[{}] drawing image #{:d} - done.'.format(
             self.name_desc, img_id))
 

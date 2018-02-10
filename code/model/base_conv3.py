@@ -277,7 +277,8 @@ class base_conv3(base_regre):
         mpplot.savefig(os.path.join(
             args.predict_dir,
             'draw_{}.png'.format(self.name_desc)))
-        mpplot.show()
+        if self.args.show_draw:
+            mpplot.show()
         print('[{}] drawing image #{:d} - done.'.format(
             self.name_desc, img_id))
 

@@ -6,7 +6,7 @@ import numpy as np
 import re
 
 
-def run_one(args, mpplot, with_train=False, with_eval=False):
+def run_one(args, with_train=False, with_eval=False):
     predict_file = args.model_inst.predict_file
     trainer = args.model_inst.get_trainer(args, new_log=False)
     if with_train or (not os.path.exists(os.path.join(
@@ -17,7 +17,8 @@ def run_one(args, mpplot, with_train=False, with_eval=False):
     # trainer.evaluate()
 
 
-def draw_compare(args, mpplot, predict_dir=None):
+def draw_compare(args, predict_dir=None):
+    mpplot = import_module('matplotlib.pyplot')
     dataeval = import_module(
         'data.' + args.data_name + '.eval')
     if predict_dir is None:
@@ -96,18 +97,18 @@ def test_dataops(args):
 
 
 if __name__ == "__main__":
-    # python -m train.evaluate --max_epoch=1 --batch_size=20 --model_name=base_clean
+    # python -m train.evaluate --max_epoch=1 --batch_size=20 --bn_decay=0.94 --model_name=base_clean
     # import pdb; pdb.set_trace()
 
     from args_holder import args_holder
-    # with_train = True
-    with_train = False
+    # import tfplot
+    with_train = True
+    # with_train = False
     with_eval = True
     # with_eval = False
 
     # mpl = import_module('matplotlib')
     # mpl.use('Agg')
-    mpplot = import_module('matplotlib.pyplot')
     with args_holder() as argsholder:
         argsholder.parse_args()
         args = argsholder.args
@@ -118,14 +119,13 @@ if __name__ == "__main__":
 
         test_dataops(args)
 
-        run_one(args, mpplot, with_train, with_eval)
+        run_one(args, with_train, with_eval)
 
-        # draw_compare(args, mpplot)
+        # draw_compare(args)
     sys.exit()
 
-    mpl = import_module('matplotlib')
-    mpl.use('Agg')
-    mpplot = import_module('matplotlib.pyplot')
+    # mpl = import_module('matplotlib')
+    # mpl.use('Agg')
     methlist = [
         # # 'localizer2',
         'dense_regre',
@@ -145,10 +145,10 @@ if __name__ == "__main__":
             args.model_name = meth
             argsholder.create_instance()
             test_dataops(args)
-            run_one(args, mpplot, with_train, with_eval)
-            # run_one(args, mpplot, True, True)
-            # run_one(args, mpplot, False, False)
-    draw_compare(args, mpplot)
+            run_one(args, with_train, with_eval)
+            # run_one(args, True, True)
+            # run_one(args, False, False)
+    draw_compare(args)
     copyfile(
         os.path.join(args.out_dir, 'log', 'univue.log'),
         os.path.join(args.predict_dir, 'univue.log')

@@ -44,6 +44,9 @@ class args_holder:
             '--mode', default='train',
             help='programm mode [default: train], from \
             [train, detect]')
+        self.parser.add_argument(
+            '--show_draw', default=False,
+            help='allow popping out drawing window')
 
         # system parameters
         self.parser.add_argument(
@@ -83,8 +86,8 @@ class args_holder:
         # Lower `decay` value (recommend trying `decay`=0.9) if model experiences
         # reasonably good training performance but poor validation and/or test performance.
         self.parser.add_argument(
-            '--bn_decay', type=float, default=0.999,
-            help='decay rate during batch normalization [default: 0.999]')
+            '--bn_decay', type=float, default=0.9997,
+            help='decay rate during batch normalization [default: 0.9997]')
         self.parser.add_argument(
             '--learning_rate', type=float, default=0.01,
             help='Initial learning rate [default: 0.001]')

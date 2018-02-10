@@ -380,7 +380,8 @@ class base_regre(object):
         mpplot.savefig(os.path.join(
             args.predict_dir,
             'draw_{}_{}.png'.format(self.name_desc, img_id)))
-        mpplot.show()
+        if self.args.show_draw:
+            mpplot.show()
         print('[{}] drawing image #{:d} - done.'.format(
             self.name_desc, img_id))
 
