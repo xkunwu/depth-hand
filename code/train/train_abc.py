@@ -126,12 +126,16 @@ class train_abc():
             learning_rate = self.get_learning_rate(global_step)
             tf.summary.scalar('learning_rate', learning_rate)
 
+            tf.summary.histogram('out_value_echt', poses_op)
+            tf.summary.histogram('out_value_pred', pred_op)
+
             optimizer = tf.train.AdamOptimizer(learning_rate)
             # train_op = optimizer.minimize(
             #     loss_op, global_step=global_step)
             from tensorflow.contrib import slim
             train_op = slim.learning.create_train_op(
                 loss_op, optimizer,
+                # summarize_gradients=True,
                 update_ops=tf.get_collection(tf.GraphKeys.UPDATE_OPS),
                 global_step=global_step)
             # from tensorflow.python.ops import control_flow_ops

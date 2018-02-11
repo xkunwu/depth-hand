@@ -159,8 +159,8 @@ class localizer2(base_regre):
         frame_h5 = self.args.data_ops.frame_size_localizer(
             frame_h5, self.caminfo)
         colors = [Color('orange').rgb, Color('red').rgb, Color('lime').rgb]
-        mpplot.subplot(1, 2, 1)
-        mpplot.imshow(frame_h5, cmap='bone')
+        ax = mpplot.subplot(1, 2, 1)
+        ax.imshow(frame_h5, cmap='bone')
         resce3 = resce_h5[0:4]
         cube = iso_cube()
         cube.load(resce3)
@@ -172,8 +172,8 @@ class localizer2(base_regre):
             rect.draw(colors[ii])
         mpplot.gca().set_title('Ground truth')
 
-        mpplot.subplot(1, 2, 2)
-        mpplot.imshow(frame_h5, cmap='bone')
+        ax = mpplot.subplot(1, 2, 2)
+        ax.imshow(frame_h5, cmap='bone')
         cube, index, confidence = self.convert_output(
             pred_val, self.args, self.caminfo)
         cube.show_dims()
@@ -203,12 +203,12 @@ class localizer2(base_regre):
 
         print('[{}] drawing image #{:d} ...'.format(self.name_desc, img_id))
         colors = [Color('orange').rgb, Color('red').rgb, Color('lime').rgb]
-        mpplot.subplot(1, 2, 1)
+        ax = mpplot.subplot(1, 2, 1)
         annot_line = args.data_io.get_line(
             thedata.training_annot_cleaned, img_id)
         img_name, _ = args.data_io.parse_line_annot(annot_line)
         img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
-        mpplot.imshow(img, cmap='bone')
+        ax.imshow(img, cmap='bone')
         resce3 = resce_h5[0:4]
         cube = iso_cube()
         cube.load(resce3)
@@ -220,9 +220,9 @@ class localizer2(base_regre):
             rect.draw(colors[ii])
         mpplot.gca().set_title('Ground truth')
 
-        mpplot.subplot(1, 2, 2)
+        ax = mpplot.subplot(1, 2, 2)
         img = frame_h5
-        mpplot.imshow(img, cmap='bone')
+        ax.imshow(img, cmap='bone')
         line_pred = linecache.getline(self.predict_file, frame_id)
         pred_list = re.split(r'\s+', line_pred.strip())
         centre = np.array([float(i) for i in pred_list[1:4]])
@@ -249,13 +249,13 @@ class localizer2(base_regre):
         print('[{}] drawing image #{:d} ...'.format(self.name_desc, img_id))
         colors = [Color('orange').rgb, Color('red').rgb, Color('lime').rgb]
         mpplot.subplots(nrows=2, ncols=2, figsize=(2 * 5, 2 * 5))
-        mpplot.subplot(2, 2, 1)
+        ax = mpplot.subplot(2, 2, 1)
         mpplot.gca().set_title('test input')
         annot_line = args.data_io.get_line(
             thedata.training_annot_cleaned, img_id)
         img_name, pose_raw = args.data_io.parse_line_annot(annot_line)
         img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
-        mpplot.imshow(img, cmap='bone')
+        ax.imshow(img, cmap='bone')
         args.data_draw.draw_pose2d(
             thedata,
             args.data_ops.raw_to_2d(pose_raw, thedata))
@@ -282,11 +282,11 @@ class localizer2(base_regre):
         corners = cube.get_corners()
         iso_cube.draw_cube_wire(corners)
 
-        mpplot.subplot(2, 2, 4)
+        ax = mpplot.subplot(2, 2, 4)
         mpplot.gca().set_title('test output')
         img_name = args.data_io.index2imagename(img_id)
         img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
-        mpplot.imshow(img, cmap='bone')
+        ax.imshow(img, cmap='bone')
         anchor_num = self.anchor_num ** 2
         pcnt = poses_h5[:anchor_num].reshape(
             (self.anchor_num, self.anchor_num))
@@ -308,7 +308,7 @@ class localizer2(base_regre):
         for ii, rect in enumerate(rects):
             rect.draw(colors[ii])
 
-        mpplot.subplot(2, 2, 2)
+        ax = mpplot.subplot(2, 2, 2)
         mpplot.gca().set_title('test storage write')
         img_name, frame, poses, resce = self.provider_worker(
             annot_line, self.image_dir, thedata)
@@ -321,7 +321,7 @@ class localizer2(base_regre):
             print(np.linalg.norm(frame_h5 - frame))
             print(np.linalg.norm(poses_h5 - poses))
             print('ERROR - h5 storage corrupted!')
-        mpplot.imshow(frame, cmap='bone')
+        ax.imshow(frame, cmap='bone')
         resce3 = resce[0:4]
         cube = iso_cube()
         cube.load(resce3)
@@ -356,23 +356,36 @@ class localizer2(base_regre):
 
         with tf.variable_scope(
                 scope, self.name_desc, [input_tensor]):
-            with slim.arg_scope(
-                    [slim.batch_norm, slim.dropout],
+            weight_decay = 0.00004
+            bn_epsilon = 0.001
+            with \
+                slim.arg_scope(
+                    [slim.batch_norm],
+                    is_training=is_training,
+                    epsilon=bn_epsilon,
+                    # # Make sure updates happen automatically
+                    # updates_collections=None,
+                    # Try zero_debias_moving_mean=True for improved stability.
+                    # zero_debias_moving_mean=True,
+                    decay=bn_decay), \
+                slim.arg_scope(
+                    [slim.dropout],
                     is_training=is_training), \
                 slim.arg_scope(
                     [slim.fully_connected],
-                    weights_regularizer=slim.l2_regularizer(0.00004),
-                    biases_regularizer=slim.l2_regularizer(0.00004),
-                    activation_fn=None, normalizer_fn=None), \
+                    weights_regularizer=slim.l2_regularizer(weight_decay),
+                    biases_regularizer=slim.l2_regularizer(weight_decay),
+                    activation_fn=tf.nn.relu,
+                    normalizer_fn=slim.batch_norm), \
                 slim.arg_scope(
                     [slim.max_pool2d, slim.avg_pool2d],
-                    stride=1, padding='SAME'), \
+                    stride=2, padding='SAME'), \
                 slim.arg_scope(
                     [slim.conv2d],
                     stride=1, padding='SAME',
+                    weights_regularizer=slim.l2_regularizer(weight_decay),
+                    biases_regularizer=slim.l2_regularizer(weight_decay),
                     activation_fn=tf.nn.relu,
-                    weights_regularizer=slim.l2_regularizer(0.00004),
-                    biases_regularizer=slim.l2_regularizer(0.00004),
                     normalizer_fn=slim.batch_norm):
                 with tf.variable_scope('stage0'):
                     sc = 'stage0_image'

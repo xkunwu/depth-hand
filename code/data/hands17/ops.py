@@ -80,8 +80,9 @@ def raw_to_heatmap2(pose_raw, cube, hmap_size, caminfo):
     for c, d in zip(coord, depth):
         img = cube.print_image(
             c.reshape(1, -1), np.array([d]), hmap_size)
-        img = ndimage.gaussian_filter(img, sigma=0.8)
-        img /= np.max(img)
+        img = ndimage.gaussian_filter(  # still a probability
+            img, sigma=0.8)
+        # img /= np.max(img)
         # mpplot = import_module('matplotlib.pyplot')
         # mpplot.imshow(img, cmap='bone')
         # mpplot.show()
@@ -98,36 +99,43 @@ def raw_to_offset(image_crop, pose_raw, cube, hmap_size, caminfo):
     image_hmap = image_crop[::4, ::4]  # downsampling to 32x32
     coord, depth = cube.image_to_unit(image_hmap)
     depth_raw = cube.unit_to_raw(coord, depth)
+    # points3_pick = cube.pick(img_to_raw(image_crop, caminfo))
+    # depth_raw = cube.transform_center_shrink(points3_pick)
     from numpy import linalg
     omap_l = []
     hmap_l = []
     umap_l = []
     theta = caminfo.region_size * 2  # maximal - cube size
+    # theta = 90  # used for illustration
     for joint in pose_raw:
         offset = joint - depth_raw  # offset in raw 3d
         dist = linalg.norm(offset, axis=1)  # offset norm
         if np.min(dist) > theta:
             # due to occlution, we cannot use small radius
             print(np.min(dist))
-            # from colour import Color
-            # ax = mpplot.subplot(projection='3d')
-            # points3 = img_to_raw(img, caminfo)
-            # # points3_trans = cube.pick(points3)
-            # # points3_trans = cube.transform_to_center(points3_trans)
-            # points3_trans = points3
-            # numpts = points3_trans.shape[0]
-            # if 1000 < numpts:
-            #     points3_trans = points3_trans[
-            #         np.random.choice(numpts, 1000, replace=False), :]
-            # ax.scatter(
-            #     points3_trans[:, 0], points3_trans[:, 1], points3_trans[:, 2],
-            #     color=Color('lightsteelblue').rgb)
-            # import data.hands17.draw as data_draw
-            # data_draw.draw_raw3d_pose(caminfo, pose_raw)
-            # corners = cube.transform_to_center(cube.get_corners())
-            # cube.draw_cube_wire(corners)
-            # ax.view_init(azim=-120, elev=-150)
-            # mpplot.show()
+        #     import data.hands17.draw as data_draw
+        #     from colour import Color
+        #     mpplot.subplots(nrows=1, ncols=2)
+        #     ax = mpplot.subplot(1, 2, 1)
+        #     ax.imshow(image_crop, cmap='bone')
+        #     data_draw.draw_pose2d(
+        #         caminfo,
+        #         raw_to_2d(pose_raw, caminfo))
+        #     ax.axis('off')
+        #     ax = mpplot.subplot(1, 2, 2, projection='3d')
+        #     points3_trans = points3_pick
+        #     numpts = points3_trans.shape[0]
+        #     if 1000 < numpts:
+        #         points3_trans = points3_trans[
+        #             np.random.choice(numpts, 1000, replace=False), :]
+        #     ax.scatter(
+        #         points3_trans[:, 0], points3_trans[:, 1], points3_trans[:, 2],
+        #         color=Color('lightsteelblue').rgb)
+        #     data_draw.draw_raw3d_pose(caminfo, pose_raw)
+        #     ax.view_init(azim=-120, elev=-150)
+        #     mpplot.show()
+        # else:
+        #     continue
 
         valid_id = np.where(np.logical_and(
             1e-1 < dist,  # remove sigular point
@@ -161,35 +169,62 @@ def raw_to_offset(image_crop, pose_raw, cube, hmap_size, caminfo):
     return offset_map, hmap3, uomap
 
 
-def hmap3_to_raw(hmap2, hmap3, uomap, depth, cube, hmap_size, caminfo, nn=5):
+def hmap3_to_raw(
+    hmap2, hmap3, uomap, image_crop,
+        cube, hmap_size, caminfo, nn=5):
     """ recover 3d from weight avarage """
+    from sklearn.preprocessing import normalize
     num_joint = hmap3.shape[2]
     theta = caminfo.region_size * 2
     pose_out = np.empty([num_joint, 3])
+    image_hmap = image_crop[::4, ::4]
     for joint in range(num_joint):
         # restore from 3d
         hm3 = hmap3[..., joint]
-        hm3[np.where(1e-2 > depth)] = 0  # mask out void
+        hm3[np.where(1e-2 > image_hmap)] = 0  # mask out void
         top_id = hm3.argpartition(-nn, axis=None)[-nn:]  # top elements
         x3, y3 = np.unravel_index(top_id, hm3.shape)
-        dist = hm3[x3, y3]
-        dist = theta - dist * theta  # inverse propotional
-        unit_off = uomap[x3, y3, 3 * joint:3 * (joint + 1)]
+        conf3 = hm3[x3, y3]
+        dist = theta - conf3 * theta  # inverse propotional
+        uom = uomap[..., 3 * joint:3 * (joint + 1)]
+        unit_off = uom[x3, y3, :]
+        unit_off = normalize(unit_off, norm='l2')
         offset = unit_off * np.tile(dist, [3, 1]).T
         p0 = cube.unit_to_raw(
             np.vstack([x3, y3]).astype(float).T / hmap_size,
-            depth[x3, y3])
+            image_hmap[x3, y3])
         pred3 = p0 + offset
         # restore from 2d
         hm2 = hmap2[..., joint]
         coord, _ = cube.raw_to_unit(pred3)
-        coord = coord.clip(0., 1.)  # pointing out is not good
-        coord *= hmap_size
-        coord *= 0.999999
-        coord = np.floor(coord).astype(int)
+        coord = cube.unit_to_image(coord, hmap_size)
         x2, y2 = coord[:, 0], coord[:, 1]
         conf = hm2[x2, y2]
-        pred32 = np.sum(pred3 * np.tile(conf, [3, 1]).T, axis=0) / np.sum(conf)
+        if 1e-2 > np.sum(conf):
+            pred32 = np.sum(
+                pred3 * np.tile(conf3, [3, 1]).T, axis=0
+            ) / np.sum(conf3)
+            # from utils.image_ops import draw_hmap2, draw_hmap3, draw_uomap
+            # fig, _ = mpplot.subplots(nrows=2, ncols=2)
+            # ax = mpplot.subplot(2, 2, 1)
+            # c0, _ = cube.raw_to_unit(p0)
+            # c0 = cube.unit_to_image(coord, hmap_size)
+            # x0, y0 = c0[:, 0], c0[:, 1]
+            # ax.quiver(
+            #     x0, y0, (x2 - x0), (y2 - y0),
+            #     color='r', width=0.004, scale=20)
+            # ax.imshow(image_hmap, cmap='bone')
+            # ax = mpplot.subplot(2, 2, 2)
+            # draw_hmap2(fig, ax, image_crop, hm2)
+            # ax = mpplot.subplot(2, 2, 3)
+            # draw_hmap3(fig, ax, image_crop, hm3)
+            # ax = mpplot.subplot(2, 2, 4)
+            # draw_uomap(fig, ax, image_crop, uom)
+            # mpplot.show()
+        else:
+            pred32 = np.sum(
+                pred3 * np.tile(conf, [3, 1]).T, axis=0
+            ) / np.sum(conf)
         pose_out[joint, :] = pred32
     return pose_out
 

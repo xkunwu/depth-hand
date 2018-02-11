@@ -39,14 +39,14 @@ class base_detec(base_regre):
         colors = [Color('orange').rgb, Color('red').rgb, Color('lime').rgb]
         mpplot.subplots(nrows=2, ncols=2, figsize=(2 * 5, 2 * 5))
 
-        mpplot.subplot(2, 2, 3)
+        ax = mpplot.subplot(2, 2, 3)
         mpplot.gca().set_title('test storage read')
         resce3 = resce_h5[0:4]
         cube = iso_cube()
         cube.load(resce3)
         # need to maintain both image and poses at the same scale
         sizel = np.floor(resce3[0]).astype(int)
-        mpplot.imshow(
+        ax.imshow(
             cv2resize(frame_h5, (sizel, sizel)),
             cmap='bone')
         pose3d = cube.trans_scale_to(poses_h5)
@@ -57,11 +57,11 @@ class base_detec(base_regre):
             pose2d,
         )
 
-        mpplot.subplot(2, 2, 4)
+        ax = mpplot.subplot(2, 2, 4)
         mpplot.gca().set_title('test output')
         img_name = args.data_io.index2imagename(img_id)
         img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
-        mpplot.imshow(img, cmap='bone')
+        ax.imshow(img, cmap='bone')
         pose_raw = self.yanker(poses_h5, resce_h5, self.caminfo)
         args.data_draw.draw_pose2d(
             thedata,
@@ -73,18 +73,18 @@ class base_detec(base_regre):
         for ii, rect in enumerate(rects):
             rect.draw(colors[ii])
 
-        mpplot.subplot(2, 2, 1)
+        ax = mpplot.subplot(2, 2, 1)
         mpplot.gca().set_title('test input')
         annot_line = args.data_io.get_line(
             thedata.training_annot_cleaned, img_id)
         img_name, pose_raw = args.data_io.parse_line_annot(annot_line)
         img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
-        mpplot.imshow(img, cmap='bone')
+        ax.imshow(img, cmap='bone')
         args.data_draw.draw_pose2d(
             thedata,
             args.data_ops.raw_to_2d(pose_raw, thedata))
 
-        mpplot.subplot(2, 2, 2)
+        ax = mpplot.subplot(2, 2, 2)
         mpplot.gca().set_title('test storage write')
         img_name, frame, poses, resce = self.provider_worker(
             annot_line, self.image_dir, thedata)
@@ -101,7 +101,7 @@ class base_detec(base_regre):
         cube = iso_cube()
         cube.load(resce3)
         sizel = np.floor(resce3[0]).astype(int)
-        mpplot.imshow(
+        ax.imshow(
             cv2resize(frame, (sizel, sizel)),
             cmap='bone')
         pose3d = cube.trans_scale_to(poses)

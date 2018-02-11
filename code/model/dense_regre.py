@@ -110,7 +110,7 @@ class dense_regre(base_regre):
 
     @staticmethod
     def get_trainer(args, new_log):
-        from train import train_dense_regre
+        from train.train_dense_regre import train_dense_regre
         return train_dense_regre(args, new_log)
 
     def __init__(self, args):
@@ -139,6 +139,9 @@ class dense_regre(base_regre):
         _, hmap3, uomap = self.data_module.ops.raw_to_offset(
             img_crop_resize, pose_raw, cube, self.hmap_size, caminfo
         )
+        # _, hmap3, uomap = self.data_module.ops.raw_to_offset(
+        #     img, pose_raw, cube, self.hmap_size, caminfo
+        # )
         index = self.data_module.io.imagename2index(img_name)
         return (index, np.expand_dims(img_crop_resize, axis=-1),
                 pose_pca.flatten().T, hmap2, hmap3, uomap, resce)
@@ -171,13 +174,13 @@ class dense_regre(base_regre):
         batchallot.batch_resce[bi, :] = resce
 
     def write_pred(self, fanno, caminfo,
-                   batch_index, batch_resce, batch_frame, batch_poses):
+                   batch_index, batch_resce,
+                   batch_frame, batch_poses):
         num_j = self.out_dim
         for ii in range(batch_index.shape[0]):
             img_name = self.data_module.io.index2imagename(batch_index[ii, 0])
             resce = batch_resce[ii, :]
             depth = np.squeeze(batch_frame[ii, ...])
-            depth = depth[::4, ::4]  # downsampling
             hmap2 = batch_poses[ii, ..., 0 * num_j:1 * num_j]
             hmap3 = batch_poses[ii, ..., 1 * num_j:2 * num_j]
             uomap = batch_poses[ii, ..., 2 * num_j:]
@@ -376,7 +379,6 @@ class dense_regre(base_regre):
         hmap2 = hmap2_h5[..., joint_id]
         hmap3 = hmap3_h5[..., joint_id]
         uomap = uomap_h5[..., 3 * joint_id:3 * (joint_id + 1)]
-        depth_hmap = frame_h5[::4, ::4]
         depth_crop = cv2resize(frame_h5, (sizel, sizel))
 
         ax = mpplot.subplot(2, 3, 1)
@@ -390,41 +392,18 @@ class dense_regre(base_regre):
         )
 
         ax = mpplot.subplot(2, 3, 4)
-        draw_hmap2(fig, ax, depth_hmap, hmap2)
-        # mpplot.imshow(depth_hmap, cmap='bone')
-        # img_h2 = mpplot.imshow(hmap2, cmap=transparent_cmap(mpplot.cm.jet))
-        # divider = make_axes_locatable(ax)
-        # cax = divider.append_axes("right", size="5%", pad=0.05)
-        # mpplot.colorbar(img_h2, cax=cax)
-        # # import seaborn as sns; sns.set(); ax = sns.heatmap(hmap2)
+        draw_hmap2(fig, ax, frame_h5, hmap2)
 
         ax = mpplot.subplot(2, 3, 5)
         draw_uomap(fig, ax, frame_h5, uomap)
-        # mpplot.imshow(frame_h5, cmap='bone')
-        # xx, yy = np.meshgrid(np.arange(0, 128, 4), np.arange(0, 128, 4))
-        # mpplot.quiver(
-        #     xx, yy,
-        #     np.squeeze(uomap[..., 0]),
-        #     -np.squeeze(uomap[..., 1]),
-        #     color='r', width=0.004, scale=20)
-        # # mpplot.quiver(  # quiver is pointing upper-right!
-        # #     xx, yy,
-        # #     np.ones_like(xx),
-        # #     np.ones_like(xx),
-        # #     color='r', width=0.004, scale=20)
 
         ax = mpplot.subplot(2, 3, 6)
-        draw_hmap3(fig, ax, depth_hmap, hmap3)
-        # mpplot.imshow(depth_hmap, cmap='bone')
-        # img_h3 = mpplot.imshow(hmap3, cmap=transparent_cmap(mpplot.cm.jet))
-        # divider = make_axes_locatable(ax)
-        # cax = divider.append_axes("right", size="5%", pad=0.05)
-        # mpplot.colorbar(img_h3, cax=cax)
+        draw_hmap3(fig, ax, frame_h5, hmap3)
 
         ax = mpplot.subplot(2, 3, 2)
         pose_out = self.yanker_hmap(
             resce_h5, hmap2_h5, hmap3_h5, uomap_h5,
-            depth_hmap, self.hmap_size, self.caminfo)
+            frame_h5, self.hmap_size, self.caminfo)
         print('reprojection error: {}'.format(
             np.sum(np.abs(pose_out - cube.transform_add_center(poses_h5))))
         )
@@ -466,26 +445,32 @@ class dense_regre(base_regre):
 
     def get_model(
             self, input_tensor, is_training, bn_decay,
-            scope=None, hg_repeat=2):
+            hg_repeat=2, scope=None):
         """ input_tensor: BxHxWxC
             out_dim: BxHxWx(J*5), where J is number of joints
         """
         end_points = {}
         self.end_point_list = []
-        num_out_map = self.out_dim * 5  # hmap2, hmap3, uomap
+        final_endpoint = 'hourglass_{}'.format(hg_repeat - 1)
+        num_joint = self.out_dim
+        # num_out_map = num_joint * 5  # hmap2, hmap3, uomap
+        num_feature = 128
 
         def add_and_check_final(name, net):
             end_points[name] = net
-            return False
+            return name == final_endpoint
 
         from tensorflow.contrib import slim
         # ~/anaconda2/lib/python2.7/site-packages/tensorflow/contrib/layers/
         with tf.variable_scope(
                 scope, self.name_desc, [input_tensor]):
+            weight_decay = 0.00004
+            bn_epsilon = 0.001
             with \
                 slim.arg_scope(
                     [slim.batch_norm],
                     is_training=is_training,
+                    epsilon=bn_epsilon,
                     # # Make sure updates happen automatically
                     # updates_collections=None,
                     # Try zero_debias_moving_mean=True for improved stability.
@@ -496,60 +481,81 @@ class dense_regre(base_regre):
                     is_training=is_training), \
                 slim.arg_scope(
                     [slim.fully_connected],
-                    weights_regularizer=slim.l2_regularizer(0.00004),
-                    biases_regularizer=slim.l2_regularizer(0.00004),
+                    weights_regularizer=slim.l2_regularizer(weight_decay),
+                    biases_regularizer=slim.l2_regularizer(weight_decay),
                     activation_fn=tf.nn.relu,
                     normalizer_fn=slim.batch_norm), \
                 slim.arg_scope(
                     [slim.max_pool2d, slim.avg_pool2d],
-                    stride=1, padding='SAME'), \
+                    stride=2, padding='SAME'), \
                 slim.arg_scope(
                     [slim.conv2d_transpose],
                     stride=2, padding='SAME',
+                    weights_regularizer=slim.l2_regularizer(weight_decay),
+                    biases_regularizer=slim.l2_regularizer(weight_decay),
                     activation_fn=tf.nn.relu,
                     normalizer_fn=slim.batch_norm), \
                 slim.arg_scope(
                     [slim.conv2d],
                     stride=1, padding='SAME',
-                    weights_regularizer=slim.l2_regularizer(0.00004),
-                    biases_regularizer=slim.l2_regularizer(0.00004),
+                    weights_regularizer=slim.l2_regularizer(weight_decay),
+                    biases_regularizer=slim.l2_regularizer(weight_decay),
                     activation_fn=tf.nn.relu,
                     normalizer_fn=slim.batch_norm):
                 with tf.variable_scope('stage128'):
                     sc = 'stage128_image'
                     net = slim.conv2d(
-                        input_tensor, 32, [1, 7], scope='conv128_7x7_1')
-                    net = slim.conv2d(
-                        net, 32, [7, 1], stride=2, scope='conv128_7x7_2')
-                    net = slim.max_pool2d(
-                        net, 3, scope='maxpool128_3x3_1')
+                        input_tensor, 32, [1, 7])
+                    net = slim.conv2d(net, 32, [7, 1])
+                    net = slim.max_pool2d(net, 3)
                     self.end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points
                     sc = 'stage64_image'
-                    net = incept_resnet.residual3(
-                        net, scope='stage64_residual_1')
+                    net = incept_resnet.resnet_k(
+                        net, scope='stage64_residual')
                     net = incept_resnet.reduce_net(
-                        net, scope='stage64_reduce_2')
-                    net = incept_resnet.residual3(
-                        net, scope='stage64_residual_2')
+                        net, scope='stage64_reduce')
+                    self.end_point_list.append(sc)
+                    if add_and_check_final(sc, net):
+                        return net, end_points
+                    sc = 'stage32_image'
+                    net = incept_resnet.resnet_k(
+                        net, scope='stage32_residual')
                     net = slim.conv2d(
-                        net, num_out_map, 1, scope='conv1_1x1_1')
+                        net, num_feature, 1, scope='stage32_out')
                     self.end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points
                 for hg in range(hg_repeat):
                     sc = 'hourglass_{}'.format(hg)
                     with tf.variable_scope(sc):
-                        net = hourglass.hg_net(
-                            net, 4, scope='hourglass'
-                        )
-                        net = incept_resnet.residual3(
-                            net, scope='residual')
+                        branch0 = hourglass.hg_net(
+                            net, 4, scope=sc + '_hg')
+                        branch0 = incept_resnet.resnet_k(
+                            branch0, scope='_res')
+                        branch_hm2 = slim.conv2d(
+                            branch0, num_joint, 1,
+                            # normalizer_fn=None, activation_fn=tf.nn.softmax)
+                            normalizer_fn=None, activation_fn=None)
+                        branch_hm3 = slim.conv2d(
+                            branch0, num_joint, 1,
+                            # normalizer_fn=None, activation_fn=tf.nn.relu)
+                            normalizer_fn=None, activation_fn=None)
+                        branch_uom = slim.conv2d(
+                            branch0, num_joint * 3, 1,
+                            # normalizer_fn=None, activation_fn=tf.nn.sigmoid)
+                            normalizer_fn=None, activation_fn=None)
+                        net_maps = tf.concat(
+                            [branch_hm2, branch_hm3, branch_uom],
+                            axis=-1)
                         self.end_point_list.append(sc)
-                        if add_and_check_final(sc, net):
-                            return net, end_points
-        return net, end_points
+                        if add_and_check_final(sc, net_maps):
+                            return net_maps, end_points
+                        branch1 = slim.conv2d(
+                            net_maps, num_feature, 1)
+                        net = net + branch0 + branch1
+        raise ValueError('final_endpoint (%s) not recognized', final_endpoint)
 
     def placeholder_inputs(self, batch_size=None):
         frames_tf = tf.placeholder(
@@ -579,15 +585,22 @@ class dense_regre(base_regre):
                 self.out_dim * 5))
         return frames_tf, poses_tf
 
-    def get_loss(self, pred, anno, end_points):
+    def get_loss(self, pred, echt, end_points):
         """ simple sum-of-squares loss
-            pred: BxJ
-            anno: BxJ
+            pred: BxHxWx(J*5)
+            echt: BxHxWx(J*5)
         """
+        # num_joint = self.out_dim
         loss = 0
         for name, net in end_points.items():
-            if name.startswith('hourglass_'):
-                loss += tf.nn.l2_loss(net - anno)  # already divided by 2
+            if not name.startswith('hourglass_'):
+                continue
+            # loss_hm2 = tf.reduce_sum(
+            #     tf.nn.cross_entropy_with_logits(
+            #         targets=echt[:, :num_joint],
+            #         logits=pred[:, :num_joint])
+            # )
+            loss += tf.nn.l2_loss(net - echt)  # already divided by 2
         reg_losses = tf.add_n(tf.get_collection(
             tf.GraphKeys.REGULARIZATION_LOSSES))
         return loss + reg_losses

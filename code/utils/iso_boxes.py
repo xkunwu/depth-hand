@@ -221,6 +221,11 @@ class iso_cube:
         normed = np.hstack((coord, depth.reshape(-1, 1)))
         return self.transform_expand_move(normed)
 
+    def unit_to_image(self, coord, sizel):
+        coord = coord.clip(0., 0.999999)  # pointing out is not good
+        coord *= sizel
+        return np.floor(coord).astype(int)
+
     def print_image(self, coord, depth, sizel):
         """ expand to required image size """
         img = np.zeros((sizel, sizel))

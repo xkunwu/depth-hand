@@ -168,12 +168,12 @@ class base_conv3(base_regre):
         print(np.histogram(frame_h5, range=(1e-4, np.max(frame_h5))))
         colors = [Color('orange').rgb, Color('red').rgb, Color('lime').rgb]
         mpplot.subplots(nrows=2, ncols=2, figsize=(2 * 5, 2 * 5))
-        mpplot.subplot(2, 2, 1)
+        ax = mpplot.subplot(2, 2, 1)
         annot_line = args.data_io.get_line(
             thedata.training_annot_cleaned, img_id)
         img_name, pose_raw = args.data_io.parse_line_annot(annot_line)
         img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
-        mpplot.imshow(img, cmap='bone')
+        ax.imshow(img, cmap='bone')
         args.data_draw.draw_pose2d(
             thedata,
             args.data_ops.raw_to_2d(pose_raw, self.caminfo))
@@ -201,7 +201,7 @@ class base_conv3(base_regre):
         ax = mpplot.subplot(2, 2, 4)
         img_name = args.data_io.index2imagename(img_id)
         img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
-        mpplot.imshow(img, cmap='bone')
+        ax.imshow(img, cmap='bone')
         pose_raw = self.yanker(poses_h5, resce_h5, self.caminfo)
         args.data_draw.draw_pose2d(
             thedata,
@@ -297,23 +297,36 @@ class base_conv3(base_regre):
 
         with tf.variable_scope(
                 scope, self.name_desc, [input_tensor]):
-            with slim.arg_scope(
-                    [slim.batch_norm, slim.dropout],
+            weight_decay = 0.00004
+            bn_epsilon = 0.001
+            with \
+                slim.arg_scope(
+                    [slim.batch_norm],
+                    is_training=is_training,
+                    epsilon=bn_epsilon,
+                    # # Make sure updates happen automatically
+                    # updates_collections=None,
+                    # Try zero_debias_moving_mean=True for improved stability.
+                    # zero_debias_moving_mean=True,
+                    decay=bn_decay), \
+                slim.arg_scope(
+                    [slim.dropout],
                     is_training=is_training), \
                 slim.arg_scope(
                     [slim.fully_connected],
-                    weights_regularizer=slim.l2_regularizer(0.00004),
-                    biases_regularizer=slim.l2_regularizer(0.00004),
-                    activation_fn=None, normalizer_fn=None), \
+                    weights_regularizer=slim.l2_regularizer(weight_decay),
+                    biases_regularizer=slim.l2_regularizer(weight_decay),
+                    activation_fn=tf.nn.relu,
+                    normalizer_fn=slim.batch_norm), \
                 slim.arg_scope(
                     [slim.max_pool3d, slim.avg_pool3d],
-                    stride=1, padding='SAME'), \
+                    stride=2, padding='SAME'), \
                 slim.arg_scope(
                     [slim.conv3d],
                     stride=1, padding='SAME',
+                    weights_regularizer=slim.l2_regularizer(weight_decay),
+                    biases_regularizer=slim.l2_regularizer(weight_decay),
                     activation_fn=tf.nn.relu,
-                    weights_regularizer=slim.l2_regularizer(0.00004),
-                    biases_regularizer=slim.l2_regularizer(0.00004),
                     normalizer_fn=slim.batch_norm):
                 with tf.variable_scope('stage32'):
                     sc = 'stage32'
@@ -360,7 +373,9 @@ class base_conv3(base_regre):
                         net, 0.5, scope='dropout4')
                     net = slim.flatten(net)
                     net = slim.fully_connected(
-                        net, self.out_dim, scope='output4')
+                        net, self.out_dim,
+                        activation_fn=None, normalizer_fn=None,
+                        scope='output4')
                     self.end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points

@@ -13,9 +13,11 @@ model_map = {
     'base_regre': 'model.base_regre',
     'base_clean_inres': 'model.base_inres',
     'base_regre_inres': 'model.base_inres',
+    'base_clean_hg': 'model.base_hourglass',
+    'base_regre_hg': 'model.base_hourglass',
     'localizer3': 'model.localizer3',
     'localizer2': 'model.localizer2',
-    'dense_regre': 'model.dense_regre.dense_regre',
+    'dense_regre': 'model.dense_regre',
 }
 
 

@@ -95,8 +95,8 @@ class capture:
         ax.set_zlabel('depth (mm)', labelpad=15)
         corners = cube.get_corners()
         iso_cube.draw_cube_wire(corners)
-        mpplot.subplot(1, 2, 2)
-        mpplot.imshow(img, cmap='bone')
+        ax = mpplot.subplot(1, 2, 2)
+        ax.imshow(img, cmap='bone')
         rects = cube.proj_rects_3(
             self.args.data_ops.raw_to_2d,
             # self.args.data_inst

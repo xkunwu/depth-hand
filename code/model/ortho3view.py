@@ -63,9 +63,9 @@ class ortho3view(base_regre):
         # need to maintain both image and poses at the same scale
         sizel = np.floor(resce3[0]).astype(int)
         for spi in range(3):
-            mpplot.subplot(3, 3, spi + 7)
+            ax = mpplot.subplot(3, 3, spi + 7)
             img = frame_h5[..., spi]
-            mpplot.imshow(
+            ax.imshow(
                 cv2resize(img, (sizel, sizel)),
                 cmap='bone')
             pose3d = cube.trans_scale_to(poses_h5)
@@ -77,22 +77,22 @@ class ortho3view(base_regre):
             )
             mpplot.gca().axis('off')
 
-        mpplot.subplot(3, 3, 3)
+        ax = mpplot.subplot(3, 3, 3)
         img_name = args.data_io.index2imagename(img_id)
         img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
-        mpplot.imshow(img, cmap='bone')
+        ax.imshow(img, cmap='bone')
         pose_raw = self.yanker(poses_h5, resce_h5, self.caminfo)
         args.data_draw.draw_pose2d(
             thedata,
             args.data_ops.raw_to_2d(pose_raw, thedata)
         )
 
-        mpplot.subplot(3, 3, 1)
+        ax = mpplot.subplot(3, 3, 1)
         annot_line = args.data_io.get_line(
             thedata.training_annot_cleaned, img_id)
         img_name, pose_raw = args.data_io.parse_line_annot(annot_line)
         img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
-        mpplot.imshow(img, cmap='bone')
+        ax.imshow(img, cmap='bone')
         args.data_draw.draw_pose2d(
             thedata,
             args.data_ops.raw_to_2d(pose_raw, thedata))
@@ -122,9 +122,9 @@ class ortho3view(base_regre):
         cube.load(resce3)
         sizel = np.floor(resce3[0]).astype(int)
         for spi in range(3):
-            mpplot.subplot(3, 3, spi + 4)
+            ax = mpplot.subplot(3, 3, spi + 4)
             img = frame[..., spi]
-            mpplot.imshow(
+            ax.imshow(
                 cv2resize(img, (sizel, sizel)),
                 cmap='bone')
             pose3d = cube.trans_scale_to(poses)
@@ -159,23 +159,36 @@ class ortho3view(base_regre):
 
         with tf.variable_scope(
                 scope, self.name_desc, [input_tensor]):
-            with slim.arg_scope(
-                    [slim.batch_norm, slim.dropout],
+            weight_decay = 0.00004
+            bn_epsilon = 0.001
+            with \
+                slim.arg_scope(
+                    [slim.batch_norm],
+                    is_training=is_training,
+                    epsilon=bn_epsilon,
+                    # # Make sure updates happen automatically
+                    # updates_collections=None,
+                    # Try zero_debias_moving_mean=True for improved stability.
+                    # zero_debias_moving_mean=True,
+                    decay=bn_decay), \
+                slim.arg_scope(
+                    [slim.dropout],
                     is_training=is_training), \
                 slim.arg_scope(
                     [slim.fully_connected],
-                    weights_regularizer=slim.l2_regularizer(0.00004),
-                    biases_regularizer=slim.l2_regularizer(0.00004),
-                    activation_fn=None, normalizer_fn=None), \
+                    weights_regularizer=slim.l2_regularizer(weight_decay),
+                    biases_regularizer=slim.l2_regularizer(weight_decay),
+                    activation_fn=tf.nn.relu,
+                    normalizer_fn=slim.batch_norm), \
                 slim.arg_scope(
                     [slim.max_pool2d, slim.avg_pool2d],
-                    stride=1, padding='SAME'), \
+                    stride=2, padding='SAME'), \
                 slim.arg_scope(
                     [slim.conv2d],
                     stride=1, padding='SAME',
+                    weights_regularizer=slim.l2_regularizer(weight_decay),
+                    biases_regularizer=slim.l2_regularizer(weight_decay),
                     activation_fn=tf.nn.relu,
-                    weights_regularizer=slim.l2_regularizer(0.00004),
-                    biases_regularizer=slim.l2_regularizer(0.00004),
                     normalizer_fn=slim.batch_norm):
                 with tf.variable_scope('stage128'):
                     sc = 'stage128_image'

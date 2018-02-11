@@ -102,27 +102,27 @@ if __name__ == "__main__":
 
     from args_holder import args_holder
     # import tfplot
-    with_train = True
-    # with_train = False
+    # with_train = True
+    with_train = False
     with_eval = True
     # with_eval = False
 
-    # mpl = import_module('matplotlib')
-    # mpl.use('Agg')
-    with args_holder() as argsholder:
-        argsholder.parse_args()
-        args = argsholder.args
-        argsholder.create_instance()
-        # import shutil
-        # shutil.rmtree(args.out_dir)
-        # os.makedirs(args.out_dir)
-
-        test_dataops(args)
-
-        run_one(args, with_train, with_eval)
-
-        # draw_compare(args)
-    sys.exit()
+    # # mpl = import_module('matplotlib')
+    # # mpl.use('Agg')
+    # with args_holder() as argsholder:
+    #     argsholder.parse_args()
+    #     args = argsholder.args
+    #     argsholder.create_instance()
+    #     # import shutil
+    #     # shutil.rmtree(args.out_dir)
+    #     # os.makedirs(args.out_dir)
+    #
+    #     test_dataops(args)
+    #
+    #     run_one(args, with_train, with_eval)
+    #
+    #     # draw_compare(args)
+    # sys.exit()
 
     # mpl = import_module('matplotlib')
     # mpl.use('Agg')
@@ -137,6 +137,8 @@ if __name__ == "__main__":
         # 'base_clean',
         # 'base_regre_inres',
         # 'base_clean_inres',
+        # 'base_regre_hg',
+        # 'base_clean_hg',
     ]
     for meth in methlist:
         with args_holder() as argsholder:

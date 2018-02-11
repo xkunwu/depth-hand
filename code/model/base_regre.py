@@ -308,13 +308,13 @@ class base_regre(object):
         resce2 = resce_h5[4:7]
         mpplot.subplots(nrows=2, ncols=2, figsize=(2 * 5, 2 * 5))
 
-        mpplot.subplot(2, 2, 3)
+        ax = mpplot.subplot(2, 2, 3)
         mpplot.gca().set_title('test storage read')
         # resize the cropped resion for eazier pose drawing in the commen frame
         sizel = np.floor(resce2[0]).astype(int)
         resce_cp = np.copy(resce2)
         resce_cp[0] = 1
-        mpplot.imshow(
+        ax.imshow(
             cv2resize(frame_h5, (sizel, sizel)),
             cmap='bone')
         pose_raw = args.data_ops.local_to_raw(poses_h5, resce3)
@@ -323,11 +323,11 @@ class base_regre(object):
             args.data_ops.raw_to_2d(pose_raw, thedata, resce_cp)
         )
 
-        mpplot.subplot(2, 2, 4)
+        ax = mpplot.subplot(2, 2, 4)
         mpplot.gca().set_title('test output')
         img_name = args.data_io.index2imagename(img_id)
         img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
-        mpplot.imshow(img, cmap='bone')
+        ax.imshow(img, cmap='bone')
         pose_raw = self.yanker(
             poses_h5, resce_h5, self.caminfo)
         args.data_draw.draw_pose2d(
@@ -338,18 +338,18 @@ class base_regre(object):
         rect.load(resce2)
         rect.draw()
 
-        mpplot.subplot(2, 2, 1)
+        ax = mpplot.subplot(2, 2, 1)
         mpplot.gca().set_title('test input #{:d}'.format(img_id))
         annot_line = args.data_io.get_line(
             thedata.training_annot_cleaned, img_id)
         img_name, pose_raw = args.data_io.parse_line_annot(annot_line)
         img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
-        mpplot.imshow(img, cmap='bone')
+        ax.imshow(img, cmap='bone')
         args.data_draw.draw_pose2d(
             thedata,
             args.data_ops.raw_to_2d(pose_raw, thedata))
 
-        mpplot.subplot(2, 2, 2)
+        ax = mpplot.subplot(2, 2, 2)
         mpplot.gca().set_title('test storage write')
         img_name, frame, poses, resce = self.provider_worker(
             annot_line, self.image_dir, thedata)
@@ -367,7 +367,7 @@ class base_regre(object):
         sizel = np.floor(resce2[0]).astype(int)
         resce_cp = np.copy(resce2)
         resce_cp[0] = 1
-        mpplot.imshow(
+        ax.imshow(
             cv2resize(frame, (sizel, sizel)),
             cmap='bone')
         pose_raw = args.data_ops.local_to_raw(poses, resce3)
@@ -444,13 +444,17 @@ class base_regre(object):
             end_points[name] = net
             return name == final_endpoint
         from tensorflow.contrib import slim
+        from incept_resnet import incept_resnet
         # ~/anaconda2/lib/python2.7/site-packages/tensorflow/contrib/layers/
         with tf.variable_scope(
                 scope, self.name_desc, [input_tensor]):
+            weight_decay = 0.00004
+            bn_epsilon = 0.001
             with \
                 slim.arg_scope(
                     [slim.batch_norm],
                     is_training=is_training,
+                    epsilon=bn_epsilon,
                     # # Make sure updates happen automatically
                     # updates_collections=None,
                     # Try zero_debias_moving_mean=True for improved stability.
@@ -461,82 +465,50 @@ class base_regre(object):
                     is_training=is_training), \
                 slim.arg_scope(
                     [slim.fully_connected],
-                    weights_regularizer=slim.l2_regularizer(0.00004),
-                    biases_regularizer=slim.l2_regularizer(0.00004),
+                    weights_regularizer=slim.l2_regularizer(weight_decay),
+                    biases_regularizer=slim.l2_regularizer(weight_decay),
                     activation_fn=tf.nn.relu,
                     normalizer_fn=slim.batch_norm), \
                 slim.arg_scope(
                     [slim.max_pool2d, slim.avg_pool2d],
-                    stride=1, padding='SAME'), \
+                    stride=2, padding='SAME'), \
                 slim.arg_scope(
                     [slim.conv2d],
                     stride=1, padding='SAME',
-                    weights_regularizer=slim.l2_regularizer(0.00004),
-                    biases_regularizer=slim.l2_regularizer(0.00004),
+                    weights_regularizer=slim.l2_regularizer(weight_decay),
+                    biases_regularizer=slim.l2_regularizer(weight_decay),
                     activation_fn=tf.nn.relu,
                     normalizer_fn=slim.batch_norm):
                 with tf.variable_scope('stage128'):
                     sc = 'stage128_image'
-                    net = slim.conv2d(
-                        input_tensor, 16, 3, scope='conv128_3x3_1')
-                    net = slim.conv2d(
-                        net, 16, 3, stride=2, scope='conv128_3x3_2')
-                    net = slim.max_pool2d(
-                        net, 3, scope='maxpool128_3x3_1')
+                    net = slim.conv2d(input_tensor, 16, 3)
+                    net = slim.conv2d(net, 16, 3)
+                    net = slim.max_pool2d(net, 3)
                     self.end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points
                     sc = 'stage64_image'
-                    net = slim.conv2d(
-                        net, 32, 3, scope='conv64_3x3_1')
-                    net = slim.max_pool2d(
-                        net, 3, stride=2, scope='maxpool64_3x3_2')
+                    net = incept_resnet.conv_maxpool(net, scope=sc)
                     self.end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points
                 with tf.variable_scope('stage32'):
                     sc = 'stage32_image'
-                    net = slim.conv2d(
-                        net, 64, 3, scope='conv32_3x3_1')
-                    net = slim.max_pool2d(
-                        net, 3, stride=2, scope='maxpool32_3x3_2')
+                    net = incept_resnet.conv_maxpool(net, scope=sc)
                     self.end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points
                 with tf.variable_scope('stage16'):
                     sc = 'stage16_image'
-                    net = slim.conv2d(
-                        net, 128, 3, scope='conv16_3x3_1')
-                    net = slim.max_pool2d(
-                        net, 3, stride=2, scope='maxpool16_3x3_2')
+                    net = incept_resnet.conv_maxpool(net, scope=sc)
                     self.end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points
                 with tf.variable_scope('stage8'):
                     sc = 'stage_out'
-                    net = slim.avg_pool2d(
-                        net, 5, stride=3, padding='VALID',
-                        scope='avgpool8_5x5_3')
-                    self.end_point_list.append('avgpool8_5x5_3')
-                    if add_and_check_final('avgpool8_5x5_3', net):
-                        return net, end_points
-                    net = slim.conv2d(net, 64, 1, scope='reduce8')
-                    self.end_point_list.append('reduce8')
-                    if add_and_check_final('reduce8', net):
-                        return net, end_points
-                    net = slim.conv2d(
-                        net, 128, net.get_shape()[1:3],
-                        padding='VALID', scope='fullconn8')
-                    self.end_point_list.append('fullconn8')
-                    if add_and_check_final('fullconn8', net):
-                        return net, end_points
-                    net = slim.flatten(net)
-                    net = slim.dropout(
-                        net, 0.5, scope='dropout8')
-                    net = slim.fully_connected(
-                        net, self.out_dim,
-                        activation_fn=None, normalizer_fn=None,
-                        scope='output8')
+                    net = incept_resnet.pullout8(
+                        net, self.out_dim, is_training,
+                        scope=sc)
                     self.end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points
@@ -568,3 +540,38 @@ class base_regre(object):
         reg_losses = tf.add_n(tf.get_collection(
             tf.GraphKeys.REGULARIZATION_LOSSES))
         return loss + reg_losses
+
+    @staticmethod
+    def base_arg_scope(is_training,
+                       bn_decay=0.9997, bn_epsilon=0.001,
+                       weight_decay=0.00004, activation_fn=tf.nn.relu):
+        from tensorflow.contrib import slim
+        with slim.arg_scope(
+                [slim.batch_norm],
+                is_training=is_training,
+                epsilon=bn_epsilon,
+                # # Make sure updates happen automatically
+                # updates_collections=None,
+                # Try zero_debias_moving_mean=True for improved stability.
+                # zero_debias_moving_mean=True,
+                decay=bn_decay):
+                    with slim.arg_scope(
+                            [slim.dropout],
+                            is_training=is_training):
+                            with slim.arg_scope(
+                                    [slim.fully_connected],
+                                    weights_regularizer=slim.l2_regularizer(weight_decay),
+                                    biases_regularizer=slim.l2_regularizer(weight_decay),
+                                    activation_fn=tf.nn.relu,
+                                    normalizer_fn=slim.batch_norm):
+                                with slim.arg_scope(
+                                        [slim.max_pool2d, slim.avg_pool2d],
+                                        stride=2, padding='SAME'):
+                                    with slim.arg_scope(
+                                            [slim.conv2d],
+                                            stride=1, padding='SAME',
+                                            weights_regularizer=slim.l2_regularizer(weight_decay),
+                                            biases_regularizer=slim.l2_regularizer(weight_decay),
+                                            activation_fn=tf.nn.relu,
+                                            normalizer_fn=slim.batch_norm) as scope:
+                                        return scope

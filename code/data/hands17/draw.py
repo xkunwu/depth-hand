@@ -134,15 +134,15 @@ def draw_prediction_poses(thedata, image_dir, annot_echt, annot_pred):
     print('drawing image #{:d}: {}'.format(img_id, img_path))
     img = dataio.read_image(img_path)
 
-    mpplot.subplot(2, 2, 1)
-    mpplot.imshow(img, cmap='bone')
+    ax = mpplot.subplot(2, 2, 1)
+    ax.imshow(img, cmap='bone')
     draw_pose_raw(
         thedata, img,
         pose_echt,
         show_margin=True)
     mpplot.gca().set_title('Ground truth #{:d}'.format(img_id))
-    mpplot.subplot(2, 2, 2)
-    mpplot.imshow(img, cmap='bone')
+    ax = mpplot.subplot(2, 2, 2)
+    ax.imshow(img, cmap='bone')
     draw_pose_raw(
         thedata, img,
         pose_pred,
@@ -157,15 +157,15 @@ def draw_prediction_poses(thedata, image_dir, annot_echt, annot_pred):
     img_path = os.path.join(image_dir, img_name)
     print('drawing image #{:d}: {}'.format(img_id, img_path))
     img = dataio.read_image(img_path)
-    mpplot.subplot(2, 2, 3)
-    mpplot.imshow(img, cmap='bone')
+    ax = mpplot.subplot(2, 2, 3)
+    ax.imshow(img, cmap='bone')
     draw_pose_raw(
         thedata, img,
         pose_echt,
         show_margin=True)
     mpplot.gca().set_title('Ground truth #{:d}'.format(img_id))
-    mpplot.subplot(2, 2, 4)
-    mpplot.imshow(img, cmap='bone')
+    ax = mpplot.subplot(2, 2, 4)
+    ax.imshow(img, cmap='bone')
     draw_pose_raw(
         thedata, img,
         pose_pred,

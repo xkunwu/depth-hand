@@ -13,8 +13,9 @@ def transparent_cmap(cmap, tmax=0.99, N=255):
     return mycmap
 
 
-def draw_hmap2(fig, ax, depth_hmap, hmap2):
-    ax.imshow(depth_hmap, cmap='bone')
+def draw_hmap2(fig, ax, image_crop, hmap2):
+    image_hmap = image_crop[::4, ::4]
+    ax.imshow(image_hmap, cmap='bone')
     img_h2 = ax.imshow(
         hmap2, cmap=transparent_cmap(mpplot.cm.jet))
     divider = make_axes_locatable(ax)
@@ -22,8 +23,9 @@ def draw_hmap2(fig, ax, depth_hmap, hmap2):
     fig.colorbar(img_h2, cax=cax)
 
 
-def draw_hmap3(fig, ax, depth_hmap, hmap3):
-    ax.imshow(depth_hmap, cmap='bone')
+def draw_hmap3(fig, ax, image_crop, hmap3):
+    image_hmap = image_crop[::4, ::4]
+    ax.imshow(image_hmap, cmap='bone')
     img_h3 = ax.imshow(
         hmap3, cmap=transparent_cmap(mpplot.cm.jet))
     divider = make_axes_locatable(ax)
@@ -31,8 +33,8 @@ def draw_hmap3(fig, ax, depth_hmap, hmap3):
     fig.colorbar(img_h3, cax=cax)
 
 
-def draw_uomap(fig, ax, depth_crop, uomap):
-    ax.imshow(depth_crop, cmap='bone')
+def draw_uomap(fig, ax, image_crop, uomap):
+    ax.imshow(image_crop, cmap='bone')
     xx, yy = np.meshgrid(
         np.arange(0, 128, 4), np.arange(0, 128, 4))
     ax.quiver(
