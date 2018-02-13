@@ -69,10 +69,10 @@ class ortho3view(base_regre):
                 cv2resize(img, (sizel, sizel)),
                 cmap='bone')
             pose3d = cube.trans_scale_to(poses_h5)
-            pose2d, _ = cube.project_pca(pose3d, roll=spi, sort=False)
+            pose2d, _ = cube.project_ortho(pose3d, roll=spi, sort=False)
             pose2d *= sizel
             args.data_draw.draw_pose2d(
-                thedata,
+                ax, thedata,
                 pose2d,
             )
             mpplot.gca().axis('off')
@@ -83,7 +83,7 @@ class ortho3view(base_regre):
         ax.imshow(img, cmap='bone')
         pose_raw = self.yanker(poses_h5, resce_h5, self.caminfo)
         args.data_draw.draw_pose2d(
-            thedata,
+            ax, thedata,
             args.data_ops.raw_to_2d(pose_raw, thedata)
         )
 
@@ -94,7 +94,7 @@ class ortho3view(base_regre):
         img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
         ax.imshow(img, cmap='bone')
         args.data_draw.draw_pose2d(
-            thedata,
+            ax, thedata,
             args.data_ops.raw_to_2d(pose_raw, thedata))
 
         img_name, frame, poses, resce = self.provider_worker(
@@ -128,17 +128,17 @@ class ortho3view(base_regre):
                 cv2resize(img, (sizel, sizel)),
                 cmap='bone')
             pose3d = cube.trans_scale_to(poses)
-            pose2d, _ = cube.project_pca(pose3d, roll=spi, sort=False)
+            pose2d, _ = cube.project_ortho(pose3d, roll=spi, sort=False)
             pose2d *= sizel
             args.data_draw.draw_pose2d(
-                thedata,
+                ax, thedata,
                 pose2d,
             )
             mpplot.gca().axis('off')
 
         mpplot.savefig(os.path.join(
             args.predict_dir,
-            'draw_{}.png'.format(self.__class__.__name__)))
+            'draw_{}_{}.png'.format(self.name_desc, img_id)))
         if self.args.show_draw:
             mpplot.show()
         print('[{}] drawing image #{:d} - done.'.format(
@@ -157,6 +157,7 @@ class ortho3view(base_regre):
             end_points[name] = net
             return name == final_endpoint
 
+        from incept_resnet import incept_resnet
         with tf.variable_scope(
                 scope, self.name_desc, [input_tensor]):
             weight_decay = 0.00004
@@ -184,6 +185,13 @@ class ortho3view(base_regre):
                     [slim.max_pool2d, slim.avg_pool2d],
                     stride=2, padding='SAME'), \
                 slim.arg_scope(
+                    [slim.conv2d_transpose],
+                    stride=2, padding='SAME',
+                    weights_regularizer=slim.l2_regularizer(weight_decay),
+                    biases_regularizer=slim.l2_regularizer(weight_decay),
+                    activation_fn=tf.nn.relu,
+                    normalizer_fn=slim.batch_norm), \
+                slim.arg_scope(
                     [slim.conv2d],
                     stride=1, padding='SAME',
                     weights_regularizer=slim.l2_regularizer(weight_decay),
@@ -192,34 +200,25 @@ class ortho3view(base_regre):
                     normalizer_fn=slim.batch_norm):
                 with tf.variable_scope('stage128'):
                     sc = 'stage128_image'
-                    net = slim.conv2d(
-                        input_tensor, 16, 3, scope='conv128_3x3_1')
-                    net = slim.conv2d(
-                        net, 16, 3, stride=2, scope='conv128_3x3_2')
-                    net = slim.max_pool2d(
-                        net, 3, scope='maxpool128_3x3_1')
-                    net = slim.conv2d(
-                        net, 32, 3, scope='conv64_3x3_1')
-                    net = slim.max_pool2d(
-                        net, 3, stride=2, scope='maxpool64_3x3_2')
+                    net = slim.conv2d(input_tensor, 8, 3)
+                    net = incept_resnet.conv_maxpool(net, scope=sc)
+                    self.end_point_list.append(sc)
+                    if add_and_check_final(sc, net):
+                        return net, end_points
+                    sc = 'stage64_image'
+                    net = incept_resnet.conv_maxpool(net, scope=sc)
                     self.end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points
                 with tf.variable_scope('stage32'):
                     sc = 'stage32_image'
-                    net = slim.conv2d(
-                        net, 64, 3, scope='conv32_3x3_1')
-                    net = slim.max_pool2d(
-                        net, 3, stride=2, scope='maxpool32_3x3_2')
+                    net = incept_resnet.conv_maxpool(net, scope=sc)
                     self.end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points
                 with tf.variable_scope('stage16'):
                     sc = 'stage16_image'
-                    net = slim.conv2d(
-                        net, 128, 3, scope='conv16_3x3_1')
-                    net = slim.max_pool2d(
-                        net, 3, stride=2, scope='maxpool16_3x3_2')
+                    net = incept_resnet.conv_maxpool(net, scope=sc)
                     self.end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points

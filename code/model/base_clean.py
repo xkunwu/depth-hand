@@ -43,7 +43,7 @@ class base_clean(base_regre):
         # cube.build(points3, 0)
         # corners = cube.get_corners()
         # ax = mpplot.subplot(projection='3d')
-        # cube.draw_cube_wire(corners)
+        # cube.draw_cube_wire(ax, corners)
         # pose_trans = cube.transform_to_center(points3)
         # ax.scatter(
         #     pose_trans[:, 0], pose_trans[:, 1], pose_trans[:, 2],
@@ -79,10 +79,10 @@ class base_clean(base_regre):
             cv2resize(frame_h5, (sizel, sizel)),
             cmap='bone')
         pose3d = cube.trans_scale_to(poses_h5)
-        pose2d, _ = cube.project_pca(pose3d, roll=0, sort=False)
+        pose2d, _ = cube.project_ortho(pose3d, roll=0, sort=False)
         pose2d *= sizel
         args.data_draw.draw_pose2d(
-            thedata,
+            ax, thedata,
             pose2d,
         )
 
@@ -93,14 +93,14 @@ class base_clean(base_regre):
         ax.imshow(img, cmap='bone')
         pose_raw = self.yanker(poses_h5, resce_h5, self.caminfo)
         args.data_draw.draw_pose2d(
-            thedata,
+            ax, thedata,
             args.data_ops.raw_to_2d(pose_raw, thedata)
         )
         rects = cube.proj_rects_3(
             args.data_ops.raw_to_2d, self.caminfo
         )
         for ii, rect in enumerate(rects):
-            rect.draw(colors[ii])
+            rect.draw(ax, colors[ii])
 
         ax = mpplot.subplot(2, 2, 1)
         mpplot.gca().set_title('test input')
@@ -110,7 +110,7 @@ class base_clean(base_regre):
         img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
         ax.imshow(img, cmap='bone')
         args.data_draw.draw_pose2d(
-            thedata,
+            ax, thedata,
             args.data_ops.raw_to_2d(pose_raw, thedata))
 
         ax = mpplot.subplot(2, 2, 2)
@@ -134,16 +134,16 @@ class base_clean(base_regre):
             cv2resize(frame, (sizel, sizel)),
             cmap='bone')
         pose3d = cube.trans_scale_to(poses)
-        pose2d, _ = cube.project_pca(pose3d, roll=0, sort=False)
+        pose2d, _ = cube.project_ortho(pose3d, roll=0, sort=False)
         pose2d *= sizel
         args.data_draw.draw_pose2d(
-            thedata,
+            ax, thedata,
             pose2d,
         )
 
         mpplot.savefig(os.path.join(
             args.predict_dir,
-            'draw_{}.png'.format(self.name_desc)))
+            'draw_{}_{}.png'.format(self.name_desc, img_id)))
         if self.args.show_draw:
             mpplot.show()
         print('[{}] drawing image #{:d} - done.'.format(

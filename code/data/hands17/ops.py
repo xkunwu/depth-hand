@@ -87,8 +87,7 @@ def raw_to_heatmap2(pose_raw, cube, hmap_size, caminfo):
         # mpplot.imshow(img, cmap='bone')
         # mpplot.show()
         img_l.append(img)
-    img_arr = np.stack(img_l, axis=2)
-    return img_arr
+    return np.stack(img_l, axis=2)
 
 
 def raw_to_offset(image_crop, pose_raw, cube, hmap_size, caminfo):
@@ -119,7 +118,7 @@ def raw_to_offset(image_crop, pose_raw, cube, hmap_size, caminfo):
         #     ax = mpplot.subplot(1, 2, 1)
         #     ax.imshow(image_crop, cmap='bone')
         #     data_draw.draw_pose2d(
-        #         caminfo,
+        #         ax, caminfo,
         #         raw_to_2d(pose_raw, caminfo))
         #     ax.axis('off')
         #     ax = mpplot.subplot(1, 2, 2, projection='3d')
@@ -131,7 +130,7 @@ def raw_to_offset(image_crop, pose_raw, cube, hmap_size, caminfo):
         #     ax.scatter(
         #         points3_trans[:, 0], points3_trans[:, 1], points3_trans[:, 2],
         #         color=Color('lightsteelblue').rgb)
-        #     data_draw.draw_raw3d_pose(caminfo, pose_raw)
+        #     data_draw.draw_raw3d_pose(ax, caminfo, pose_raw)
         #     ax.view_init(azim=-120, elev=-150)
         #     mpplot.show()
         # else:
@@ -164,23 +163,23 @@ def raw_to_offset(image_crop, pose_raw, cube, hmap_size, caminfo):
         # mpplot.imshow(img, cmap=mpplot.cm.jet)
         # mpplot.show()
     offset_map = np.stack(omap_l, axis=2)
-    hmap3 = np.stack(hmap_l, axis=2)
+    olmap = np.stack(hmap_l, axis=2)
     uomap = np.stack(umap_l, axis=2)
-    return offset_map, hmap3, uomap
+    return offset_map, olmap, uomap
 
 
-def hmap3_to_raw(
-    hmap2, hmap3, uomap, image_crop,
+def offset_to_raw(
+    hmap2, olmap, uomap, image_crop,
         cube, hmap_size, caminfo, nn=5):
     """ recover 3d from weight avarage """
     from sklearn.preprocessing import normalize
-    num_joint = hmap3.shape[2]
+    num_joint = olmap.shape[2]
     theta = caminfo.region_size * 2
     pose_out = np.empty([num_joint, 3])
     image_hmap = image_crop[::4, ::4]
     for joint in range(num_joint):
         # restore from 3d
-        hm3 = hmap3[..., joint]
+        hm3 = olmap[..., joint]
         hm3[np.where(1e-2 > image_hmap)] = 0  # mask out void
         top_id = hm3.argpartition(-nn, axis=None)[-nn:]  # top elements
         x3, y3 = np.unravel_index(top_id, hm3.shape)
@@ -204,7 +203,7 @@ def hmap3_to_raw(
             pred32 = np.sum(
                 pred3 * np.tile(conf3, [3, 1]).T, axis=0
             ) / np.sum(conf3)
-            # from utils.image_ops import draw_hmap2, draw_hmap3, draw_uomap
+            # from utils.image_ops import draw_hmap2, draw_olmap, draw_uomap
             # fig, _ = mpplot.subplots(nrows=2, ncols=2)
             # ax = mpplot.subplot(2, 2, 1)
             # c0, _ = cube.raw_to_unit(p0)
@@ -217,7 +216,7 @@ def hmap3_to_raw(
             # ax = mpplot.subplot(2, 2, 2)
             # draw_hmap2(fig, ax, image_crop, hm2)
             # ax = mpplot.subplot(2, 2, 3)
-            # draw_hmap3(fig, ax, image_crop, hm3)
+            # draw_olmap(fig, ax, image_crop, hm3)
             # ax = mpplot.subplot(2, 2, 4)
             # draw_uomap(fig, ax, image_crop, uom)
             # mpplot.show()
@@ -383,7 +382,7 @@ def voxelize_depth(img, pose_raw, step, anchor_num, caminfo):
     # ax.view_init(azim=-90, elev=-60)
     # ax.set_zlabel('depth (mm)', labelpad=15)
     # corners = cube.get_corners()
-    # iso_cube.draw_cube_wire(corners)
+    # iso_cube.draw_cube_wire(ax, corners)
     # from mayavi import mlab
     # mlab.figure(size=(800, 800))
     # mlab.pipeline.volume(mlab.pipeline.scalar_field(pcnt))
@@ -421,7 +420,7 @@ def generate_anchors_2d(img, pose_raw, anchor_num, caminfo):
     # ))
     # mpplot.imshow(img, cmap='bone')
     # rect.show_dims()
-    # rect.draw()
+    # rect.draw(ax)
     # mpplot.show()
     resce = cube.dump()
     return np.append(pcnt.flatten(), anchors), resce
@@ -473,10 +472,130 @@ def fill_grid(img, pose_raw, step, caminfo):
         caminfo.region_size
     )
     points3_pick = cube.pick(img_to_raw(img, caminfo))
-    points3_trans = cube.transform_center_shrink(points3_pick)
     grid = regu_grid()
     grid.from_cube(cube, step)
-    pcnt = grid.fill(points3_trans)
+    pcnt = grid.fill(points3_pick)
+    resce = cube.dump()
+    return pcnt, resce
+
+
+def raw_to_vxoff(vxhit, pose_raw, cube, step, caminfo):
+    """ offset map from voxel center to each joint
+        Args:
+            img: should be size of 128
+    """
+    grid = regu_grid()
+    grid.from_cube(cube, step)
+    vol_shape = (step, step, step)
+    from numpy import linalg
+    omap_l = []
+    hmap_l = []
+    umap_l = []
+    theta = caminfo.region_size * 2  # maximal - cube size
+    for jj, joint in enumerate(pose_raw):
+        vh = vxhit[..., joint]
+        index = np.array(np.unravel_index(
+            int(vh), vol_shape))
+        voxcens = grid.voxen(index)
+        offset = joint - voxcens
+        dist = linalg.norm(offset, axis=1)  # offset norm
+        valid_id = np.where(np.logical_and(
+            1e-1 < dist,  # remove sigular point
+            theta > dist  # limit support within theta
+        ))
+        offset = offset[valid_id]
+        dist = dist[valid_id]
+        unit_off = offset / np.tile(dist, [3, 1]).T  # unit offset
+        dist = (theta - dist) / theta  # inverse propotional
+        index_valid = index[valid_id]
+        for dim in range(3):
+            om = np.zeros(vol_shape)
+            om[index_valid] = offset[:, dim]
+            omap_l.append(om)
+            um = np.zeros(vol_shape)
+            um[index_valid] = unit_off[:, dim]
+            umap_l.append(um)
+        hm = np.zeros(vol_shape)
+        hm[index_valid] = dist
+        hmap_l.append(hm)
+    offset_map = np.stack(omap_l, axis=2)
+    olmap = np.stack(hmap_l, axis=2)
+    uomap = np.stack(umap_l, axis=2)
+    return offset_map, olmap, uomap
+
+
+def vxoff_to_raw(
+    olmap, uomap, vxhit,
+        cube, hmap_size, caminfo, nn=5):
+    """ recover 3d from weight avarage """
+    from sklearn.preprocessing import normalize
+    num_joint = olmap.shape[2]
+    theta = caminfo.region_size * 2
+    pose_out = np.empty([num_joint, 3])
+    image_hmap = image_crop[::4, ::4]
+    for joint in range(num_joint):
+        # restore from 3d
+        hm3 = olmap[..., joint]
+        hm3[np.where(1e-2 > image_hmap)] = 0  # mask out void
+        top_id = hm3.argpartition(-nn, axis=None)[-nn:]  # top elements
+        x3, y3 = np.unravel_index(top_id, hm3.shape)
+        conf3 = hm3[x3, y3]
+        dist = theta - conf3 * theta  # inverse propotional
+        uom = uomap[..., 3 * joint:3 * (joint + 1)]
+        unit_off = uom[x3, y3, :]
+        unit_off = normalize(unit_off, norm='l2')
+        offset = unit_off * np.tile(dist, [3, 1]).T
+        p0 = cube.unit_to_raw(
+            np.vstack([x3, y3]).astype(float).T / hmap_size,
+            image_hmap[x3, y3])
+        pred3 = p0 + offset
+        pred32 = np.sum(
+            pred3 * np.tile(conf3, [3, 1]).T, axis=0
+        ) / np.sum(conf3)
+        pose_out[joint, :] = pred32
+    return pose_out
+
+
+def raw_to_vxlabel(pose_raw, cube, step, caminfo):
+    """ 01-voxel heatmap, also labels """
+    grid = regu_grid()
+    grid.from_cube(cube, step)
+    indices = grid.putit(pose_raw)
+    # vol_l = []
+    # for index in indices:
+    #     vol = np.zeros((step, step, step))
+    #     vol[index[0], index[1], index[2]] = 1.
+    # return np.stack(vol_l, axis=3)
+    return np.ravel_multi_index(
+        indices.T, (step, step, step))
+
+
+def vxlabel_to_raw(vxhit, cube, step, caminfo):
+    """ vxhit: sequential number """
+    grid = regu_grid()
+    grid.from_cube(cube, step)
+    num_joint = vxhit.shape[-1]
+    pose_out = np.empty([num_joint, 3])
+    vol_shape = (step, step, step)
+    for joint in range(num_joint):
+        vh = vxhit[..., joint]
+        # index = np.array(np.unravel_index(
+        #     np.argmax(vh), vh.shape))
+        index = np.array(np.unravel_index(
+            int(vh), vol_shape))
+        pose_out[joint, :] = grid.voxen(index)
+    return pose_out
+
+
+def voxel_hit(img, pose_raw, step, caminfo):
+    cube = iso_cube(
+        (np.max(pose_raw, axis=0) + np.min(pose_raw, axis=0)) / 2,
+        caminfo.region_size
+    )
+    points3_pick = cube.pick(img_to_raw(img, caminfo))
+    grid = regu_grid()
+    grid.from_cube(cube, step)
+    pcnt = grid.hit(points3_pick)
     resce = cube.dump()
     return pcnt, resce
 
@@ -487,10 +606,10 @@ def proj_ortho3(img, pose_raw, caminfo):
         caminfo.region_size
     )
     points3_pick = cube.pick(img_to_raw(img, caminfo))
-    points3_trans = cube.transform_center_shrink(points3_pick)
+    points3_norm = cube.transform_center_shrink(points3_pick)
     img_l = []
     for spi in range(3):
-        coord, depth = cube.project_pca(points3_trans, roll=spi)
+        coord, depth = cube.project_ortho(points3_norm, roll=spi)
         img_crop = cube.print_image(coord, depth, caminfo.crop_size)
         # img_l.append(
         #     cv2resize(img_crop, (caminfo.crop_size, caminfo.crop_size))
@@ -498,7 +617,7 @@ def proj_ortho3(img, pose_raw, caminfo):
         img_l.append(
             img_crop
         )
-        # pose2d, _ = cube.project_pca(pose_trans, roll=spi, sort=False)
+        # pose2d, _ = cube.project_ortho(pose_trans, roll=spi, sort=False)
     # resce = np.concatenate((
     #     np.array([float(caminfo.crop_size) / cube.get_sidelen()]),
     #     np.ones(2) * cube.get_sidelen(),
@@ -535,8 +654,8 @@ def crop_resize_pca(img, pose_raw, caminfo):
         caminfo.region_size
     )
     points3_pick = cube.pick(img_to_raw(img, caminfo))
-    points3_trans = cube.transform_center_shrink(points3_pick)
-    coord, depth = cube.project_pca(points3_trans)
+    points3_norm = cube.transform_center_shrink(points3_pick)
+    coord, depth = cube.project_ortho(points3_norm)
     img_crop_resize = cube.print_image(
         coord, depth, caminfo.crop_size)
     # I0 = np.zeros((8, 8))
@@ -584,7 +703,7 @@ def crop_resize(img, pose_raw, caminfo):
     # import matplotlib.pyplot as mpplot
     # mpplot.imshow(img, cmap='bone')
     # rect.show_dims()
-    # rect.draw()
+    # rect.draw(ax)
     # rect = proj_cube_to_rect(cube, caminfo.region_size, caminfo)
     # rect.show_dims()
     # cube.show_dims()

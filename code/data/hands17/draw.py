@@ -29,7 +29,7 @@ iso_cube = getattr(
 )
 
 
-def draw_pose2d(thedata, pose2d, show_margin=True):
+def draw_pose2d(ax, thedata, pose2d, show_margin=True):
     """ Draw 2D pose on the image domain.
         Args:
             pose2d: nx2 array, image domain coordinates
@@ -46,14 +46,14 @@ def draw_pose2d(thedata, pose2d, show_margin=True):
         color_range = [C.rgb for C in make_color_range(
             color_v0, thedata.join_color[fii + 1], len(p2joints) + 1)]
         for jj, joint in enumerate(p2joints):
-            mpplot.plot(
+            ax.plot(
                 p2joints[jj, 1], p2joints[jj, 0],
                 # p2joints[jj, 0], p2joints[jj, 1],
                 'o',
                 color=color_range[jj + 1]
             )
         p2joints = np.vstack((p2wrist, p2joints))
-        mpplot.plot(
+        ax.plot(
             p2joints[:, 1], p2joints[:, 0],
             # p2joints[:, 0], p2joints[:, 1],
             '-',
@@ -65,14 +65,14 @@ def draw_pose2d(thedata, pose2d, show_margin=True):
         # x, y = verts[:, 0], verts[:, 1]
         # z = np.linspace(0, 1, step)
         # colorline(x, y, z, cmap=mpplot.get_cmap('jet'))
-    # mpplot.gca().add_artist(
-    #     mpplot.Circle(
+    # ax.add_artist(
+    #     ax.Circle(
     #         p2wrist[0, :],
     #         20,
     #         color=[i / 255 for i in thedata.join_color[0]]
     #     )
     # )
-    mpplot.plot(
+    ax.plot(
         p2wrist[0, 1], p2wrist[0, 0],
         # p2wrist[0, 0], p2wrist[0, 1],
         'o',
@@ -82,7 +82,7 @@ def draw_pose2d(thedata, pose2d, show_margin=True):
     #     for jj in range(4):
     #         p0 = pose2d[bone[jj][0], :]
     #         p2 = pose2d[bone[jj][1], :]
-    #         mpplot.plot(
+    #         ax.plot(
     #             (int(p0[0]), int(p0[1])), (int(p2[0]), int(p2[1])),
     #             color=[i / 255 for i in thedata.join_color[fii + 1]],
     #             linewidth=2.0
@@ -95,7 +95,7 @@ def draw_pose2d(thedata, pose2d, show_margin=True):
     return fig2data(mpplot.gcf(), show_margin)
 
 
-def draw_pose_raw(thedata, img, pose_raw, show_margin=False):
+def draw_pose_raw(ax, thedata, img, pose_raw, show_margin=False):
     """ Draw 3D pose onto 2D image domain: using only (x, y).
         Args:
             pose_raw: nx3 array
@@ -114,10 +114,10 @@ def draw_pose_raw(thedata, img, pose_raw, show_margin=False):
         thedata.region_size
     )
     rect = dataops.get_rect2(cube, thedata)
-    rect.draw()
+    rect.draw(ax)
 
     img_posed = draw_pose2d(
-        thedata,
+        ax, thedata,
         pose2d,
         show_margin)
     return img_posed
@@ -137,17 +137,17 @@ def draw_prediction_poses(thedata, image_dir, annot_echt, annot_pred):
     ax = mpplot.subplot(2, 2, 1)
     ax.imshow(img, cmap='bone')
     draw_pose_raw(
-        thedata, img,
+        ax, thedata, img,
         pose_echt,
         show_margin=True)
-    mpplot.gca().set_title('Ground truth #{:d}'.format(img_id))
+    ax.set_title('Ground truth #{:d}'.format(img_id))
     ax = mpplot.subplot(2, 2, 2)
     ax.imshow(img, cmap='bone')
     draw_pose_raw(
-        thedata, img,
+        ax, thedata, img,
         pose_pred,
         show_margin=True)
-    mpplot.gca().set_title('Prediction')
+    ax.set_title('Prediction')
 
     img_id = np.random.randint(1, high=sum(1 for _ in open(annot_pred, 'r')))
     line_echt = linecache.getline(annot_echt, img_id)
@@ -160,17 +160,17 @@ def draw_prediction_poses(thedata, image_dir, annot_echt, annot_pred):
     ax = mpplot.subplot(2, 2, 3)
     ax.imshow(img, cmap='bone')
     draw_pose_raw(
-        thedata, img,
+        ax, thedata, img,
         pose_echt,
         show_margin=True)
-    mpplot.gca().set_title('Ground truth #{:d}'.format(img_id))
+    ax.set_title('Ground truth #{:d}'.format(img_id))
     ax = mpplot.subplot(2, 2, 4)
     ax.imshow(img, cmap='bone')
     draw_pose_raw(
-        thedata, img,
+        ax, thedata, img,
         pose_pred,
         show_margin=True)
-    mpplot.gca().set_title('Prediction')
+    ax.set_title('Prediction')
     mpplot.tight_layout()
     return img_id
 
@@ -197,10 +197,11 @@ def draw_pose_raw_random(thedata, image_dir, annot_txt, img_id=-1):
     img = dataio.read_image(img_path)
 
     mpplot.imshow(img, cmap='bone')
+    ax = mpplot.gca()
     # if resce is None:
-    draw_pose_raw(thedata, img, pose_raw)
+    draw_pose_raw(ax, thedata, img, pose_raw)
     # else:
-    #     draw_pose2d(thedata, pose_raw[:, 0:2])
+    #     draw_pose2d(ax, thedata, pose_raw[:, 0:2])
     # mpplot.show()
     return img_id
 
@@ -218,13 +219,14 @@ def draw_pose_stream(thedata, gif_file, max_draw=100):
                 img_name, pose_raw, resce = dataio.parse_line_annot(annot_line)
                 img = dataio.read_image(os.path.join(thedata.training_images, img_name))
                 mpplot.imshow(img, cmap='bone')
-                img_posed = draw_pose_raw(img, pose_raw)
+                ax = mpplot.gca()
+                img_posed = draw_pose_raw(ax, img, pose_raw)
                 # mpplot.show()
                 gif_writer.append_data(img_posed)
                 mpplot.gcf().clear()
 
 
-def draw_raw3d_pose(thedata, pose_raw, zdir='z'):
+def draw_raw3d_pose(ax, thedata, pose_raw, zdir='z'):
     p3wrist = np.array([pose_raw[0, :]])
     for fii, joints in enumerate(thedata.join_id):
         p3joints = pose_raw[joints, :]
@@ -233,20 +235,20 @@ def draw_raw3d_pose(thedata, pose_raw, zdir='z'):
         color_range = [C.rgb for C in make_color_range(
             color_v0, thedata.join_color[fii + 1], len(p3joints) + 1)]
         for jj, joint in enumerate(p3joints):
-            mpplot.gca().scatter(
+            ax.scatter(
                 p3joints[jj, 0], p3joints[jj, 1], p3joints[jj, 2],
                 color=color_range[jj + 1],
                 zdir=zdir
             )
         p3joints_w = np.vstack((p3wrist, p3joints))
-        mpplot.plot(
+        ax.plot(
             p3joints_w[:, 0], p3joints_w[:, 1], p3joints_w[:, 2],
             '-',
             linewidth=2.0,
             color=thedata.join_color[fii + 1].rgb,
             zdir=zdir
         )
-    mpplot.gca().scatter(
+    ax.scatter(
         p3wrist[0, 0], p3wrist[0, 1], p3wrist[0, 2],
         color=thedata.join_color[0].rgb,
         zdir=zdir
@@ -272,7 +274,7 @@ def draw_raw3d(thedata, img, pose_raw):
         color=Color('lightsteelblue').rgb)
     ax.view_init(azim=-90, elev=-60)
     ax.set_zlabel('depth (mm)', labelpad=15)
-    draw_raw3d_pose(thedata, pose_raw)
+    draw_raw3d_pose(ax, thedata, pose_raw)
     corners = cube.get_corners()
     corners = cube.transform_add_center(corners)
     cube.draw_wire(corners)
@@ -290,7 +292,7 @@ def draw_raw3d(thedata, img, pose_raw):
     ax.scatter(
         points3_sam[:, 0], points3_sam[:, 1], points3_sam[:, 2],
         color=Color('lightsteelblue').rgb)
-    draw_raw3d_pose(thedata, pose_trans)
+    draw_raw3d_pose(ax, thedata, pose_trans)
     corners = cube.get_corners()
     cube.draw_wire(corners)
     ax.view_init(azim=-120, elev=-150)
@@ -300,13 +302,13 @@ def draw_raw3d(thedata, img, pose_raw):
     fig_size = (3 * 5, 5)
     mpplot.subplots(nrows=1, ncols=3, figsize=fig_size)
     for spi in range(3):
-        mpplot.subplot(1, 3, spi + 1)
-        coord, depth = cube.project_pca(points3_trans, roll=spi)
+        ax = mpplot.subplot(1, 3, spi + 1)
+        coord, depth = cube.project_ortho(points3_trans, roll=spi)
         img = cube.print_image(coord, depth, thedata.crop_size)
-        pose2d, _ = cube.project_pca(pose_trans, roll=spi, sort=False)
-        draw_pose2d(thedata, pose2d)
-        mpplot.imshow(img, cmap='bone')
-    mpplot.gca().axis('off')
+        pose2d, _ = cube.project_ortho(pose_trans, roll=spi, sort=False)
+        draw_pose2d(ax, thedata, pose2d)
+        ax.imshow(img, cmap='bone')
+        ax.axis('off')
     mpplot.tight_layout()
     mpplot.show()
 
@@ -331,26 +333,26 @@ def draw_raw3d_random(thedata, image_dir, annot_txt, img_id=-1):
     draw_raw3d(thedata, img, pose_raw)
     fig_size = (3 * 5, 5)
     mpplot.subplots(nrows=1, ncols=2, figsize=fig_size)
-    mpplot.subplot(1, 3, 1)
-    mpplot.imshow(img, cmap='bone')
+    ax = mpplot.subplot(1, 3, 1)
+    ax.imshow(img, cmap='bone')
     draw_pose_raw(thedata, img, pose_raw)
-    mpplot.subplot(1, 3, 2)
+    ax = mpplot.subplot(1, 3, 2)
     img_crop_resize, resce = dataops.crop_resize(
         img, pose_raw, thedata)
-    mpplot.imshow(img_crop_resize, cmap='bone')
+    ax.imshow(img_crop_resize, cmap='bone')
     draw_pose2d(
-        thedata,
+        ax, thedata,
         dataops.raw_to_2d(pose_raw, thedata, resce))
-    mpplot.gca().set_title('Cropped')
-    mpplot.subplot(1, 3, 3)
+    ax.set_title('Cropped')
+    ax = mpplot.subplot(1, 3, 3)
     img_crop_resize, resce = dataops.crop_resize_pca(
         img, pose_raw, thedata)
-    mpplot.imshow(img_crop_resize, cmap='bone')
+    ax.imshow(img_crop_resize, cmap='bone')
     draw_pose2d(
-        thedata,
+        ax, thedata,
         dataops.raw_to_2d(pose_raw, thedata, resce))
-    mpplot.gca().set_title('Cleaned')
-    mpplot.gca().axis('off')
+    ax.set_title('Cleaned')
+    ax.axis('off')
     mpplot.tight_layout()
     mpplot.show()
     return img_id

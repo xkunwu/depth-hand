@@ -134,6 +134,7 @@ def draw_error_per_joint(errors, methods, ax, join_name=None, draw_std=False):
     mpplot.margins(0.1)
     mpplot.tight_layout()
     mpplot.legend(methods, loc='upper left')
+    return err_mean[:, -1]
 
 
 def evaluate_detection(thedata, model_name, predict_dir, predict_file):

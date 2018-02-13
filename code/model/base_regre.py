@@ -1,11 +1,11 @@
 import os
+from importlib import import_module
 import numpy as np
 import tensorflow as tf
 import progressbar
 import h5py
 import matplotlib.pyplot as mpplot
 from cv2 import resize as cv2resize
-from model.batch_allot import batch_allot
 from utils.coder import file_pack
 from utils.iso_boxes import iso_rect
 
@@ -28,7 +28,10 @@ class base_regre(object):
         self.crop_range = 480.
         self.num_channel = 1
         self.num_appen = 7
-        self.batch_allot = batch_allot
+        self.batch_allot = getattr(
+            import_module('model.batch_allot'),
+            'batch_allot'
+        )
         self.store_file = None
         self.batch_data = None
         # receive arguments
@@ -319,7 +322,7 @@ class base_regre(object):
             cmap='bone')
         pose_raw = args.data_ops.local_to_raw(poses_h5, resce3)
         args.data_draw.draw_pose2d(
-            thedata,
+            ax, thedata,
             args.data_ops.raw_to_2d(pose_raw, thedata, resce_cp)
         )
 
@@ -331,12 +334,12 @@ class base_regre(object):
         pose_raw = self.yanker(
             poses_h5, resce_h5, self.caminfo)
         args.data_draw.draw_pose2d(
-            thedata,
+            ax, thedata,
             args.data_ops.raw_to_2d(pose_raw, thedata)
         )
         rect = iso_rect()
         rect.load(resce2)
-        rect.draw()
+        rect.draw(ax)
 
         ax = mpplot.subplot(2, 2, 1)
         mpplot.gca().set_title('test input #{:d}'.format(img_id))
@@ -346,7 +349,7 @@ class base_regre(object):
         img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
         ax.imshow(img, cmap='bone')
         args.data_draw.draw_pose2d(
-            thedata,
+            ax, thedata,
             args.data_ops.raw_to_2d(pose_raw, thedata))
 
         ax = mpplot.subplot(2, 2, 2)
@@ -372,7 +375,7 @@ class base_regre(object):
             cmap='bone')
         pose_raw = args.data_ops.local_to_raw(poses, resce3)
         args.data_draw.draw_pose2d(
-            thedata,
+            ax, thedata,
             args.data_ops.raw_to_2d(pose_raw, thedata, resce_cp)
         )
 
@@ -473,6 +476,13 @@ class base_regre(object):
                     [slim.max_pool2d, slim.avg_pool2d],
                     stride=2, padding='SAME'), \
                 slim.arg_scope(
+                    [slim.conv2d_transpose],
+                    stride=2, padding='SAME',
+                    weights_regularizer=slim.l2_regularizer(weight_decay),
+                    biases_regularizer=slim.l2_regularizer(weight_decay),
+                    activation_fn=tf.nn.relu,
+                    normalizer_fn=slim.batch_norm), \
+                slim.arg_scope(
                     [slim.conv2d],
                     stride=1, padding='SAME',
                     weights_regularizer=slim.l2_regularizer(weight_decay),
@@ -481,9 +491,8 @@ class base_regre(object):
                     normalizer_fn=slim.batch_norm):
                 with tf.variable_scope('stage128'):
                     sc = 'stage128_image'
-                    net = slim.conv2d(input_tensor, 16, 3)
-                    net = slim.conv2d(net, 16, 3)
-                    net = slim.max_pool2d(net, 3)
+                    net = slim.conv2d(input_tensor, 8, 3)
+                    net = incept_resnet.conv_maxpool(net, scope=sc)
                     self.end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points
@@ -541,37 +550,37 @@ class base_regre(object):
             tf.GraphKeys.REGULARIZATION_LOSSES))
         return loss + reg_losses
 
-    @staticmethod
-    def base_arg_scope(is_training,
-                       bn_decay=0.9997, bn_epsilon=0.001,
-                       weight_decay=0.00004, activation_fn=tf.nn.relu):
-        from tensorflow.contrib import slim
-        with slim.arg_scope(
-                [slim.batch_norm],
-                is_training=is_training,
-                epsilon=bn_epsilon,
-                # # Make sure updates happen automatically
-                # updates_collections=None,
-                # Try zero_debias_moving_mean=True for improved stability.
-                # zero_debias_moving_mean=True,
-                decay=bn_decay):
-                    with slim.arg_scope(
-                            [slim.dropout],
-                            is_training=is_training):
-                            with slim.arg_scope(
-                                    [slim.fully_connected],
-                                    weights_regularizer=slim.l2_regularizer(weight_decay),
-                                    biases_regularizer=slim.l2_regularizer(weight_decay),
-                                    activation_fn=tf.nn.relu,
-                                    normalizer_fn=slim.batch_norm):
-                                with slim.arg_scope(
-                                        [slim.max_pool2d, slim.avg_pool2d],
-                                        stride=2, padding='SAME'):
-                                    with slim.arg_scope(
-                                            [slim.conv2d],
-                                            stride=1, padding='SAME',
-                                            weights_regularizer=slim.l2_regularizer(weight_decay),
-                                            biases_regularizer=slim.l2_regularizer(weight_decay),
-                                            activation_fn=tf.nn.relu,
-                                            normalizer_fn=slim.batch_norm) as scope:
-                                        return scope
+    # @staticmethod
+    # def base_arg_scope(is_training,
+    #                    bn_decay=0.9997, bn_epsilon=0.001,
+    #                    weight_decay=0.00004, activation_fn=tf.nn.relu):
+    #     from tensorflow.contrib import slim
+    #     with slim.arg_scope(
+    #             [slim.batch_norm],
+    #             is_training=is_training,
+    #             epsilon=bn_epsilon,
+    #             # # Make sure updates happen automatically
+    #             # updates_collections=None,
+    #             # Try zero_debias_moving_mean=True for improved stability.
+    #             # zero_debias_moving_mean=True,
+    #             decay=bn_decay):
+    #                 with slim.arg_scope(
+    #                         [slim.dropout],
+    #                         is_training=is_training):
+    #                         with slim.arg_scope(
+    #                                 [slim.fully_connected],
+    #                                 weights_regularizer=slim.l2_regularizer(weight_decay),
+    #                                 biases_regularizer=slim.l2_regularizer(weight_decay),
+    #                                 activation_fn=tf.nn.relu,
+    #                                 normalizer_fn=slim.batch_norm):
+    #                             with slim.arg_scope(
+    #                                     [slim.max_pool2d, slim.avg_pool2d],
+    #                                     stride=2, padding='SAME'):
+    #                                 with slim.arg_scope(
+    #                                         [slim.conv2d],
+    #                                         stride=1, padding='SAME',
+    #                                         weights_regularizer=slim.l2_regularizer(weight_decay),
+    #                                         biases_regularizer=slim.l2_regularizer(weight_decay),
+    #                                         activation_fn=tf.nn.relu,
+    #                                         normalizer_fn=slim.batch_norm) as scope:
+    #                                     return scope

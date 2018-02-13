@@ -169,7 +169,7 @@ class localizer2(base_regre):
             self.args.data_ops.raw_to_2d, self.caminfo
         )
         for ii, rect in enumerate(rects):
-            rect.draw(colors[ii])
+            rect.draw(ax, colors[ii])
         mpplot.gca().set_title('Ground truth')
 
         ax = mpplot.subplot(1, 2, 2)
@@ -181,7 +181,7 @@ class localizer2(base_regre):
             self.args.data_ops.raw_to_2d, self.caminfo
         )
         for ii, rect in enumerate(rects):
-            rect.draw(colors[ii])
+            rect.draw(ax, colors[ii])
         mpplot.tight_layout()
         mpplot.gca().set_title('Prediction')
         fname = 'debug_train_{}.png'.format(self.name_desc)
@@ -217,7 +217,7 @@ class localizer2(base_regre):
             args.data_ops.raw_to_2d, self.caminfo
         )
         for ii, rect in enumerate(rects):
-            rect.draw(colors[ii])
+            rect.draw(ax, colors[ii])
         mpplot.gca().set_title('Ground truth')
 
         ax = mpplot.subplot(1, 2, 2)
@@ -232,7 +232,7 @@ class localizer2(base_regre):
             args.data_ops.raw_to_2d, self.caminfo
         )
         for ii, rect in enumerate(rects):
-            rect.draw(colors[ii])
+            rect.draw(ax, colors[ii])
         mpplot.gca().set_title('Prediction')
 
     def draw_random(self, thedata, args):
@@ -257,7 +257,7 @@ class localizer2(base_regre):
         img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
         ax.imshow(img, cmap='bone')
         args.data_draw.draw_pose2d(
-            thedata,
+            ax, thedata,
             args.data_ops.raw_to_2d(pose_raw, thedata))
 
         ax = mpplot.subplot(2, 2, 3, projection='3d')
@@ -278,9 +278,9 @@ class localizer2(base_regre):
             color=Color('lightsteelblue').rgb)
         ax.view_init(azim=-90, elev=-60)
         ax.set_zlabel('depth (mm)', labelpad=15)
-        args.data_draw.draw_raw3d_pose(thedata, pose_raw)
+        args.data_draw.draw_raw3d_pose(ax, thedata, pose_raw)
         corners = cube.get_corners()
-        iso_cube.draw_cube_wire(corners)
+        iso_cube.draw_cube_wire(ax, corners)
 
         ax = mpplot.subplot(2, 2, 4)
         mpplot.gca().set_title('test output')
@@ -299,14 +299,14 @@ class localizer2(base_regre):
             index, anchors, self.caminfo)
         print(np.append(points2, wsizes).reshape(1, -1))
         rect = iso_rect(points2 - wsizes, wsizes * 2)
-        rect.draw()
+        rect.draw(ax)
         cube = iso_cube(centre.flatten(), self.region_size)
         cube.show_dims()
         rects = cube.proj_rects_3(
             args.data_ops.raw_to_2d, self.caminfo
         )
         for ii, rect in enumerate(rects):
-            rect.draw(colors[ii])
+            rect.draw(ax, colors[ii])
 
         ax = mpplot.subplot(2, 2, 2)
         mpplot.gca().set_title('test storage write')
@@ -330,11 +330,11 @@ class localizer2(base_regre):
             args.data_ops.raw_to_2d, self.caminfo
         )
         for ii, rect in enumerate(rects):
-            rect.draw(colors[ii])
+            rect.draw(ax, colors[ii])
 
         mpplot.savefig(os.path.join(
             args.predict_dir,
-            'draw_{}.png'.format(self.name_desc)))
+            'draw_{}_{}.png'.format(self.name_desc, img_id)))
         if self.args.show_draw:
             mpplot.show()
         print('[{}] drawing image #{:d} - done.'.format(
@@ -380,6 +380,13 @@ class localizer2(base_regre):
                 slim.arg_scope(
                     [slim.max_pool2d, slim.avg_pool2d],
                     stride=2, padding='SAME'), \
+                slim.arg_scope(
+                    [slim.conv2d_transpose],
+                    stride=2, padding='SAME',
+                    weights_regularizer=slim.l2_regularizer(weight_decay),
+                    biases_regularizer=slim.l2_regularizer(weight_decay),
+                    activation_fn=tf.nn.relu,
+                    normalizer_fn=slim.batch_norm), \
                 slim.arg_scope(
                     [slim.conv2d],
                     stride=1, padding='SAME',

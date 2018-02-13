@@ -4,67 +4,60 @@ import numpy as np
 import tensorflow as tf
 import progressbar
 import h5py
-import matplotlib.pyplot as mpplot
-from cv2 import resize as cv2resize
-from model.base_regre import base_regre
+from .base_conv3 import base_conv3
 from utils.iso_boxes import iso_cube
-from model.incept_resnet import incept_resnet
-from model.hourglass import hourglass
-from utils.image_ops import draw_hmap2, draw_olmap, draw_uomap
+from utils.regu_grid import regu_grid
 
 
-class dense_regre(base_regre):
+class voxel_detect(base_conv3):
+    """ basic 3d detection based method
+    """
     @staticmethod
     def get_trainer(args, new_log):
-        from train.train_dense_regre import train_dense_regre
-        return train_dense_regre(args, new_log)
+        from train.train_voxel_detect import train_voxel_detect
+        return train_voxel_detect(args, new_log)
 
     def __init__(self, args):
-        super(dense_regre, self).__init__(args)
+        super(voxel_detect, self).__init__(args)
         self.batch_allot = getattr(
             import_module('model.batch_allot'),
-            'batch_allot_hmap'
+            'batch_allot_vxhit'
         )
         self.num_appen = 4
+        self.crop_size = 64
         self.hmap_size = 32
 
     def receive_data(self, thedata, args):
         """ Receive parameters specific to the data """
-        super(dense_regre, self).receive_data(thedata, args)
+        super(voxel_detect, self).receive_data(thedata, args)
         self.out_dim = thedata.join_num
 
     def provider_worker(self, line, image_dir, caminfo):
         img_name, pose_raw = self.data_module.io.parse_line_annot(line)
         img = self.data_module.io.read_image(os.path.join(image_dir, img_name))
-        img_crop_resize, resce = self.data_module.ops.crop_resize_pca(
-            img, pose_raw, caminfo)
+        pcnt, resce = self.data_module.ops.voxel_hit(
+            img, pose_raw, caminfo.crop_size, caminfo)
         resce3 = resce[0:4]
         cube = iso_cube()
         cube.load(resce3)
         pose_pca = self.data_module.ops.raw_to_pca(pose_raw, resce3)
-        hmap2 = self.data_module.ops.raw_to_heatmap2(
+        vxhit = self.data_module.ops.raw_to_vxlabel(
             pose_raw, cube, self.hmap_size, caminfo
         )
-        _, olmap, uomap = self.data_module.ops.raw_to_offset(
-            img_crop_resize, pose_raw, cube, self.hmap_size, caminfo
-        )
-        # _, olmap, uomap = self.data_module.ops.raw_to_offset(
-        #     img, pose_raw, cube, self.hmap_size, caminfo
-        # )
         index = self.data_module.io.imagename2index(img_name)
-        return (index, np.expand_dims(img_crop_resize, axis=-1),
-                pose_pca.flatten().T, hmap2, olmap, uomap, resce)
+        return (index, np.expand_dims(pcnt, axis=-1),
+                pose_pca.flatten().T, vxhit, resce)
 
     def yanker(self, pose_local, resce):
         resce3 = resce[0:4]
         return self.data_module.ops.pca_to_raw(pose_local, resce3)
 
-    def yanker_hmap(self, resce, hmap2, olmap, uomap, depth, hmap_size, caminfo):
+    def yanker_hmap(self, resce, voxhig, hmap_size, caminfo):
         resce3 = resce[0:4]
         cube = iso_cube()
         cube.load(resce3)
-        return self.data_module.ops.offset_to_raw(
-            hmap2, olmap, uomap, depth, cube, hmap_size, caminfo)
+        return self.data_module.ops.vxlabel_to_raw(
+            voxhig, cube, hmap_size, caminfo)
 
     @staticmethod
     def put_worker(
@@ -72,36 +65,23 @@ class dense_regre(base_regre):
             caminfo, data_module, batchallot):
         bi = args[0]
         line = args[1]
-        index, frame, poses, hmap2, olmap, uomap, resce = \
+        index, frame, poses, vxhit, resce = \
             model_inst.provider_worker(line, image_dir, caminfo)
         batchallot.batch_index[bi, :] = index
         batchallot.batch_frame[bi, ...] = frame
         batchallot.batch_poses[bi, :] = poses
-        batchallot.batch_hmap2[bi, :] = hmap2
-        batchallot.batch_olmap[bi, :] = olmap
-        batchallot.batch_uomap[bi, :] = uomap
+        batchallot.batch_vxhit[bi, :] = vxhit
         batchallot.batch_resce[bi, :] = resce
 
-    def evaluate_batch(self, writer, pred_val):
-        self.write_pred(
-            writer, self.caminfo,
-            self.batch_data['batch_index'], self.batch_data['batch_resce'],
-            self.batch_data['batch_frame'], pred_val
-        )
-
     def write_pred(self, fanno, caminfo,
-                   batch_index, batch_resce,
-                   batch_frame, batch_poses):
-        num_j = self.out_dim
+                   batch_index, batch_resce, batch_poses):
         for ii in range(batch_index.shape[0]):
             img_name = self.data_module.io.index2imagename(batch_index[ii, 0])
             resce = batch_resce[ii, :]
-            depth = np.squeeze(batch_frame[ii, ...])
-            hmap2 = batch_poses[ii, ..., 0 * num_j:1 * num_j]
-            olmap = batch_poses[ii, ..., 1 * num_j:2 * num_j]
-            uomap = batch_poses[ii, ..., 2 * num_j:]
+            vxhit = batch_poses[ii, ...]
+            vxhit = np.argmax(vxhit, axis=0)
             pose_raw = self.yanker_hmap(
-                resce, hmap2, olmap, uomap, depth,
+                resce, np.array(vxhit),
                 self.hmap_size, caminfo)
             fanno.write(
                 img_name +
@@ -119,23 +99,10 @@ class dense_regre(base_regre):
         # print(self.batch_beg, batch_end, self.split_end)
         if batch_end >= self.split_end:
             return None
-        # self.batch_data = {
-        #     'batch_index': self.store_file['index'][self.batch_beg:batch_end, ...],
-        #     'batch_frame': self.store_file['frame'][self.batch_beg:batch_end, ...],
-        #     'batch_poses': self.store_file['poses'][self.batch_beg:batch_end, ...],
-        #     'batch_hmap2': self.store_file['hmap2'][self.batch_beg:batch_end, ...],
-        #     'batch_olmap': self.store_file['olmap'][self.batch_beg:batch_end, ...],
-        #     'batch_uomap': self.store_file['uomap'][self.batch_beg:batch_end, ...],
-        #     'batch_resce': self.store_file['resce'][self.batch_beg:batch_end, ...]
-        # }
-        batch_hmaps = []
-        batch_hmaps.append(self.store_file['hmap2'][self.batch_beg:batch_end, ...])
-        batch_hmaps.append(self.store_file['olmap'][self.batch_beg:batch_end, ...])
-        batch_hmaps.append(self.store_file['uomap'][self.batch_beg:batch_end, ...])
         self.batch_data = {
             'batch_index': self.store_file['index'][self.batch_beg:batch_end, ...],
             'batch_frame': self.store_file['frame'][self.batch_beg:batch_end, ...],
-            'batch_poses': np.concatenate(batch_hmaps, axis=-1),
+            'batch_poses': self.store_file['vxhit'][self.batch_beg:batch_end, ...].astype(np.int32),
             'batch_resce': self.store_file['resce'][self.batch_beg:batch_end, ...]
         }
         self.batch_beg = batch_end
@@ -175,10 +142,10 @@ class dense_regre(base_regre):
             h5file.create_dataset(
                 'frame',
                 (num_line,
-                    crop_size, crop_size,
+                    crop_size, crop_size, crop_size,
                     num_channel),
                 chunks=(1,
-                        crop_size, crop_size,
+                        crop_size, crop_size, crop_size,
                         num_channel),
                 compression='lzf',
                 # dtype=np.float32)
@@ -189,21 +156,15 @@ class dense_regre(base_regre):
                 compression='lzf',
                 # dtype=np.float32)
                 dtype=float)
+            # h5file.create_dataset(
+            #     'vxhit',
+            #     (num_line, hmap_size, hmap_size, hmap_size, out_dim),
+            #     compression='lzf',
+            #     # dtype=np.float32)
+            #     dtype=float)
             h5file.create_dataset(
-                'hmap2',
-                (num_line, hmap_size, hmap_size, out_dim),
-                compression='lzf',
-                # dtype=np.float32)
-                dtype=float)
-            h5file.create_dataset(
-                'olmap',
-                (num_line, hmap_size, hmap_size, out_dim),
-                compression='lzf',
-                # dtype=np.float32)
-                dtype=float)
-            h5file.create_dataset(
-                'uomap',
-                (num_line, hmap_size, hmap_size, out_dim * 3),
+                'vxhit',
+                (num_line, out_dim),
                 compression='lzf',
                 # dtype=np.float32)
                 dtype=float)
@@ -228,12 +189,8 @@ class dense_regre(base_regre):
                     batchallot.batch_frame[0:resline, ...]
                 h5file['poses'][store_beg:store_beg + resline, ...] = \
                     batchallot.batch_poses[0:resline, ...]
-                h5file['hmap2'][store_beg:store_beg + resline, ...] = \
-                    batchallot.batch_hmap2[0:resline, ...]
-                h5file['olmap'][store_beg:store_beg + resline, ...] = \
-                    batchallot.batch_olmap[0:resline, ...]
-                h5file['uomap'][store_beg:store_beg + resline, ...] = \
-                    batchallot.batch_uomap[0:resline, ...]
+                h5file['vxhit'][store_beg:store_beg + resline, ...] = \
+                    batchallot.batch_vxhit[0:resline, ...]
                 h5file['resce'][store_beg:store_beg + resline, ...] = \
                     batchallot.batch_resce[0:resline, ...]
                 timerbar.update(bi)
@@ -242,16 +199,18 @@ class dense_regre(base_regre):
         timerbar.finish()
 
     def draw_random(self, thedata, args):
+        import matplotlib.pyplot as mpplot
+        from mpl_toolkits.mplot3d import Axes3D
+        from mayavi import mlab
+
         with h5py.File(self.appen_train, 'r') as h5file:
             store_size = h5file['index'].shape[0]
             frame_id = np.random.choice(store_size)
-            # frame_id = 741  # showing pinky
-            img_id = h5file['index'][frame_id, 0]  # img_id = frame_id + 1
+            # frame_id = 651
+            img_id = h5file['index'][frame_id, 0]
             frame_h5 = np.squeeze(h5file['frame'][frame_id, ...], -1)
             poses_h5 = h5file['poses'][frame_id, ...].reshape(-1, 3)
-            hmap2_h5 = h5file['hmap2'][frame_id, ...]
-            olmap_h5 = h5file['olmap'][frame_id, ...]
-            uomap_h5 = h5file['uomap'][frame_id, ...]
+            vxhit_h5 = h5file['vxhit'][frame_id, ...]
             resce_h5 = h5file['resce'][frame_id, ...]
 
         print('[{}] drawing image #{:d} ...'.format(self.name_desc, img_id))
@@ -263,70 +222,171 @@ class dense_regre(base_regre):
         cube = iso_cube()
         cube.load(resce3)
         cube.show_dims()
-        sizel = np.floor(resce3[0]).astype(int)
+        img_name = args.data_io.index2imagename(img_id)
+        img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
         from colour import Color
         colors = [Color('orange').rgb, Color('red').rgb, Color('lime').rgb]
-        fig, _ = mpplot.subplots(nrows=2, ncols=3, figsize=(2 * 5, 3 * 5))
-        joint_id = self.out_dim - 1
-        hmap2 = hmap2_h5[..., joint_id]
-        olmap = olmap_h5[..., joint_id]
-        uomap = uomap_h5[..., 3 * joint_id:3 * (joint_id + 1)]
-        depth_crop = cv2resize(frame_h5, (sizel, sizel))
+        fig, _ = mpplot.subplots(nrows=2, ncols=4, figsize=(2 * 5, 4 * 5))
 
-        ax = mpplot.subplot(2, 3, 1)
-        ax.imshow(depth_crop, cmap='bone')
-        pose3d = cube.trans_scale_to(poses_h5)
-        pose2d, _ = cube.project_ortho(pose3d, roll=0, sort=False)
-        pose2d *= sizel
-        args.data_draw.draw_pose2d(
-            ax, thedata,
-            pose2d,
-        )
+        ax = mpplot.subplot(2, 4, 3, projection='3d')
+        points3 = args.data_ops.img_to_raw(img, self.caminfo)
+        points3_trans = cube.pick(points3)
+        points3_trans = cube.transform_to_center(points3_trans)
+        numpts = points3_trans.shape[0]
+        if 1000 < numpts:
+            points3_trans = points3_trans[
+                np.random.choice(numpts, 1000, replace=False), :]
+        ax.scatter(
+            points3_trans[:, 0], points3_trans[:, 1], points3_trans[:, 2],
+            color=Color('lightsteelblue').rgb)
+        args.data_draw.draw_raw3d_pose(ax, thedata, poses_h5)
+        corners = cube.transform_to_center(cube.get_corners())
+        cube.draw_cube_wire(ax, corners)
+        # ax.view_init(azim=-120, elev=-150)
+        ax.view_init(azim=-90, elev=-75)
 
-        ax = mpplot.subplot(2, 3, 4)
-        draw_hmap2(fig, ax, frame_h5, hmap2)
-
-        ax = mpplot.subplot(2, 3, 5)
-        draw_uomap(fig, ax, frame_h5, uomap)
-
-        ax = mpplot.subplot(2, 3, 6)
-        draw_olmap(fig, ax, frame_h5, olmap)
-
-        ax = mpplot.subplot(2, 3, 2)
-        pose_out = self.yanker_hmap(
-            resce_h5, hmap2_h5, olmap_h5, uomap_h5,
-            frame_h5, self.hmap_size, self.caminfo)
-        print('reprojection error: {}'.format(
-            np.sum(np.abs(pose_out - cube.transform_add_center(poses_h5))))
-        )
-        ax.imshow(depth_crop, cmap='bone')
-        pose3d = cube.transform_center_shrink(pose_out)
-        pose2d, _ = cube.project_ortho(pose3d, roll=0, sort=False)
-        pose2d *= sizel
-        args.data_draw.draw_pose2d(
-            ax, thedata,
-            pose2d,
-        )
-
-        ax = mpplot.subplot(2, 3, 3)
-        annot_line = args.data_io.get_line(
-            thedata.training_annot_cleaned, img_id)
-        img_name, pose_raw = args.data_io.parse_line_annot(annot_line)
-        img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
+        ax = mpplot.subplot(2, 4, 1)
         ax.imshow(img, cmap='bone')
+        pose_raw = self.yanker(poses_h5, resce_h5)
         args.data_draw.draw_pose2d(
             ax, thedata,
-            args.data_ops.raw_to_2d(pose_raw, thedata))
+            args.data_ops.raw_to_2d(pose_raw, self.caminfo)
+        )
         rects = cube.proj_rects_3(
             args.data_ops.raw_to_2d, self.caminfo
         )
         for ii, rect in enumerate(rects):
             rect.draw(ax, colors[ii])
-        offset, olmap, uomap = self.data_module.ops.raw_to_offset(
-            frame_h5, pose_raw, cube, self.hmap_size, self.caminfo
-        )
 
-        # mpplot.tight_layout()
+        ax = mpplot.subplot(2, 4, 2, projection='3d')
+        numpts = points3.shape[0]
+        if 1000 < numpts:
+            samid = np.random.choice(numpts, 1000, replace=False)
+            points3_sam = points3[samid, :]
+        else:
+            points3_sam = points3
+        ax.scatter(
+            points3_sam[:, 0], points3_sam[:, 1], points3_sam[:, 2],
+            color=Color('lightsteelblue').rgb)
+        ax.view_init(azim=-90, elev=-60)
+        ax.set_zlabel('depth (mm)', labelpad=15)
+        args.data_draw.draw_raw3d_pose(ax, thedata, pose_raw)
+        corners = cube.get_corners()
+        iso_cube.draw_cube_wire(ax, corners)
+
+        ax = mpplot.subplot(2, 4, 4, projection='3d')
+        # grid = regu_grid()
+        # grid.from_cube(cube, self.crop_size)
+        # grid.draw_map(ax, frame_h5)
+        args.data_draw.draw_raw3d_pose(ax, thedata, pose_raw)
+        ax.view_init(azim=-90, elev=-75)
+        ax.set_zlabel('depth (mm)', labelpad=15)
+
+        pose_yank = self.yanker_hmap(
+            resce3, vxhit_h5, self.hmap_size, self.caminfo)
+        diff = np.abs(pose_raw - pose_yank)
+        print(diff)
+        print(np.min(diff, axis=0), np.max(diff, axis=0))
+        voxel_crop = self.crop_size
+        voxel_hmap = self.hmap_size
+        grid = regu_grid()
+        grid.from_cube(cube, voxel_crop)
+        vxhit_crop = frame_h5
+
+        ax = mpplot.subplot(2, 4, 5)
+        pose3d = cube.transform_center_shrink(pose_raw)
+        pose2d, _ = cube.project_ortho(pose3d, roll=0, sort=False)
+        pose2d *= voxel_crop
+        args.data_draw.draw_pose2d(
+            ax, thedata,
+            pose2d,
+        )
+        coord = grid.slice_ortho(vxhit_crop, roll=0)
+        grid.draw_slice(ax, coord, 1.)
+        ax.set_xlim([0, voxel_crop])
+        ax.set_ylim([0, voxel_crop])
+        ax.set_aspect('equal', adjustable='box')
+        ax.invert_yaxis()
+
+        ax = mpplot.subplot(2, 4, 6)
+        pose3d = cube.transform_center_shrink(pose_yank)
+        pose2d, _ = cube.project_ortho(pose3d, roll=1, sort=False)
+        pose2d *= voxel_crop
+        args.data_draw.draw_pose2d(
+            ax, thedata,
+            pose2d,
+        )
+        coord = grid.slice_ortho(vxhit_crop, roll=1)
+        grid.draw_slice(ax, coord, 1.)
+        ax.set_xlim([0, voxel_crop])
+        ax.set_ylim([0, voxel_crop])
+        ax.set_aspect('equal', adjustable='box')
+        ax.invert_yaxis()
+
+        from mpl_toolkits.axes_grid1 import make_axes_locatable
+        from utils.image_ops import transparent_cmap
+        ax = mpplot.subplot(2, 4, 7)
+        vxhit_hmap = vxhit_crop[::2, ::2, ::2]
+        coord = grid.slice_ortho(vxhit_hmap, roll=0)
+        grid.draw_slice(ax, coord, 1.)
+        vxhit_sum = np.zeros(voxel_hmap * voxel_hmap * voxel_hmap)
+        # for ii in vxhit_h5.astype(int):
+        #     vxhit_sum[ii] += 1
+        vxhit_sum[vxhit_h5.astype(int)] = 1
+        vxhit_sum = vxhit_sum.reshape((voxel_hmap, voxel_hmap, voxel_hmap))
+        vxhit_axis = np.sum(vxhit_sum, axis=2)
+        vxhit_axis = np.swapaxes(vxhit_axis, 0, 1)  # swap xy
+        img_hit = ax.imshow(
+            vxhit_axis, cmap=transparent_cmap(mpplot.cm.jet))
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        fig.colorbar(img_hit, cax=cax)
+        ax.set_xlim([0, voxel_hmap])
+        ax.set_ylim([0, voxel_hmap])
+        ax.set_aspect('equal', adjustable='box')
+        ax.invert_yaxis()
+
+        ax = mpplot.subplot(2, 4, 8)
+        vxhit_hmap = vxhit_crop[::2, ::2, ::2]
+        coord = grid.slice_ortho(vxhit_hmap, roll=1)
+        grid.draw_slice(ax, coord, 1.)
+        vxhit_sum = np.zeros(voxel_hmap * voxel_hmap * voxel_hmap)
+        # for ii in vxhit_h5.astype(int):
+        #     vxhit_sum[ii] += 1
+        vxhit_sum[vxhit_h5.astype(int)] = 1
+        vxhit_sum = vxhit_sum.reshape((voxel_hmap, voxel_hmap, voxel_hmap))
+        vxhit_axis = np.sum(vxhit_sum, axis=1)
+        img_hit = ax.imshow(
+            vxhit_axis, cmap=transparent_cmap(mpplot.cm.jet))
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        fig.colorbar(img_hit, cax=cax)
+        ax.set_xlim([0, voxel_hmap])
+        ax.set_ylim([0, voxel_hmap])
+        ax.set_aspect('equal', adjustable='box')
+        ax.invert_yaxis()
+
+        # if self.args.show_draw:
+        #     mlab.figure(size=(800, 800))
+        #     points3_trans = cube.transform_to_center(points3_sam)
+        #     mlab.points3d(
+        #         points3_trans[:, 0], points3_trans[:, 1], points3_trans[:, 2],
+        #         scale_factor=8,
+        #         color=Color('lightsteelblue').rgb)
+        #     mlab.outline()
+
+        # if self.args.show_draw:
+        #     mlab.figure(size=(800, 800))
+        #     # mlab.contour3d(frame_h5)
+        #     mlab.pipeline.volume(mlab.pipeline.scalar_field(frame_h5))
+        #     mlab.pipeline.image_plane_widget(
+        #         mlab.pipeline.scalar_field(frame_h5),
+        #         plane_orientation='z_axes',
+        #         slice_index=self.crop_size / 2)
+        #     np.set_printoptions(precision=4)
+        #     # print(frame_h5[12:20, 12:20, 16])
+        #     mlab.outline()
+
         mpplot.savefig(os.path.join(
             args.predict_dir,
             'draw_{}_{}.png'.format(self.name_desc, img_id)))
@@ -337,22 +397,23 @@ class dense_regre(base_regre):
 
     def get_model(
             self, input_tensor, is_training, bn_decay,
-            hg_repeat=2, scope=None):
-        """ input_tensor: BxHxWxC
-            out_dim: BxHxWx(J*5), where J is number of joints
+            hg_repeat=1, scope=None):
+        """ input_tensor: BxHxWxDxC
+            out_dim: BxHxWxDxJ, where J is number of joints
         """
         end_points = {}
         self.end_point_list = []
         final_endpoint = 'hourglass_{}'.format(hg_repeat - 1)
         num_joint = self.out_dim
-        # num_out_map = num_joint * 5  # hmap2, olmap, uomap
-        num_feature = 128
+        num_feature = 32
+        num_vol = 32 * 32 * 32
 
         def add_and_check_final(name, net):
             end_points[name] = net
             return name == final_endpoint
 
         from tensorflow.contrib import slim
+        from inresnet3d import inresnet3d
         # ~/anaconda2/lib/python2.7/site-packages/tensorflow/contrib/layers/
         with tf.variable_scope(
                 scope, self.name_desc, [input_tensor]):
@@ -378,74 +439,56 @@ class dense_regre(base_regre):
                     activation_fn=tf.nn.relu,
                     normalizer_fn=slim.batch_norm), \
                 slim.arg_scope(
-                    [slim.max_pool2d, slim.avg_pool2d],
+                    [slim.max_pool3d, slim.avg_pool3d],
                     stride=2, padding='SAME'), \
                 slim.arg_scope(
-                    [slim.conv2d_transpose],
+                    [slim.conv3d_transpose],
                     stride=2, padding='SAME',
                     weights_regularizer=slim.l2_regularizer(weight_decay),
                     biases_regularizer=slim.l2_regularizer(weight_decay),
                     activation_fn=tf.nn.relu,
                     normalizer_fn=slim.batch_norm), \
                 slim.arg_scope(
-                    [slim.conv2d],
+                    [slim.conv3d],
                     stride=1, padding='SAME',
                     weights_regularizer=slim.l2_regularizer(weight_decay),
                     biases_regularizer=slim.l2_regularizer(weight_decay),
                     activation_fn=tf.nn.relu,
                     normalizer_fn=slim.batch_norm):
-                with tf.variable_scope('stage128'):
-                    sc = 'stage128_image'
-                    net = slim.conv2d(
-                        input_tensor, 32, [1, 7])
-                    net = slim.conv2d(net, 32, [7, 1])
-                    net = slim.max_pool2d(net, 3)
-                    self.end_point_list.append(sc)
-                    if add_and_check_final(sc, net):
-                        return net, end_points
-                    sc = 'stage64_image'
-                    net = incept_resnet.resnet_k(
-                        net, scope='stage64_residual')
-                    net = incept_resnet.reduce_net(
-                        net, scope='stage64_reduce')
+                with tf.variable_scope('stage64'):
+                    sc = 'stage64'
+                    net = slim.conv3d(input_tensor, 16, 3)
+                    net = inresnet3d.conv_maxpool(net, scope=sc)
                     self.end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points
                     sc = 'stage32_image'
-                    net = incept_resnet.resnet_k(
+                    net = inresnet3d.resnet_k(
                         net, scope='stage32_residual')
-                    net = slim.conv2d(
+                    net = slim.conv3d(
                         net, num_feature, 1, scope='stage32_out')
                     self.end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points
-                for hg in range(hg_repeat):
+                for hg in range(hg_repeat):  # 32x32x32
                     sc = 'hourglass_{}'.format(hg)
                     with tf.variable_scope(sc):
-                        branch0 = hourglass.hg_net(
-                            net, 4, scope=sc + '_hg')
-                        branch0 = incept_resnet.resnet_k(
+                        branch0 = inresnet3d.hourglass3d(
+                            net, 2, scope=sc + '_hg')
+                        branch0 = inresnet3d.resnet_k(
                             branch0, scope='_res')
-                        branch_hm2 = slim.conv2d(
+                        branch_det = slim.conv3d(
                             branch0, num_joint, 1,
                             # normalizer_fn=None, activation_fn=tf.nn.softmax)
                             normalizer_fn=None, activation_fn=None)
-                        branch_hm3 = slim.conv2d(
-                            branch0, num_joint, 1,
-                            # normalizer_fn=None, activation_fn=tf.nn.relu)
-                            normalizer_fn=None, activation_fn=None)
-                        branch_uom = slim.conv2d(
-                            branch0, num_joint * 3, 1,
-                            # normalizer_fn=None, activation_fn=tf.nn.sigmoid)
-                            normalizer_fn=None, activation_fn=None)
-                        net_maps = tf.concat(
-                            [branch_hm2, branch_hm3, branch_uom],
-                            axis=-1)
+                        branch_flat = tf.reshape(
+                            branch_det,
+                            [-1, num_vol, num_joint])
                         self.end_point_list.append(sc)
-                        if add_and_check_final(sc, net_maps):
-                            return net_maps, end_points
-                        branch1 = slim.conv2d(
-                            net_maps, num_feature, 1)
+                        if add_and_check_final(sc, branch_flat):
+                            return branch_flat, end_points
+                        branch1 = slim.conv3d(
+                            branch_det, num_feature, 1)
                         net = net + branch0 + branch1
         raise ValueError('final_endpoint (%s) not recognized', final_endpoint)
 
@@ -453,7 +496,7 @@ class dense_regre(base_regre):
         frames_tf = tf.placeholder(
             tf.float32, shape=(
                 batch_size,
-                self.crop_size, self.crop_size,
+                self.crop_size, self.crop_size, self.crop_size,
                 1))
         # hmap2_tf = tf.placeholder(
         #     tf.float32, shape=(
@@ -471,28 +514,27 @@ class dense_regre(base_regre):
         #         self.hmap_size, self.hmap_size,
         #         self.out_dim * 3))
         poses_tf = tf.placeholder(
-            tf.float32, shape=(
+            tf.int32, shape=(
                 batch_size,
-                self.hmap_size, self.hmap_size,
-                self.out_dim * 5))
+                self.out_dim))
         return frames_tf, poses_tf
 
     def get_loss(self, pred, echt, end_points):
         """ simple sum-of-squares loss
-            pred: BxHxWx(J*5)
-            echt: BxHxWx(J*5)
+            pred: BxHxWxDxJ
+            echt: BxJ
         """
-        # num_joint = self.out_dim
         loss = 0
+        # pred_shape = pred.shape
         for name, net in end_points.items():
             if not name.startswith('hourglass_'):
                 continue
-            # loss_hm2 = tf.reduce_sum(
-            #     tf.nn.cross_entropy_with_logits(
-            #         targets=echt[:, :num_joint],
-            #         logits=pred[:, :num_joint])
-            # )
-            loss += tf.nn.l2_loss(net - echt)  # already divided by 2
+            echt_l = tf.unstack(echt, axis=-1)
+            pred_l = tf.unstack(pred, axis=-1)
+            vxhit_losses = [
+                tf.nn.sparse_softmax_cross_entropy_with_logits(
+                    labels=e, logits=p) for e, p in zip(echt_l, pred_l)]
+            loss += tf.reduce_sum(tf.add_n(vxhit_losses))
         reg_losses = tf.add_n(tf.get_collection(
             tf.GraphKeys.REGULARIZATION_LOSSES))
         return loss + reg_losses

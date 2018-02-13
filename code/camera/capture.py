@@ -94,7 +94,7 @@ class capture:
         ax.view_init(azim=-90, elev=-60)
         ax.set_zlabel('depth (mm)', labelpad=15)
         corners = cube.get_corners()
-        iso_cube.draw_cube_wire(corners)
+        iso_cube.draw_cube_wire(ax, corners)
         ax = mpplot.subplot(1, 2, 2)
         ax.imshow(img, cmap='bone')
         rects = cube.proj_rects_3(
@@ -104,7 +104,7 @@ class capture:
         )
         colors = [Color('orange').rgb, Color('red').rgb, Color('lime').rgb]
         for ii, rect in enumerate(rects):
-            rect.draw(colors[ii])
+            rect.draw(ax, colors[ii])
             rect.show_dims()
         mpplot.tight_layout()
         mpplot.show()

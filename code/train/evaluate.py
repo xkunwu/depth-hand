@@ -48,7 +48,7 @@ def draw_compare(args, predict_dir=None):
     mpplot.close(fig)
     # mpplot.gcf().clear()
     fig = mpplot.figure(figsize=(2 * 5, 1 * 5))
-    dataeval.draw_error_per_joint(
+    err_mean = dataeval.draw_error_per_joint(
         errors, methods, mpplot.gca(), args.data_inst.join_name)
     mpplot.savefig(os.path.join(predict_dir, 'error_bar.png'))
     mpplot.close(fig)
@@ -58,6 +58,11 @@ def draw_compare(args, predict_dir=None):
     restr = 'maximal per-joint mean error summary:'
     for ii in idx:
         restr += ' {}({:.2f})'.format(methods[ii], maxmean[ii])
+    args.logger.info(restr)
+    idx = np.argsort(err_mean)
+    restr = 'mean error summary:'
+    for ii in idx:
+        restr += ' {}({:.2f})'.format(methods[ii], err_mean[ii])
     args.logger.info(restr)
     print('figures saved: error summary')
 
@@ -128,10 +133,13 @@ if __name__ == "__main__":
     # mpl.use('Agg')
     methlist = [
         # # 'localizer2',
-        'dense_regre',
+        # 'dense_regre',
         # 'direc_tsdf',
         # 'trunc_dist',
+        # 'voxel_regre',
+        'voxel_detect',
         # 'base_conv3',
+        # 'base_conv3_inres',
         # 'ortho3view',
         # 'base_regre',
         # 'base_clean',
@@ -150,7 +158,11 @@ if __name__ == "__main__":
             run_one(args, with_train, with_eval)
             # run_one(args, True, True)
             # run_one(args, False, False)
-    draw_compare(args)
+    with args_holder() as argsholder:
+        argsholder.parse_args()
+        argsholder.create_instance()
+        args = argsholder.args
+        draw_compare(args)
     copyfile(
         os.path.join(args.out_dir, 'log', 'univue.log'),
         os.path.join(args.predict_dir, 'univue.log')

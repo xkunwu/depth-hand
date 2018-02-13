@@ -74,12 +74,11 @@ class regu_grid:
         print(self.cll, self.cellen, self.step)
 
     def from_cube(self, cube, step):
-        """ in unit coordinates """
-        # self.cll = np.zeros(3) - cube.sidelen
-        self.cll = - np.ones(3)
+        self.cll = cube.cen - cube.sidelen
+        # self.cll = - np.ones(3)
         self.step = step
-        # self.cellen = cube.sidelen * 2. / step
-        self.cellen = 2. / step
+        self.cellen = cube.sidelen * 2. / step
+        # self.cellen = 2. / step
         # self.pcnt = np.zeros(shape=(self.step, self.step, self.step))
 
     # def subdivide(self, volume, step):
@@ -89,7 +88,8 @@ class regu_grid:
     #     self.pcnt = np.zeros(shape=(self.step, self.step, self.step))
 
     def putit(self, points3):
-        return np.floor((points3 - self.cll) / self.cellen).astype(int)
+        index = np.floor((points3 - self.cll) / self.cellen).astype(int)
+        return np.clip(index, 0, self.step - 1)
 
     def fill(self, points3):
         pcnt = np.zeros(shape=(self.step, self.step, self.step))
@@ -97,7 +97,15 @@ class regu_grid:
         for index in indices:
             pcnt[index[0], index[1], index[2]] += 1.
         pcnt /= np.max(pcnt)  # normalized density
+        # self.pcnt = pcnt
         return pcnt
+
+    def hit(self, points3):
+        vxhit = np.zeros(shape=(self.step, self.step, self.step))
+        indices = self.putit(points3)
+        vxhit[indices[:, 0], indices[:, 1], indices[:, 2]] = 1.
+        # self.vxhit = vxhit
+        return vxhit
 
     def prow_anchor_single(self, points3, wsizes):
         scale_base = self.cellen * self.step
@@ -131,8 +139,51 @@ class regu_grid:
         cen = float(index) - self.cll
         return grid_cell(cen, self.cellen)
 
-    def draw(self):
-        pass
+    def slice_ortho(self, vxhit_map, roll=0):
+        ar3 = np.arange(3)
+        if 0 < roll:
+            ar3 = np.roll(ar3, roll)
+        # each row is in an axis
+        indices = np.argwhere(1e-2 < vxhit_map).T
+        # indices = np.array(np.unravel_index(
+        #     (vxhit_seq), (self.step, self.step, self.step)))
+        indices2d = indices[ar3[:2], :]
+        seq2d = np.ravel_multi_index(
+            indices2d, (self.step, self.step))
+        seq2d_unique = np.unique(seq2d)
+        coord = np.array(np.unravel_index(
+            (seq2d_unique), (self.step, self.step))).T
+        return coord[:, ::-1]
+
+    def draw_slice(self, ax, coord, cellen=None):
+        from utils.iso_boxes import iso_rect
+        if cellen is None:
+            cellen = self.cellen
+        for c in coord:
+            rect = iso_rect(c * cellen, cellen)
+            rect.draw(ax)
+
+    def draw_map(self, ax, vxhit_map):
+        from utils.iso_boxes import iso_cube
+        indices = np.argwhere(1e-2 < vxhit_map)
+        for index in indices:
+            cube_vox = iso_cube(
+                self.voxen(index),
+                (self.cellen / 2) * 0.8
+            )
+            corners = cube_vox.get_corners()
+            # iso_cube.draw_cube_wire(ax, corners)
+            iso_cube.draw_cube_face(ax, corners)
+
+        from mayavi import mlab
+        from colour import Color
+        xx, yy, zz = np.where(1e-2 < vxhit_map)
+        mlab.points3d(
+            xx, yy, zz,
+            mode="cube",
+            color=Color('khaki').rgb,
+            scale_factor=1)
+        mlab.show()
 
 
 class latice_image:
@@ -171,6 +222,7 @@ class latice_image:
         pmax = np.where(np.max(pcnt) == pcnt)
         pcnt = np.zeros(shape=(self.step, self.step))
         pcnt[pmax] = 1.
+        # self.pcnt = pcnt
         return pcnt
 
     def prow_anchor_single(self, points2, wsizes):

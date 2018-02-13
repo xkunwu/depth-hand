@@ -7,42 +7,6 @@ from utils.iso_boxes import iso_cube
 from utils.regu_grid import latice_image
 
 
-# def prow_dirtsdf(line, image_dir, caminfo):
-#     img_name, pose_raw = dataio.parse_line_annot(line)
-#     img = dataio.read_image(os.path.join(image_dir, img_name))
-#     pcnt, resce = dataops.fill_grid(
-#         img, pose_raw, caminfo.crop_size, caminfo)
-#     befs = dataops.trunc_belief(pcnt)
-#     resce3 = resce[0:4]
-#     pose_pca = dataops.raw_to_pca(pose_raw, resce3)
-#     index = dataio.imagename2index(img_name)
-#     return (index, befs,
-#             pose_pca.flatten().T, resce)
-#
-#
-# def yank_dirtsdf(pose_local, resce, caminfo):
-#     resce3 = resce[0:4]
-#     return dataops.pca_to_raw(pose_local, resce3)
-
-
-# def prow_truncdf(line, image_dir, caminfo):
-#     img_name, pose_raw = dataio.parse_line_annot(line)
-#     img = dataio.read_image(os.path.join(image_dir, img_name))
-#     pcnt, resce = dataops.fill_grid(
-#         img, pose_raw, caminfo.crop_size, caminfo)
-#     tdf = dataops.prop_dist(pcnt)
-#     resce3 = resce[0:4]
-#     pose_pca = dataops.raw_to_pca(pose_raw, resce3)
-#     index = dataio.imagename2index(img_name)
-#     return (index, np.expand_dims(tdf, axis=-1),
-#             pose_pca.flatten().T, resce)
-#
-#
-# def yank_truncdf(pose_local, resce, caminfo):
-#     resce3 = resce[0:4]
-#     return dataops.pca_to_raw(pose_local, resce3)
-
-
 def prow_localizer2(line, image_dir, caminfo):
     img_name, pose_raw = dataio.parse_line_annot(line)
     img = dataio.read_image(os.path.join(image_dir, img_name))
@@ -103,84 +67,6 @@ def yank_localizer3(pose_local, resce, caminfo):
     cube.load(resce)
     centre = cube.cen
     return centre
-
-
-# def prow_conv3d(line, image_dir, caminfo):
-#     img_name, pose_raw = dataio.parse_line_annot(line)
-#     img = dataio.read_image(os.path.join(image_dir, img_name))
-#     pcnt, resce = dataops.fill_grid(
-#         img, pose_raw, caminfo.crop_size, caminfo)
-#     resce3 = resce[0:4]
-#     pose_pca = dataops.raw_to_pca(pose_raw, resce3)
-#     index = dataio.imagename2index(img_name)
-#     return (index, np.expand_dims(pcnt, axis=-1),
-#             pose_pca.flatten().T, resce)
-#
-#
-# def yank_conv3d(pose_local, resce, caminfo):
-#     resce3 = resce[0:4]
-#     return dataops.pca_to_raw(pose_local, resce3)
-
-
-# def prow_ortho3v(line, image_dir, caminfo):
-#     img_name, pose_raw = dataio.parse_line_annot(line)
-#     img = dataio.read_image(os.path.join(image_dir, img_name))
-#     img_crop_resize, resce = dataops.proj_ortho3(
-#         img, pose_raw, caminfo)
-#     resce3 = resce[0:4]
-#     pose_pca = dataops.raw_to_pca(pose_raw, resce3)
-#     index = dataio.imagename2index(img_name)
-#     return (index, img_crop_resize,
-#             pose_pca.flatten().T, resce)
-#
-#
-# def yank_ortho3v(pose_local, resce, caminfo):
-#     resce3 = resce[0:4]
-#     return dataops.pca_to_raw(pose_local, resce3)
-
-
-# def prow_cleaned(line, image_dir, caminfo):
-#     img_name, pose_raw = dataio.parse_line_annot(line)
-#     img = dataio.read_image(os.path.join(image_dir, img_name))
-#     img_crop_resize, resce = dataops.crop_resize_pca(
-#         img, pose_raw, caminfo)
-#     resce3 = resce[0:4]
-#     pose_pca = dataops.raw_to_pca(pose_raw, resce3)
-#     index = dataio.imagename2index(img_name)
-#     return (index, np.expand_dims(img_crop_resize, axis=-1),
-#             pose_pca.flatten().T, resce)
-#
-#
-# def yank_cleaned(pose_local, resce, caminfo):
-#     resce3 = resce[0:4]
-#     return dataops.pca_to_raw(pose_local, resce3)
-
-
-# def prow_cropped(line, image_dir, caminfo):
-#     img_name, pose_raw = dataio.parse_line_annot(line)
-#     img = dataio.read_image(os.path.join(image_dir, img_name))
-#     img_crop_resize, resce = dataops.crop_resize(
-#         img, pose_raw, caminfo)
-#     resce3 = resce[0:4]
-#     pose_local = dataops.raw_to_local(pose_raw, resce3)
-#     index = dataio.imagename2index(img_name)
-#     return (index, np.expand_dims(img_crop_resize, axis=-1),
-#             pose_local.flatten().T, resce)
-#
-#
-# def yank_cropped(pose_local, resce, caminfo):
-#     resce3 = resce[0:4]
-#     return dataops.local_to_raw(pose_local, resce3)
-
-
-# def put_worker(args, worker, image_dir, caminfo, batchallot):
-#     bi = args[0]
-#     line = args[1]
-#     index, frame, poses, resce = worker(line, image_dir, caminfo)
-#     batchallot.batch_index[bi, :] = index
-#     batchallot.batch_frame[bi, ...] = frame
-#     batchallot.batch_poses[bi, :] = poses
-#     batchallot.batch_resce[bi, :] = resce
 
 
 def test_puttensor(

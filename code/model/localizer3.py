@@ -152,9 +152,9 @@ class localizer3(base_conv3):
             color=Color('lightsteelblue').rgb)
         ax.view_init(azim=-90, elev=-60)
         ax.set_zlabel('depth (mm)', labelpad=15)
-        args.data_draw.draw_raw3d_pose(thedata, pose_raw)
+        args.data_draw.draw_raw3d_pose(ax, thedata, pose_raw)
         corners = cube.get_corners()
-        iso_cube.draw_cube_wire(corners)
+        iso_cube.draw_cube_wire(ax, corners)
         mpplot.gca().set_title('Ground truth')
 
         ax = mpplot.subplot(1, 2, 2, projection='3d')
@@ -163,7 +163,7 @@ class localizer3(base_conv3):
             color=Color('lightsteelblue').rgb)
         ax.view_init(azim=-90, elev=-60)
         ax.set_zlabel('depth (mm)', labelpad=15)
-        args.data_draw.draw_raw3d_pose(thedata, pose_raw)
+        args.data_draw.draw_raw3d_pose(ax, thedata, pose_raw)
 
         line_pred = linecache.getline(self.predict_file, frame_id)
         pred_list = re.split(r'\s+', line_pred.strip())
@@ -171,7 +171,7 @@ class localizer3(base_conv3):
         cube = iso_cube(centre, self.region_size)
         # cube.show_dims()
         corners = cube.get_corners()
-        iso_cube.draw_cube_wire(corners)
+        iso_cube.draw_cube_wire(ax, corners)
         mpplot.gca().set_title('Prediction')
 
         print('[{}] drawing image #{:d} - done.'.format(
@@ -198,7 +198,7 @@ class localizer3(base_conv3):
         img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
         ax.imshow(img, cmap='bone')
         args.data_draw.draw_pose2d(
-            thedata,
+            ax, thedata,
             args.data_ops.raw_to_2d(pose_raw, self.caminfo))
 
         ax = mpplot.subplot(2, 2, 3, projection='3d')
@@ -219,9 +219,9 @@ class localizer3(base_conv3):
             color=Color('lightsteelblue').rgb)
         ax.view_init(azim=-90, elev=-60)
         ax.set_zlabel('depth (mm)', labelpad=15)
-        args.data_draw.draw_raw3d_pose(thedata, pose_raw)
+        args.data_draw.draw_raw3d_pose(ax, thedata, pose_raw)
         corners = cube.get_corners()
-        iso_cube.draw_cube_wire(corners)
+        iso_cube.draw_cube_wire(ax, corners)
 
         ax = mpplot.subplot(2, 2, 4)
         mpplot.gca().set_title('test output')
@@ -242,9 +242,9 @@ class localizer3(base_conv3):
             color=Color('lightsteelblue').rgb)
         ax.view_init(azim=-90, elev=-60)
         ax.set_zlabel('depth (mm)', labelpad=15)
-        args.data_draw.draw_raw3d_pose(thedata, pose_raw)
+        args.data_draw.draw_raw3d_pose(ax, thedata, pose_raw)
         corners = cube.get_corners()
-        iso_cube.draw_cube_wire(corners)
+        iso_cube.draw_cube_wire(ax, corners)
 
         mlab.figure(size=(800, 800))
         img_name, frame, poses, resce = self.provider_worker(
@@ -283,7 +283,7 @@ class localizer3(base_conv3):
 
         mpplot.savefig(os.path.join(
             args.predict_dir,
-            'draw_{}.png'.format(self.name_desc)))
+            'draw_{}_{}.png'.format(self.name_desc, img_id)))
         if self.args.show_draw:
             mpplot.show()
         print('[{}] drawing image #{:d} - done.'.format(
@@ -329,6 +329,13 @@ class localizer3(base_conv3):
                     [slim.max_pool3d, slim.avg_pool3d],
                     stride=2, padding='SAME'), \
                 slim.arg_scope(
+                    [slim.conv3d_transpose],
+                    stride=2, padding='SAME',
+                    weights_regularizer=slim.l2_regularizer(weight_decay),
+                    biases_regularizer=slim.l2_regularizer(weight_decay),
+                    activation_fn=tf.nn.relu,
+                    normalizer_fn=slim.batch_norm), \
+                slim.arg_scope(
                     [slim.conv3d],
                     stride=1, padding='SAME',
                     weights_regularizer=slim.l2_regularizer(weight_decay),
@@ -337,7 +344,7 @@ class localizer3(base_conv3):
                     normalizer_fn=slim.batch_norm):
                 with tf.variable_scope('stage0'):
                     sc = 'stage0'
-                    net = slim.conv3d(input_tensor, 32, 3, scope='conv0_3x3_1')
+                    net = slim.conv3d(input_tensor, 16, 3, scope='conv0_3x3_1')
                     net = slim.conv3d(net, 32, 3, stride=2, scope='conv0_3x3_2')
                     net = slim.max_pool3d(
                         net, 3, scope='maxpool0_3x3_1')

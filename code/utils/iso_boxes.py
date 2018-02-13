@@ -1,9 +1,5 @@
 import numpy as np
 # from pyquaternion import Quaternion
-import matplotlib.pyplot as mpplot
-import matplotlib.patches as mppatches
-from mpl_toolkits.mplot3d import Axes3D
-from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 from colour import Color
 
 
@@ -54,8 +50,9 @@ class iso_rect:
         img[coord[:, 0], coord[:, 1]] = value
         return img
 
-    def draw(self, color=Color('orange').rgb):
-        mpplot.gca().add_patch(mppatches.Rectangle(
+    def draw(self, ax, color=Color('orange').rgb):
+        import matplotlib.patches as mppatches
+        ax.add_patch(mppatches.Rectangle(
             (self.cll[1], self.cll[0]), self.sidelen, self.sidelen,
             linewidth=1, facecolor='none',
             edgecolor=color
@@ -196,7 +193,7 @@ class iso_cube:
         # return np.dot(points3 - self.cen, self.evecs) * sizel / self.sidelen
         return points3 * sizel / self.sidelen
 
-    def project_pca(self, normed, roll=0, sort=True):
+    def project_ortho(self, normed, roll=0, sort=True):
         """ produced coordinates in unit range """
         ar3 = np.arange(3)
         if 0 < roll:
@@ -213,7 +210,7 @@ class iso_cube:
 
     def raw_to_unit(self, points, sort=False):
         normed = self.transform_center_shrink(points)
-        return self.project_pca(normed, sort=sort)
+        return self.project_ortho(normed, sort=sort)
 
     def unit_to_raw(self, coord, depth):
         coord = (coord * 2) - np.ones(2)
@@ -320,10 +317,20 @@ class iso_cube:
             cmax,
             [cmin[0], cmax[1], cmax[2]]
         ])
+        # from itertools import product, combinations
+        # r = [-1, 1]
+        # for s, e in combinations(np.array(list(product(r, r, r))), 2):
+        #     if np.sum(np.abs(s-e)) == r[1]-r[0]:
+        #         ax.plot3D(*zip(s, e), color="b")
         return corners
 
     @staticmethod
-    def draw_cube_face(corners, alpha='0.25'):
+    def draw_cube_face(
+            ax, corners,
+            edgecolors=Color('gold').rgb,
+            facecolor=Color('khaki').rgb,
+            alpha='0.25'):
+        from mpl_toolkits.mplot3d.art3d import Poly3DCollection
         faces = [
             [corners[0], corners[3], corners[2], corners[1]],
             [corners[0], corners[1], corners[5], corners[4]],
@@ -332,70 +339,74 @@ class iso_cube:
             [corners[2], corners[3], corners[7], corners[6]],
             [corners[1], corners[2], corners[6], corners[5]]
         ]
-        mpplot.gca().add_collection3d(Poly3DCollection(
+        ax.add_collection3d(Poly3DCollection(
             faces,
-            linewidths=1, edgecolors='red',
-            facecolors=Color('orange').rgb, alpha=alpha
+            linewidths=1,
+            edgecolors=edgecolors,
+            facecolors=facecolor,
+            alpha=alpha
         ))
-        mpplot.gca().scatter(
-            corners[:, 0], corners[:, 1], corners[:, 2],
-            color=Color('cyan').rgb, alpha=0.5, marker='o')
+        # ax.scatter(
+        #     corners[:, 0], corners[:, 1], corners[:, 2],
+        #     color=Color('cyan').rgb, alpha=0.5, marker='o')
 
     @staticmethod
-    def draw_cube_wire(corners):
+    def draw_cube_wire(ax, corners, color=Color('orange').rgb):
         ring_b = np.array([
             corners[0], corners[1], corners[2], corners[3], corners[0]
         ])
         ring_u = np.array([
             corners[4], corners[5], corners[6], corners[7], corners[4]
         ])
-        mpplot.plot(
+        ax.plot(
             ring_b[:, 0], ring_b[:, 1], ring_b[:, 2],
             '-',
             linewidth=2.0,
-            color=Color('orange').rgb
+            color=color
         )
-        mpplot.plot(
+        ax.plot(
             ring_u[:, 0], ring_u[:, 1], ring_u[:, 2],
             '-',
             linewidth=2.0,
-            color=Color('orange').rgb
+            color=color
         )
-        mpplot.plot(
+        ax.plot(
             [corners[0, 0], corners[4, 0]],
             [corners[0, 1], corners[4, 1]],
             [corners[0, 2], corners[4, 2]],
             '-',
             linewidth=2.0,
-            color=Color('orange').rgb
+            color=color
         )
-        mpplot.plot(
+        ax.plot(
             [corners[1, 0], corners[5, 0]],
             [corners[1, 1], corners[5, 1]],
             [corners[1, 2], corners[5, 2]],
             '-',
             linewidth=2.0,
-            color=Color('orange').rgb
+            color=color
         )
-        mpplot.plot(
+        ax.plot(
             [corners[2, 0], corners[6, 0]],
             [corners[2, 1], corners[6, 1]],
             [corners[2, 2], corners[6, 2]],
             '-',
             linewidth=2.0,
-            color=Color('orange').rgb
+            color=color
         )
-        mpplot.plot(
+        ax.plot(
             [corners[3, 0], corners[7, 0]],
             [corners[3, 1], corners[7, 1]],
             [corners[3, 2], corners[7, 2]],
             '-',
             linewidth=2.0,
-            color=Color('orange').rgb
+            color=color
         )
 
 
 if __name__ == "__main__":
+    import matplotlib.pyplot as mpplot
+    from mpl_toolkits.mplot3d import Axes3D
     cube = iso_cube()
     # points3 = np.random.randn(1000, 3)
     points3 = np.random.rand(1000, 3) * 6

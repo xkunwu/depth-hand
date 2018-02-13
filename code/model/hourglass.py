@@ -6,6 +6,7 @@ from model.incept_resnet import incept_resnet
 class hourglass:
     @staticmethod
     def hg_net(net, n, scope=None, reuse=None):
+        num = int(net.shape[-1].value)
         sc_current = 'hg_net_{}'.format(n)
         with tf.variable_scope(scope, sc_current, [net], reuse=reuse):
             upper0 = incept_resnet.resnet_k(net)
@@ -13,10 +14,14 @@ class hourglass:
             lower0 = slim.max_pool2d(net, 3, stride=2)
             lower0 = incept_resnet.resnet_k(lower0)
 
+            lower0 = slim.conv2d(lower0, num * 2, 1, stride=1)
+
             if 1 < n:
                 lower1 = hourglass.hg_net(lower0, n - 1)
             else:
                 lower1 = lower0
+
+            lower1 = slim.conv2d(lower1, num, 1, stride=1)
 
             lower2 = incept_resnet.resnet_k(lower1)
             upper1 = slim.conv2d_transpose(
@@ -77,9 +82,8 @@ class hourglass:
                     normalizer_fn=slim.batch_norm):
                 with tf.variable_scope('stage128'):
                     sc = 'stage128'
-                    net = slim.conv2d(input_tensor, 16, 3)
-                    net = slim.conv2d(net, 16, 3)
-                    net = slim.max_pool2d(net, 3)
+                    net = slim.conv2d(input_tensor, 8, 3)
+                    net = incept_resnet.conv_maxpool(net, scope=sc)
                     end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points

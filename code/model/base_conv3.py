@@ -7,7 +7,6 @@ from tensorflow.contrib import slim
 import progressbar
 import h5py
 from model.base_regre import base_regre
-from model.batch_allot import batch_allot_conv3
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 BASE_DIR = os.path.abspath(os.path.join(BASE_DIR, os.pardir))
@@ -31,9 +30,12 @@ class base_conv3(base_regre):
     """
     def __init__(self, args):
         super(base_conv3, self).__init__(args)
-        self.batch_allot = batch_allot_conv3
+        self.batch_allot = getattr(
+            import_module('model.batch_allot'),
+            'batch_allot_conv3'
+        )
         self.net_rank = 3
-        self.crop_size = 32
+        self.crop_size = 64
         self.num_appen = 4
 
     def prepare_data(self, thedata, args,
@@ -128,6 +130,7 @@ class base_conv3(base_regre):
 
     def draw_random(self, thedata, args):
         import matplotlib.pyplot as mpplot
+        from mpl_toolkits.mplot3d import Axes3D
         from colour import Color
         from mayavi import mlab
 
@@ -137,8 +140,7 @@ class base_conv3(base_regre):
         # #     (np.zeros((10, 2)), np.arange(-1, 1, 0.2).reshape(10, 1)))
         # # grid = regu_grid()
         # # grid.from_cube(cube, 6)
-        # # grid.fill(points3_trans)
-        # # pcnt = grid.pcnt
+        # # pcnt = grid.fill(points3_trans)
         #
         # pcnt = np.zeros((6, 6, 6))
         # pcnt[2:4, 2:4, 3] = 1
@@ -175,7 +177,7 @@ class base_conv3(base_regre):
         img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
         ax.imshow(img, cmap='bone')
         args.data_draw.draw_pose2d(
-            thedata,
+            ax, thedata,
             args.data_ops.raw_to_2d(pose_raw, self.caminfo))
 
         ax = mpplot.subplot(2, 2, 3, projection='3d')
@@ -193,9 +195,9 @@ class base_conv3(base_regre):
         ax.scatter(
             points3_trans[:, 0], points3_trans[:, 1], points3_trans[:, 2],
             color=Color('lightsteelblue').rgb)
-        args.data_draw.draw_raw3d_pose(thedata, poses_h5)
+        args.data_draw.draw_raw3d_pose(ax, thedata, poses_h5)
         corners = cube.transform_to_center(cube.get_corners())
-        cube.draw_cube_wire(corners)
+        cube.draw_cube_wire(ax, corners)
         ax.view_init(azim=-120, elev=-150)
 
         ax = mpplot.subplot(2, 2, 4)
@@ -204,14 +206,14 @@ class base_conv3(base_regre):
         ax.imshow(img, cmap='bone')
         pose_raw = self.yanker(poses_h5, resce_h5, self.caminfo)
         args.data_draw.draw_pose2d(
-            thedata,
+            ax, thedata,
             args.data_ops.raw_to_2d(pose_raw, self.caminfo)
         )
         rects = cube.proj_rects_3(
             args.data_ops.raw_to_2d, self.caminfo
         )
         for ii, rect in enumerate(rects):
-            rect.draw(colors[ii])
+            rect.draw(ax, colors[ii])
 
         ax = mpplot.subplot(2, 2, 2, projection='3d')
         numpts = points3.shape[0]
@@ -225,17 +227,18 @@ class base_conv3(base_regre):
             color=Color('lightsteelblue').rgb)
         ax.view_init(azim=-90, elev=-60)
         ax.set_zlabel('depth (mm)', labelpad=15)
-        args.data_draw.draw_raw3d_pose(thedata, pose_raw)
+        args.data_draw.draw_raw3d_pose(ax, thedata, pose_raw)
         corners = cube.get_corners()
-        iso_cube.draw_cube_wire(corners)
+        iso_cube.draw_cube_wire(ax, corners)
 
-        # mlab.figure(size=(800, 800))
-        # points3_trans = cube.transform_to_center(points3_sam)
-        # mlab.points3d(
-        #     points3_trans[:, 0], points3_trans[:, 1], points3_trans[:, 2],
-        #     scale_factor=8,
-        #     color=Color('lightsteelblue').rgb)
-        # mlab.outline()
+        # if self.args.show_draw:
+        #     mlab.figure(size=(800, 800))
+        #     points3_trans = cube.transform_to_center(points3_sam)
+        #     mlab.points3d(
+        #         points3_trans[:, 0], points3_trans[:, 1], points3_trans[:, 2],
+        #         scale_factor=8,
+        #         color=Color('lightsteelblue').rgb)
+        #     mlab.outline()
 
         img_name, frame, poses, resce = self.provider_worker(
             annot_line, self.image_dir, self.caminfo)
@@ -263,20 +266,21 @@ class base_conv3(base_regre):
         cube.load(resce3)
         cube.show_dims()
 
-        # mlab.figure(size=(800, 800))
-        # # mlab.contour3d(frame)
-        # mlab.pipeline.volume(mlab.pipeline.scalar_field(frame))
-        # mlab.pipeline.image_plane_widget(
-        #     mlab.pipeline.scalar_field(frame),
-        #     plane_orientation='z_axes',
-        #     slice_index=self.crop_size / 2)
-        # np.set_printoptions(precision=4)
-        # # print(frame[12:20, 12:20, 16])
-        # mlab.outline()
+        if self.args.show_draw:
+            mlab.figure(size=(800, 800))
+            # mlab.contour3d(frame)
+            mlab.pipeline.volume(mlab.pipeline.scalar_field(frame))
+            mlab.pipeline.image_plane_widget(
+                mlab.pipeline.scalar_field(frame),
+                plane_orientation='z_axes',
+                slice_index=self.crop_size / 2)
+            np.set_printoptions(precision=4)
+            # print(frame[12:20, 12:20, 16])
+            mlab.outline()
 
         mpplot.savefig(os.path.join(
             args.predict_dir,
-            'draw_{}.png'.format(self.name_desc)))
+            'draw_{}_{}.png'.format(self.name_desc, img_id)))
         if self.args.show_draw:
             mpplot.show()
         print('[{}] drawing image #{:d} - done.'.format(
@@ -295,6 +299,7 @@ class base_conv3(base_regre):
             end_points[name] = net
             return name == final_endpoint
 
+        from inresnet3d import inresnet3d
         with tf.variable_scope(
                 scope, self.name_desc, [input_tensor]):
             weight_decay = 0.00004
@@ -322,60 +327,60 @@ class base_conv3(base_regre):
                     [slim.max_pool3d, slim.avg_pool3d],
                     stride=2, padding='SAME'), \
                 slim.arg_scope(
+                    [slim.conv3d_transpose],
+                    stride=2, padding='SAME',
+                    weights_regularizer=slim.l2_regularizer(weight_decay),
+                    biases_regularizer=slim.l2_regularizer(weight_decay),
+                    activation_fn=tf.nn.relu,
+                    normalizer_fn=slim.batch_norm), \
+                slim.arg_scope(
                     [slim.conv3d],
                     stride=1, padding='SAME',
                     weights_regularizer=slim.l2_regularizer(weight_decay),
                     biases_regularizer=slim.l2_regularizer(weight_decay),
                     activation_fn=tf.nn.relu,
                     normalizer_fn=slim.batch_norm):
+                with tf.variable_scope('stage64'):
+                    sc = 'stage64'
+                    net = slim.conv3d(input_tensor, 16, 3)
+                    net = inresnet3d.conv_maxpool(net, scope=sc)
+                    self.end_point_list.append(sc)
+                    if add_and_check_final(sc, net):
+                        return net, end_points
                 with tf.variable_scope('stage32'):
                     sc = 'stage32'
-                    net = slim.conv3d(
-                        input_tensor, 32, 3, scope='conv32_3x3x3_1')
-                    net = slim.conv3d(
-                        net, 32, 3, stride=2, scope='conv32_3x3x3_2')
-                    net = slim.max_pool3d(
-                        net, 3, scope='maxpool32_3x3x3_1')
+                    net = inresnet3d.conv_maxpool(net, scope=sc)
                     self.end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points
                 with tf.variable_scope('stage16'):
                     sc = 'stage16'
-                    net = slim.conv3d(
-                        net, 64, 3, scope='conv16_3x3x3_1')
-                    net = slim.max_pool3d(
-                        net, 3, stride=2, scope='maxpool16_3x3x3_2')
+                    net = inresnet3d.conv_maxpool(net, scope=sc)
                     self.end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points
                 with tf.variable_scope('stage8'):
-                    sc = 'stage8'
-                    net = slim.conv3d(
-                        net, 128, 3, scope='conv16_3x3x3_1')
-                    net = slim.max_pool3d(
-                        net, 3, stride=2, scope='maxpool16_3x3x3_2')
-                    self.end_point_list.append(sc)
-                    if add_and_check_final(sc, net):
-                        return net, end_points
-                with tf.variable_scope('stage4'):
                     sc = 'stage_out'
-                    net = slim.conv3d(net, 128, 1, scope='reduce4')
-                    self.end_point_list.append('reduce4')
-                    if add_and_check_final('reduce4', net):
-                        return net, end_points
-                    net = slim.conv3d(
-                        net, 1024, net.get_shape()[1:4],
-                        padding='VALID', scope='fullconn4')
-                    self.end_point_list.append('fullconn4')
-                    if add_and_check_final('fullconn4', net):
-                        return net, end_points
-                    net = slim.dropout(
-                        net, 0.5, scope='dropout4')
-                    net = slim.flatten(net)
-                    net = slim.fully_connected(
-                        net, self.out_dim,
-                        activation_fn=None, normalizer_fn=None,
-                        scope='output4')
+                    net = inresnet3d.pullout8(
+                        net, self.out_dim, is_training,
+                        scope=sc)
+                    # net = slim.conv3d(net, 128, 1, scope='reduce4')
+                    # self.end_point_list.append('reduce4')
+                    # if add_and_check_final('reduce4', net):
+                    #     return net, end_points
+                    # net = slim.conv3d(
+                    #     net, 1024, net.get_shape()[1:4],
+                    #     padding='VALID', scope='fullconn4')
+                    # self.end_point_list.append('fullconn4')
+                    # if add_and_check_final('fullconn4', net):
+                    #     return net, end_points
+                    # net = slim.dropout(
+                    #     net, 0.5, scope='dropout4')
+                    # net = slim.flatten(net)
+                    # net = slim.fully_connected(
+                    #     net, self.out_dim,
+                    #     activation_fn=None, normalizer_fn=None,
+                    #     scope='output4')
                     self.end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points

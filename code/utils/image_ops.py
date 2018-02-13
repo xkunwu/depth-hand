@@ -23,11 +23,11 @@ def draw_hmap2(fig, ax, image_crop, hmap2):
     fig.colorbar(img_h2, cax=cax)
 
 
-def draw_hmap3(fig, ax, image_crop, hmap3):
+def draw_olmap(fig, ax, image_crop, olmap):
     image_hmap = image_crop[::4, ::4]
     ax.imshow(image_hmap, cmap='bone')
     img_h3 = ax.imshow(
-        hmap3, cmap=transparent_cmap(mpplot.cm.jet))
+        olmap, cmap=transparent_cmap(mpplot.cm.jet))
     divider = make_axes_locatable(ax)
     cax = divider.append_axes("right", size="5%", pad=0.05)
     fig.colorbar(img_h3, cax=cax)
@@ -56,9 +56,9 @@ def figure_hmap2(depth_hmap, hmap2):
     return fig
 
 
-def figure_hmap3(depth_hmap, hmap3):
+def figure_olmap(depth_hmap, olmap):
     fig, ax = tfplot.subplots(figsize=(4, 4))
-    draw_hmap3(fig, ax, depth_hmap, hmap3)
+    draw_olmap(fig, ax, depth_hmap, olmap)
     # ax.axis('off')
     return fig
 
@@ -70,7 +70,7 @@ def figure_uomap(depth_crop, uomap):
     return fig
 
 tfplot_hmap2 = tfplot.wrap(figure_hmap2, batch=False)
-tfplot_hmap3 = tfplot.wrap(figure_hmap3, batch=False)
+tfplot_olmap = tfplot.wrap(figure_olmap, batch=False)
 tfplot_uomap = tfplot.wrap(figure_uomap, batch=False)
 
 

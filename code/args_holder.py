@@ -7,7 +7,10 @@ import logging
 model_map = {
     'direc_tsdf': 'model.direc_tsdf',
     'trunc_dist': 'model.trunc_dist',
+    'voxel_regre': 'model.voxel_regre',
+    'voxel_detect': 'model.voxel_detect',
     'base_conv3': 'model.base_conv3',
+    'base_conv3_inres': 'model.base_inres',
     'ortho3view': 'model.ortho3view',
     'base_clean': 'model.base_clean',
     'base_regre': 'model.base_regre',
@@ -25,6 +28,10 @@ class args_holder:
     """ this class holds all arguments, and provides parsing functionality """
     def __init__(self):
         self.parser = argparse.ArgumentParser()
+        self.logFormatter = logging.Formatter(
+            # '%(asctime)s [%(levelname)-5.5s]  %(message)s (%(filename)s:%(lineno)s)',
+            '%(asctime)s [%(levelname)-5.5s]  %(message)s',
+            datefmt='%y-%m-%d %H:%M:%S')
 
         # directories
         home_dir = os.path.expanduser('~')
@@ -123,11 +130,7 @@ class args_holder:
         else:
             self.args.log_dir_t = os.readlink(log_dir_ln)
 
-    def make_logging(self):
-        logFormatter = logging.Formatter(
-            # '%(asctime)s [%(levelname)-5.5s]  %(message)s (%(filename)s:%(lineno)s)',
-            '%(asctime)s [%(levelname)-5.5s]  %(message)s',
-            datefmt='%y-%m-%d %H:%M:%S')
+    def make_central_logging(self):
         logger = logging.getLogger('univue')
         logger.setLevel(logging.INFO)
         fileHandler = logging.FileHandler(
@@ -135,12 +138,15 @@ class args_holder:
                 self.args.out_dir, 'log', 'univue.log'),
             mode='a'
         )
-        fileHandler.setFormatter(logFormatter)
+        fileHandler.setFormatter(self.logFormatter)
         logger.addHandler(fileHandler)
         consoleHandler = logging.StreamHandler(stream=sys.stdout)
-        consoleHandler.setFormatter(logFormatter)
+        consoleHandler.setFormatter(self.logFormatter)
         logger.addHandler(consoleHandler)
         self.args.logger = logger
+
+    def make_logging(self):
+        self.make_central_logging()
         logger = logging.getLogger('train')
         logger.setLevel(logging.INFO)
         if self.args.retrain:
@@ -153,10 +159,10 @@ class args_holder:
                 os.path.join(self.args.log_dir_t, 'train.log'),
                 mode='a'
             )
-        fileHandler.setFormatter(logFormatter)
+        fileHandler.setFormatter(self.logFormatter)
         logger.addHandler(fileHandler)
         consoleHandler = logging.StreamHandler(stream=sys.stdout)
-        consoleHandler.setFormatter(logFormatter)
+        consoleHandler.setFormatter(self.logFormatter)
         logger.addHandler(consoleHandler)
 
     @staticmethod
