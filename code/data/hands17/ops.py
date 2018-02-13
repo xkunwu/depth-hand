@@ -379,7 +379,7 @@ def voxelize_depth(img, pose_raw, step, anchor_num, caminfo):
     #     points3_sam = points3
     # ax.scatter(
     #     points3_sam[:, 0], points3_sam[:, 1], points3_sam[:, 2])
-    # ax.view_init(azim=-90, elev=-60)
+    # ax.view_init(azim=-90, elev=-75)
     # ax.set_zlabel('depth (mm)', labelpad=15)
     # corners = cube.get_corners()
     # iso_cube.draw_cube_wire(ax, corners)

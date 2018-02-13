@@ -2,7 +2,27 @@ import os
 import tensorflow as tf
 from functools import reduce
 from train.train_abc import train_abc
-# from utils.image_ops import tfplot_hmap2, tfplot_olmap, tfplot_uomap
+from utils.image_ops import tfplot_vxhit, tfplot_vxmap
+
+
+def unravel_index(indices, shape):
+    indices = tf.expand_dims(indices, 0)
+    shape = tf.expand_dims(shape, 1)
+    shape = tf.cast(shape, tf.float32)
+    strides = tf.cumprod(shape, reverse=True)
+    strides_shifted = tf.cumprod(shape, exclusive=True, reverse=True)
+    strides = tf.cast(strides, tf.int32)
+    strides_shifted = tf.cast(strides_shifted, tf.int32)
+
+    def even():
+        rem = indices - (indices // strides) * strides
+        return rem // strides_shifted
+
+    def odd():
+        div = indices // strides_shifted
+        return div - (div // strides) * strides
+    rank = tf.rank(shape)
+    return tf.cond(tf.equal(rank - (rank // 2) * 2, 0), even, odd)
 
 
 class train_voxel_detect(train_abc):
@@ -39,6 +59,18 @@ class train_voxel_detect(train_abc):
             learning_rate = self.get_learning_rate(global_step)
             tf.summary.scalar('learning_rate', learning_rate)
 
+            hmap_size = self.args.model_inst.hmap_size
+            vxmap_echt_op = tf.expand_dims(tfplot_vxhit(
+                frames_op[0, ..., 0],
+                poses_op[0, 0],
+                hmap_size), axis=0)
+            tf.summary.image('vxmap_echt/', vxmap_echt_op, max_outputs=1)
+            vxmap_pred_op = tf.expand_dims(tfplot_vxmap(
+                frames_op[0, ..., 0],
+                pred_op[0, :, 0],
+                hmap_size), axis=0)
+            tf.summary.image('vxmap_pred/', vxmap_pred_op, max_outputs=1)
+
             # num_j = self.args.model_inst.out_dim
             # hmap2_echt_op = tf.expand_dims(tfplot_hmap2(
             #     frames_op[0, ..., 0],
@@ -67,20 +99,32 @@ class train_voxel_detect(train_abc):
             #     pred_op[0, ..., -3:]),
             #     axis=0)
             # tf.summary.image('uomap_pred/', uomap_pred_op, max_outputs=1)
-            #
-            # num_j = self.args.model_inst.out_dim
-            # tf.summary.histogram(
-            #     'hmap2_value_echt', poses_op[..., :num_j])
-            # tf.summary.histogram(
-            #     'hmap2_value_pred', pred_op[..., :num_j])
-            # tf.summary.histogram(
-            #     'olmap_value_echt', poses_op[..., num_j:num_j * 2])
-            # tf.summary.histogram(
-            #     'olmap_value_pred', pred_op[..., num_j:num_j * 2])
-            # tf.summary.histogram(
-            #     'uomap_value_echt', poses_op[..., - num_j * 3:])
-            # tf.summary.histogram(
-            #     'uomap_value_pred', pred_op[..., - num_j * 3:])
+
+            hmap_size = self.args.model_inst.hmap_size
+            joint_id = 0
+            vxmap = pred_op[0, :, joint_id]
+            tf.summary.histogram(
+                'vxhit_value_pred', vxmap)
+            index_echt = unravel_index(
+                poses_op[0, joint_id], (hmap_size, hmap_size, hmap_size))
+            index_pred = unravel_index(
+                tf.argmax(vxmap, output_type=tf.int32),
+                (hmap_size, hmap_size, hmap_size))
+            tf.summary.scalar(
+                'vxhit_diff_echt',
+                tf.reduce_sum(tf.abs(index_echt - index_pred)))
+            joint_id = -1
+            vxmap = pred_op[0, :, joint_id]
+            tf.summary.histogram(
+                'vxhit_1_value_pred', vxmap)
+            index_echt = unravel_index(
+                poses_op[0, joint_id], (hmap_size, hmap_size, hmap_size))
+            index_pred = unravel_index(
+                tf.argmax(vxmap, output_type=tf.int32),
+                (hmap_size, hmap_size, hmap_size))
+            tf.summary.scalar(
+                'vxhit_1_diff_echt',
+                tf.reduce_sum(tf.abs(index_echt - index_pred)))
 
             optimizer = tf.train.AdamOptimizer(learning_rate)
             # train_op = optimizer.minimize(

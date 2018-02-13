@@ -91,7 +91,7 @@ class capture:
         ax.scatter(
             points3_sam[:, 0], points3_sam[:, 1], points3_sam[:, 2],
             color=Color('lightsteelblue').rgb)
-        ax.view_init(azim=-90, elev=-60)
+        ax.view_init(azim=-90, elev=-75)
         ax.set_zlabel('depth (mm)', labelpad=15)
         corners = cube.get_corners()
         iso_cube.draw_cube_wire(ax, corners)
@@ -145,7 +145,7 @@ class capture:
             model_path = self.args.model_inst.ckpt_path
             saver.restore(sess, model_path)
 
-            mpplot.subplots(nrows=1, ncols=2, figsize=(6 * 2, 6))
+            mpplot.subplots(nrows=1, ncols=2, figsize=(6, 6 * 2))
             while True:
                 depth = self.read_frame_from_device(dev)
                 depth = self.preprocess_input(depth)

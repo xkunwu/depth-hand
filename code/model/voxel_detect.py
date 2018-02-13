@@ -52,12 +52,12 @@ class voxel_detect(base_conv3):
         resce3 = resce[0:4]
         return self.data_module.ops.pca_to_raw(pose_local, resce3)
 
-    def yanker_hmap(self, resce, voxhig, hmap_size, caminfo):
+    def yanker_hmap(self, resce, voxhit, hmap_size, caminfo):
         resce3 = resce[0:4]
         cube = iso_cube()
         cube.load(resce3)
         return self.data_module.ops.vxlabel_to_raw(
-            voxhig, cube, hmap_size, caminfo)
+            voxhit, cube, hmap_size, caminfo)
 
     @staticmethod
     def put_worker(
@@ -74,12 +74,12 @@ class voxel_detect(base_conv3):
         batchallot.batch_resce[bi, :] = resce
 
     def write_pred(self, fanno, caminfo,
-                   batch_index, batch_resce, batch_poses):
+                   batch_index, batch_resce, pred):
         for ii in range(batch_index.shape[0]):
             img_name = self.data_module.io.index2imagename(batch_index[ii, 0])
             resce = batch_resce[ii, :]
-            vxhit = batch_poses[ii, ...]
-            vxhit = np.argmax(vxhit, axis=0)
+            vxmap = pred[ii, ...]
+            vxhit = np.argmax(vxmap, axis=0)  # convert to label
             pose_raw = self.yanker_hmap(
                 resce, np.array(vxhit),
                 self.hmap_size, caminfo)
@@ -226,7 +226,7 @@ class voxel_detect(base_conv3):
         img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
         from colour import Color
         colors = [Color('orange').rgb, Color('red').rgb, Color('lime').rgb]
-        fig, _ = mpplot.subplots(nrows=2, ncols=4, figsize=(2 * 5, 4 * 5))
+        fig, _ = mpplot.subplots(nrows=2, ncols=4, figsize=(4 * 5, 2 * 5))
 
         ax = mpplot.subplot(2, 4, 3, projection='3d')
         points3 = args.data_ops.img_to_raw(img, self.caminfo)
@@ -242,7 +242,6 @@ class voxel_detect(base_conv3):
         args.data_draw.draw_raw3d_pose(ax, thedata, poses_h5)
         corners = cube.transform_to_center(cube.get_corners())
         cube.draw_cube_wire(ax, corners)
-        # ax.view_init(azim=-120, elev=-150)
         ax.view_init(azim=-90, elev=-75)
 
         ax = mpplot.subplot(2, 4, 1)
@@ -268,7 +267,7 @@ class voxel_detect(base_conv3):
         ax.scatter(
             points3_sam[:, 0], points3_sam[:, 1], points3_sam[:, 2],
             color=Color('lightsteelblue').rgb)
-        ax.view_init(azim=-90, elev=-60)
+        ax.view_init(azim=-90, elev=-75)
         ax.set_zlabel('depth (mm)', labelpad=15)
         args.data_draw.draw_raw3d_pose(ax, thedata, pose_raw)
         corners = cube.get_corners()
@@ -291,80 +290,36 @@ class voxel_detect(base_conv3):
         voxel_hmap = self.hmap_size
         grid = regu_grid()
         grid.from_cube(cube, voxel_crop)
-        vxhit_crop = frame_h5
+        vxmap_crop = frame_h5
+
+        def draw_voxel_pose(ax, poses, roll=0):
+            pose3d = cube.transform_center_shrink(poses)
+            pose2d, _ = cube.project_ortho(pose3d, roll=roll, sort=False)
+            pose2d *= voxel_crop
+            args.data_draw.draw_pose2d(
+                ax, thedata,
+                pose2d,
+            )
+            coord = grid.slice_ortho(vxmap_crop, roll=roll)
+            grid.draw_slice(ax, coord, 1.)
+            ax.set_xlim([0, voxel_crop])
+            ax.set_ylim([0, voxel_crop])
+            ax.set_aspect('equal', adjustable='box')
+            ax.invert_yaxis()
 
         ax = mpplot.subplot(2, 4, 5)
-        pose3d = cube.transform_center_shrink(pose_raw)
-        pose2d, _ = cube.project_ortho(pose3d, roll=0, sort=False)
-        pose2d *= voxel_crop
-        args.data_draw.draw_pose2d(
-            ax, thedata,
-            pose2d,
-        )
-        coord = grid.slice_ortho(vxhit_crop, roll=0)
-        grid.draw_slice(ax, coord, 1.)
-        ax.set_xlim([0, voxel_crop])
-        ax.set_ylim([0, voxel_crop])
-        ax.set_aspect('equal', adjustable='box')
-        ax.invert_yaxis()
+        draw_voxel_pose(ax, pose_raw, roll=0)
 
+        roll = 2
         ax = mpplot.subplot(2, 4, 6)
-        pose3d = cube.transform_center_shrink(pose_yank)
-        pose2d, _ = cube.project_ortho(pose3d, roll=1, sort=False)
-        pose2d *= voxel_crop
-        args.data_draw.draw_pose2d(
-            ax, thedata,
-            pose2d,
-        )
-        coord = grid.slice_ortho(vxhit_crop, roll=1)
-        grid.draw_slice(ax, coord, 1.)
-        ax.set_xlim([0, voxel_crop])
-        ax.set_ylim([0, voxel_crop])
-        ax.set_aspect('equal', adjustable='box')
-        ax.invert_yaxis()
+        draw_voxel_pose(ax, pose_yank, roll=roll)
 
-        from mpl_toolkits.axes_grid1 import make_axes_locatable
-        from utils.image_ops import transparent_cmap
+        from utils.image_ops import draw_vxhit
         ax = mpplot.subplot(2, 4, 7)
-        vxhit_hmap = vxhit_crop[::2, ::2, ::2]
-        coord = grid.slice_ortho(vxhit_hmap, roll=0)
-        grid.draw_slice(ax, coord, 1.)
-        vxhit_sum = np.zeros(voxel_hmap * voxel_hmap * voxel_hmap)
-        # for ii in vxhit_h5.astype(int):
-        #     vxhit_sum[ii] += 1
-        vxhit_sum[vxhit_h5.astype(int)] = 1
-        vxhit_sum = vxhit_sum.reshape((voxel_hmap, voxel_hmap, voxel_hmap))
-        vxhit_axis = np.sum(vxhit_sum, axis=2)
-        vxhit_axis = np.swapaxes(vxhit_axis, 0, 1)  # swap xy
-        img_hit = ax.imshow(
-            vxhit_axis, cmap=transparent_cmap(mpplot.cm.jet))
-        divider = make_axes_locatable(ax)
-        cax = divider.append_axes("right", size="5%", pad=0.05)
-        fig.colorbar(img_hit, cax=cax)
-        ax.set_xlim([0, voxel_hmap])
-        ax.set_ylim([0, voxel_hmap])
-        ax.set_aspect('equal', adjustable='box')
-        ax.invert_yaxis()
+        draw_vxhit(fig, ax, vxmap_crop, vxhit_h5, voxel_hmap, roll=0)
 
         ax = mpplot.subplot(2, 4, 8)
-        vxhit_hmap = vxhit_crop[::2, ::2, ::2]
-        coord = grid.slice_ortho(vxhit_hmap, roll=1)
-        grid.draw_slice(ax, coord, 1.)
-        vxhit_sum = np.zeros(voxel_hmap * voxel_hmap * voxel_hmap)
-        # for ii in vxhit_h5.astype(int):
-        #     vxhit_sum[ii] += 1
-        vxhit_sum[vxhit_h5.astype(int)] = 1
-        vxhit_sum = vxhit_sum.reshape((voxel_hmap, voxel_hmap, voxel_hmap))
-        vxhit_axis = np.sum(vxhit_sum, axis=1)
-        img_hit = ax.imshow(
-            vxhit_axis, cmap=transparent_cmap(mpplot.cm.jet))
-        divider = make_axes_locatable(ax)
-        cax = divider.append_axes("right", size="5%", pad=0.05)
-        fig.colorbar(img_hit, cax=cax)
-        ax.set_xlim([0, voxel_hmap])
-        ax.set_ylim([0, voxel_hmap])
-        ax.set_aspect('equal', adjustable='box')
-        ax.invert_yaxis()
+        draw_vxhit(fig, ax, vxmap_crop, vxhit_h5, voxel_hmap, roll=roll)
 
         # if self.args.show_draw:
         #     mlab.figure(size=(800, 800))
@@ -406,7 +361,7 @@ class voxel_detect(base_conv3):
         final_endpoint = 'hourglass_{}'.format(hg_repeat - 1)
         num_joint = self.out_dim
         num_feature = 32
-        num_vol = 32 * 32 * 32
+        num_vol = self.hmap_size * self.hmap_size * self.hmap_size
 
         def add_and_check_final(name, net):
             end_points[name] = net

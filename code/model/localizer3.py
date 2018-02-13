@@ -150,7 +150,7 @@ class localizer3(base_conv3):
         ax.scatter(
             points3_sam[:, 0], points3_sam[:, 1], points3_sam[:, 2],
             color=Color('lightsteelblue').rgb)
-        ax.view_init(azim=-90, elev=-60)
+        ax.view_init(azim=-90, elev=-75)
         ax.set_zlabel('depth (mm)', labelpad=15)
         args.data_draw.draw_raw3d_pose(ax, thedata, pose_raw)
         corners = cube.get_corners()
@@ -161,7 +161,7 @@ class localizer3(base_conv3):
         ax.scatter(
             points3_sam[:, 0], points3_sam[:, 1], points3_sam[:, 2],
             color=Color('lightsteelblue').rgb)
-        ax.view_init(azim=-90, elev=-60)
+        ax.view_init(azim=-90, elev=-75)
         ax.set_zlabel('depth (mm)', labelpad=15)
         args.data_draw.draw_raw3d_pose(ax, thedata, pose_raw)
 
@@ -217,7 +217,7 @@ class localizer3(base_conv3):
         ax.scatter(
             points3_sam[:, 0], points3_sam[:, 1], points3_sam[:, 2],
             color=Color('lightsteelblue').rgb)
-        ax.view_init(azim=-90, elev=-60)
+        ax.view_init(azim=-90, elev=-75)
         ax.set_zlabel('depth (mm)', labelpad=15)
         args.data_draw.draw_raw3d_pose(ax, thedata, pose_raw)
         corners = cube.get_corners()
@@ -240,7 +240,7 @@ class localizer3(base_conv3):
         ax.scatter(
             points3_sam[:, 0], points3_sam[:, 1], points3_sam[:, 2],
             color=Color('lightsteelblue').rgb)
-        ax.view_init(azim=-90, elev=-60)
+        ax.view_init(azim=-90, elev=-75)
         ax.set_zlabel('depth (mm)', labelpad=15)
         args.data_draw.draw_raw3d_pose(ax, thedata, pose_raw)
         corners = cube.get_corners()

@@ -4,6 +4,7 @@ import matplotlib.image as mpimg
 import matplotlib.collections as mcoll
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import tfplot
+from utils.regu_grid import regu_grid
 
 
 def transparent_cmap(cmap, tmax=0.99, N=255):
@@ -11,6 +12,93 @@ def transparent_cmap(cmap, tmax=0.99, N=255):
     mycmap._init()
     mycmap._lut[:, -1] = np.linspace(0, tmax, N + 4)
     return mycmap
+
+
+def draw_vxsum(
+    fig, ax, vxmap_crop, vxmap_sum,
+        voxel_hmap, roll=0):
+    vxmap_hmap = vxmap_crop[::2, ::2, ::2]
+    grid = regu_grid(step=voxel_hmap)
+    coord = grid.slice_ortho(vxmap_hmap, roll=roll)
+    grid.draw_slice(ax, coord, 1.)
+    vxmap_axis = np.sum(vxmap_sum, axis=(2 - roll))
+    if 1 != roll:
+        vxmap_axis = np.swapaxes(vxmap_axis, 0, 1)  # swap xy
+    img_hit = ax.imshow(
+        vxmap_axis, cmap=transparent_cmap(mpplot.cm.jet))
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    fig.colorbar(img_hit, cax=cax)
+    ax.set_xlim([0, voxel_hmap])
+    ax.set_ylim([0, voxel_hmap])
+    ax.set_aspect('equal', adjustable='box')
+    ax.invert_yaxis()
+
+
+def draw_vxhit(
+    fig, ax, vxmap_crop, vxhit,
+        voxel_hmap, roll=0):
+    vxmap_sum = np.zeros(voxel_hmap * voxel_hmap * voxel_hmap)
+    vxmap_sum[vxhit.astype(int)] = 1
+    vxmap_sum = vxmap_sum.reshape((voxel_hmap, voxel_hmap, voxel_hmap))
+    draw_vxsum(fig, ax, vxmap_crop, vxmap_sum, voxel_hmap, roll=roll)
+    # vxmap_hmap = vxmap_crop[::2, ::2, ::2]
+    # grid = regu_grid(step=voxel_hmap)
+    # coord = grid.slice_ortho(vxmap_hmap, roll=roll)
+    # grid.draw_slice(ax, coord, 1.)
+    # vxmap_axis = np.sum(vxmap_sum, axis=(2 - roll))
+    # if 1 != roll:
+    #     vxmap_axis = np.swapaxes(vxmap_axis, 0, 1)  # swap xy
+    # img_hit = ax.imshow(
+    #     vxmap_axis, cmap=transparent_cmap(mpplot.cm.jet))
+    # divider = make_axes_locatable(ax)
+    # cax = divider.append_axes("right", size="5%", pad=0.05)
+    # fig.colorbar(img_hit, cax=cax)
+    # ax.set_xlim([0, voxel_hmap])
+    # ax.set_ylim([0, voxel_hmap])
+    # ax.set_aspect('equal', adjustable='box')
+    # ax.invert_yaxis()
+
+
+def figure_vxhit(vxmap_crop, vxhit, voxel_hmap):
+    fig, ax = tfplot.subplots(figsize=(4, 4))
+    draw_vxhit(fig, ax, vxmap_crop, vxhit, voxel_hmap)
+    ax.axis('off')
+    return fig
+
+tfplot_vxhit = tfplot.wrap(figure_vxhit, batch=False)
+
+
+def draw_vxmap(
+    fig, ax, vxmap_crop, vxmap_pred,
+        voxel_hmap, roll=0):
+    vxmap_sum = vxmap_pred.reshape((voxel_hmap, voxel_hmap, voxel_hmap))
+    draw_vxsum(fig, ax, vxmap_crop, vxmap_sum, voxel_hmap, roll=roll)
+    # vxmap_hmap = vxmap_crop[::2, ::2, ::2]
+    # grid = regu_grid(step=voxel_hmap)
+    # coord = grid.slice_ortho(vxmap_hmap, roll=roll)
+    # grid.draw_slice(ax, coord, 1.)
+    # vxmap_axis = np.sum(vxmap_sum, axis=(2 - roll))
+    # if 1 != roll:
+    #     vxmap_axis = np.swapaxes(vxmap_axis, 0, 1)  # swap xy
+    # img_hit = ax.imshow(
+    #     vxmap_axis, cmap=transparent_cmap(mpplot.cm.jet))
+    # divider = make_axes_locatable(ax)
+    # cax = divider.append_axes("right", size="5%", pad=0.05)
+    # fig.colorbar(img_hit, cax=cax)
+    # ax.set_xlim([0, voxel_hmap])
+    # ax.set_ylim([0, voxel_hmap])
+    # ax.set_aspect('equal', adjustable='box')
+    # ax.invert_yaxis()
+
+
+def figure_vxmap(vxmap_crop, vxmap_pred, voxel_hmap):
+    fig, ax = tfplot.subplots(figsize=(4, 4))
+    draw_vxmap(fig, ax, vxmap_crop, vxmap_pred, voxel_hmap)
+    ax.axis('off')
+    return fig
+
+tfplot_vxmap = tfplot.wrap(figure_vxmap, batch=False)
 
 
 def draw_hmap2(fig, ax, image_crop, hmap2):

@@ -101,11 +101,11 @@ class regu_grid:
         return pcnt
 
     def hit(self, points3):
-        vxhit = np.zeros(shape=(self.step, self.step, self.step))
+        vxmap = np.zeros(shape=(self.step, self.step, self.step))
         indices = self.putit(points3)
-        vxhit[indices[:, 0], indices[:, 1], indices[:, 2]] = 1.
-        # self.vxhit = vxhit
-        return vxhit
+        vxmap[indices[:, 0], indices[:, 1], indices[:, 2]] = 1.
+        # self.vxmap = vxmap
+        return vxmap
 
     def prow_anchor_single(self, points3, wsizes):
         scale_base = self.cellen * self.step
@@ -139,14 +139,14 @@ class regu_grid:
         cen = float(index) - self.cll
         return grid_cell(cen, self.cellen)
 
-    def slice_ortho(self, vxhit_map, roll=0):
+    def slice_ortho(self, vxmap, roll=0):
         ar3 = np.arange(3)
         if 0 < roll:
             ar3 = np.roll(ar3, roll)
         # each row is in an axis
-        indices = np.argwhere(1e-2 < vxhit_map).T
+        indices = np.argwhere(1e-2 < vxmap).T
         # indices = np.array(np.unravel_index(
-        #     (vxhit_seq), (self.step, self.step, self.step)))
+        #     (vxhit), (self.step, self.step, self.step)))
         indices2d = indices[ar3[:2], :]
         seq2d = np.ravel_multi_index(
             indices2d, (self.step, self.step))
@@ -163,9 +163,9 @@ class regu_grid:
             rect = iso_rect(c * cellen, cellen)
             rect.draw(ax)
 
-    def draw_map(self, ax, vxhit_map):
+    def draw_map(self, ax, vxmap):
         from utils.iso_boxes import iso_cube
-        indices = np.argwhere(1e-2 < vxhit_map)
+        indices = np.argwhere(1e-2 < vxmap)
         for index in indices:
             cube_vox = iso_cube(
                 self.voxen(index),
@@ -177,7 +177,7 @@ class regu_grid:
 
         from mayavi import mlab
         from colour import Color
-        xx, yy, zz = np.where(1e-2 < vxhit_map)
+        xx, yy, zz = np.where(1e-2 < vxmap)
         mlab.points3d(
             xx, yy, zz,
             mode="cube",

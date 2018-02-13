@@ -266,7 +266,7 @@ class dense_regre(base_regre):
         sizel = np.floor(resce3[0]).astype(int)
         from colour import Color
         colors = [Color('orange').rgb, Color('red').rgb, Color('lime').rgb]
-        fig, _ = mpplot.subplots(nrows=2, ncols=3, figsize=(2 * 5, 3 * 5))
+        fig, _ = mpplot.subplots(nrows=2, ncols=3, figsize=(3 * 5, 2 * 5))
         joint_id = self.out_dim - 1
         hmap2 = hmap2_h5[..., joint_id]
         olmap = olmap_h5[..., joint_id]
