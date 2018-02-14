@@ -341,14 +341,14 @@ class batch_allot_vxdir(object):
                     self.out_dim),
                 # dtype=np.float32)
                 dtype=float),
-            'batch_vxpro': np.empty(
+            'batch_olmap': np.empty(
                 shape=(
                     self.batch_size,
                     self.hmap_size, self.hmap_size, self.hmap_size,
                     self.out_dim),
                 # dtype=np.float32)
                 dtype=float),
-            'batch_vxdir': np.empty(
+            'batch_uomap': np.empty(
                 shape=(
                     self.batch_size,
                     self.hmap_size, self.hmap_size, self.hmap_size,
@@ -363,8 +363,8 @@ class batch_allot_vxdir(object):
         self.batch_bytes = \
             batch_data['batch_index'].nbytes + batch_data['batch_frame'].nbytes + \
             batch_data['batch_poses'].nbytes + batch_data['batch_resce'].nbytes + \
-            batch_data['batch_vxhit'].nbytes + batch_data['batch_vxpro'].nbytes + \
-            batch_data['batch_vxdir'].nbytes
+            batch_data['batch_vxhit'].nbytes + batch_data['batch_olmap'].nbytes + \
+            batch_data['batch_uomap'].nbytes
         self.batch_beg = 0
 
     def allot(self, store_size=-1):
@@ -403,14 +403,14 @@ class batch_allot_vxdir(object):
                 self.out_dim),
             # dtype=np.float32)
             dtype=float)
-        self.batch_vxpro = np.empty(
+        self.batch_olmap = np.empty(
             shape=(
                 self.store_size,
                 self.hmap_size, self.hmap_size, self.hmap_size,
                 self.out_dim),
             # dtype=np.float32)
             dtype=float)
-        self.batch_vxdir = np.empty(
+        self.batch_uomap = np.empty(
             shape=(
                 self.store_size,
                 self.hmap_size, self.hmap_size, self.hmap_size,

@@ -59,7 +59,9 @@ class dense_regre(base_regre):
         resce3 = resce[0:4]
         return self.data_module.ops.pca_to_raw(pose_local, resce3)
 
-    def yanker_hmap(self, resce, hmap2, olmap, uomap, depth, hmap_size, caminfo):
+    def yanker_hmap(
+        self, resce, hmap2, olmap, uomap, depth,
+            hmap_size, caminfo):
         resce3 = resce[0:4]
         cube = iso_cube()
         cube.load(resce3)
@@ -322,9 +324,13 @@ class dense_regre(base_regre):
         )
         for ii, rect in enumerate(rects):
             rect.draw(ax, colors[ii])
-        offset, olmap, uomap = self.data_module.ops.raw_to_offset(
-            frame_h5, pose_raw, cube, self.hmap_size, self.caminfo
-        )
+
+        # hmap2 = self.data_module.ops.raw_to_heatmap2(
+        #     pose_raw, cube, self.hmap_size, self.caminfo
+        # )
+        # offset, olmap, uomap = self.data_module.ops.raw_to_offset(
+        #     frame_h5, pose_raw, cube, self.hmap_size, self.caminfo
+        # )
 
         # mpplot.tight_layout()
         mpplot.savefig(os.path.join(

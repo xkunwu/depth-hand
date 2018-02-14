@@ -2,7 +2,7 @@ import os
 import tensorflow as tf
 from functools import reduce
 from train.train_abc import train_abc
-from utils.image_ops import tfplot_vxhit, tfplot_vxmap
+from utils.image_ops import tfplot_vxlab, tfplot_vxmap_flat
 
 
 def unravel_index(indices, shape):
@@ -60,12 +60,12 @@ class train_voxel_detect(train_abc):
             tf.summary.scalar('learning_rate', learning_rate)
 
             hmap_size = self.args.model_inst.hmap_size
-            vxmap_echt_op = tf.expand_dims(tfplot_vxhit(
+            vxmap_echt_op = tf.expand_dims(tfplot_vxlab(
                 frames_op[0, ..., 0],
                 poses_op[0, 0],
                 hmap_size), axis=0)
             tf.summary.image('vxmap_echt/', vxmap_echt_op, max_outputs=1)
-            vxmap_pred_op = tf.expand_dims(tfplot_vxmap(
+            vxmap_pred_op = tf.expand_dims(tfplot_vxmap_flat(
                 frames_op[0, ..., 0],
                 pred_op[0, :, 0],
                 hmap_size), axis=0)

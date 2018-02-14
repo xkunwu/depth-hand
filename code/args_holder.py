@@ -43,8 +43,11 @@ class args_holder:
         self.parser.add_argument(
             '--data_name', default='hands17',
             help='name of data set and its dir [default: hands17]')
+        # self.parser.add_argument(
+        #     '--out_root', default=os.path.join(proj_root, 'output'),
+        #     help='Output dir [default: output]')
         self.parser.add_argument(
-            '--out_root', default=os.path.join(proj_root, 'output'),
+            '--out_root', default=os.path.join(home_dir, 'data', 'univue', 'output'),
             help='Output dir [default: output]')
         self.parser.add_argument(
             '--retrain', default=False,

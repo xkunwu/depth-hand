@@ -14,14 +14,36 @@ def transparent_cmap(cmap, tmax=0.99, N=255):
     return mycmap
 
 
-def draw_vxsum(
-    fig, ax, vxmap_crop, vxmap_sum,
-        voxel_hmap, roll=0):
-    vxmap_hmap = vxmap_crop[::2, ::2, ::2]
-    grid = regu_grid(step=voxel_hmap)
-    coord = grid.slice_ortho(vxmap_hmap, roll=roll)
+def draw_uomap3d(fig, ax, vxcnt_crop, uomap):
+    crop_size = vxcnt_crop.shape[0]
+    vxcnt_hmap = vxcnt_crop[::2, ::2, ::2]
+    grid = regu_grid(step=32)
+    coord = grid.slice_ortho(vxcnt_hmap)
+    grid.draw_slice(ax, coord, 2.)
+    xx, yy = np.meshgrid(
+        np.arange(0, crop_size, 2),
+        np.arange(0, crop_size, 2))
+    ax.quiver(
+        xx, yy,
+        # np.squeeze(uomap[:, :, 15, 0]),
+        # -np.squeeze(uomap[:, :, 15, 1]),
+        np.max(uomap[:, :, :, 0], axis=0) + np.min(uomap[:, :, :, 0], axis=0),
+        -np.max(uomap[:, :, :, 1], axis=0) + np.min(uomap[:, :, :, 1], axis=0),
+        color='r', width=0.004, scale=20)
+    ax.set_xlim([0, crop_size])
+    ax.set_ylim([0, crop_size])
+    ax.set_aspect('equal', adjustable='box')
+    ax.invert_yaxis()
+
+
+def draw_vxmap(
+    fig, ax, vxcnt_crop, vxmap,
+        voxize_hmap, reduce_fn=np.sum, roll=0):
+    vxcnt_hmap = vxcnt_crop[::2, ::2, ::2]
+    grid = regu_grid(step=voxize_hmap)
+    coord = grid.slice_ortho(vxcnt_hmap, roll=roll)
     grid.draw_slice(ax, coord, 1.)
-    vxmap_axis = np.sum(vxmap_sum, axis=(2 - roll))
+    vxmap_axis = reduce_fn(vxmap, axis=(2 - roll))
     if 1 != roll:
         vxmap_axis = np.swapaxes(vxmap_axis, 0, 1)  # swap xy
     img_hit = ax.imshow(
@@ -29,24 +51,24 @@ def draw_vxsum(
     divider = make_axes_locatable(ax)
     cax = divider.append_axes("right", size="5%", pad=0.05)
     fig.colorbar(img_hit, cax=cax)
-    ax.set_xlim([0, voxel_hmap])
-    ax.set_ylim([0, voxel_hmap])
+    ax.set_xlim([0, voxize_hmap])
+    ax.set_ylim([0, voxize_hmap])
     ax.set_aspect('equal', adjustable='box')
     ax.invert_yaxis()
 
 
-def draw_vxhit(
-    fig, ax, vxmap_crop, vxhit,
-        voxel_hmap, roll=0):
-    vxmap_sum = np.zeros(voxel_hmap * voxel_hmap * voxel_hmap)
-    vxmap_sum[vxhit.astype(int)] = 1
-    vxmap_sum = vxmap_sum.reshape((voxel_hmap, voxel_hmap, voxel_hmap))
-    draw_vxsum(fig, ax, vxmap_crop, vxmap_sum, voxel_hmap, roll=roll)
-    # vxmap_hmap = vxmap_crop[::2, ::2, ::2]
-    # grid = regu_grid(step=voxel_hmap)
-    # coord = grid.slice_ortho(vxmap_hmap, roll=roll)
+def draw_vxlab(
+    fig, ax, vxcnt_crop, vxlab,
+        voxize_hmap, roll=0):
+    vxmap = np.zeros(voxize_hmap * voxize_hmap * voxize_hmap)
+    vxmap[vxlab.astype(int)] = 1
+    vxmap = vxmap.reshape((voxize_hmap, voxize_hmap, voxize_hmap))
+    draw_vxmap(fig, ax, vxcnt_crop, vxmap, voxize_hmap, roll=roll)
+    # vxcnt_hmap = vxcnt_crop[::2, ::2, ::2]
+    # grid = regu_grid(step=voxize_hmap)
+    # coord = grid.slice_ortho(vxcnt_hmap, roll=roll)
     # grid.draw_slice(ax, coord, 1.)
-    # vxmap_axis = np.sum(vxmap_sum, axis=(2 - roll))
+    # vxmap_axis = np.sum(vxmap, axis=(2 - roll))
     # if 1 != roll:
     #     vxmap_axis = np.swapaxes(vxmap_axis, 0, 1)  # swap xy
     # img_hit = ax.imshow(
@@ -54,31 +76,31 @@ def draw_vxhit(
     # divider = make_axes_locatable(ax)
     # cax = divider.append_axes("right", size="5%", pad=0.05)
     # fig.colorbar(img_hit, cax=cax)
-    # ax.set_xlim([0, voxel_hmap])
-    # ax.set_ylim([0, voxel_hmap])
+    # ax.set_xlim([0, voxize_hmap])
+    # ax.set_ylim([0, voxize_hmap])
     # ax.set_aspect('equal', adjustable='box')
     # ax.invert_yaxis()
 
 
-def figure_vxhit(vxmap_crop, vxhit, voxel_hmap):
+def figure_vxlab(vxcnt_crop, vxlab, voxize_hmap):
     fig, ax = tfplot.subplots(figsize=(4, 4))
-    draw_vxhit(fig, ax, vxmap_crop, vxhit, voxel_hmap)
+    draw_vxlab(fig, ax, vxcnt_crop, vxlab, voxize_hmap)
     ax.axis('off')
     return fig
 
-tfplot_vxhit = tfplot.wrap(figure_vxhit, batch=False)
+tfplot_vxlab = tfplot.wrap(figure_vxlab, batch=False)
 
 
-def draw_vxmap(
-    fig, ax, vxmap_crop, vxmap_pred,
-        voxel_hmap, roll=0):
-    vxmap_sum = vxmap_pred.reshape((voxel_hmap, voxel_hmap, voxel_hmap))
-    draw_vxsum(fig, ax, vxmap_crop, vxmap_sum, voxel_hmap, roll=roll)
-    # vxmap_hmap = vxmap_crop[::2, ::2, ::2]
-    # grid = regu_grid(step=voxel_hmap)
-    # coord = grid.slice_ortho(vxmap_hmap, roll=roll)
+def draw_vxmap_flat(
+    fig, ax, vxcnt_crop, vxmap_flat,
+        voxize_hmap, roll=0):
+    vxmap = vxmap_flat.reshape((voxize_hmap, voxize_hmap, voxize_hmap))
+    draw_vxmap(fig, ax, vxcnt_crop, vxmap, voxize_hmap, roll=roll)
+    # vxcnt_hmap = vxcnt_crop[::2, ::2, ::2]
+    # grid = regu_grid(step=voxize_hmap)
+    # coord = grid.slice_ortho(vxcnt_hmap, roll=roll)
     # grid.draw_slice(ax, coord, 1.)
-    # vxmap_axis = np.sum(vxmap_sum, axis=(2 - roll))
+    # vxmap_axis = np.sum(vxmap, axis=(2 - roll))
     # if 1 != roll:
     #     vxmap_axis = np.swapaxes(vxmap_axis, 0, 1)  # swap xy
     # img_hit = ax.imshow(
@@ -86,19 +108,19 @@ def draw_vxmap(
     # divider = make_axes_locatable(ax)
     # cax = divider.append_axes("right", size="5%", pad=0.05)
     # fig.colorbar(img_hit, cax=cax)
-    # ax.set_xlim([0, voxel_hmap])
-    # ax.set_ylim([0, voxel_hmap])
+    # ax.set_xlim([0, voxize_hmap])
+    # ax.set_ylim([0, voxize_hmap])
     # ax.set_aspect('equal', adjustable='box')
     # ax.invert_yaxis()
 
 
-def figure_vxmap(vxmap_crop, vxmap_pred, voxel_hmap):
+def figure_vxmap_flat(vxcnt_crop, vxmap_flat, voxize_hmap):
     fig, ax = tfplot.subplots(figsize=(4, 4))
-    draw_vxmap(fig, ax, vxmap_crop, vxmap_pred, voxel_hmap)
+    draw_vxmap_flat(fig, ax, vxcnt_crop, vxmap_flat, voxize_hmap)
     ax.axis('off')
     return fig
 
-tfplot_vxmap = tfplot.wrap(figure_vxmap, batch=False)
+tfplot_vxmap_flat = tfplot.wrap(figure_vxmap_flat, batch=False)
 
 
 def draw_hmap2(fig, ax, image_crop, hmap2):
@@ -122,9 +144,15 @@ def draw_olmap(fig, ax, image_crop, olmap):
 
 
 def draw_uomap(fig, ax, image_crop, uomap):
+    crop_size = image_crop.shape[0]
+    hmap_size = uomap.shape[0]
+    step = crop_size / hmap_size
+    assert (128 == crop_size)
+    assert (4 == step)
     ax.imshow(image_crop, cmap='bone')
     xx, yy = np.meshgrid(
-        np.arange(0, 128, 4), np.arange(0, 128, 4))
+        np.arange(0, crop_size, step),
+        np.arange(0, crop_size, step))
     ax.quiver(
         xx, yy,
         np.squeeze(uomap[..., 0]),

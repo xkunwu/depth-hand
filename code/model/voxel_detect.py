@@ -41,7 +41,7 @@ class voxel_detect(base_conv3):
         cube = iso_cube()
         cube.load(resce3)
         pose_pca = self.data_module.ops.raw_to_pca(pose_raw, resce3)
-        vxhit = self.data_module.ops.raw_to_vxlabel(
+        vxhit = self.data_module.ops.raw_to_vxlab(
             pose_raw, cube, self.hmap_size, caminfo
         )
         index = self.data_module.io.imagename2index(img_name)
@@ -56,7 +56,7 @@ class voxel_detect(base_conv3):
         resce3 = resce[0:4]
         cube = iso_cube()
         cube.load(resce3)
-        return self.data_module.ops.vxlabel_to_raw(
+        return self.data_module.ops.vxlab_to_raw(
             voxhit, cube, hmap_size, caminfo)
 
     @staticmethod
@@ -286,40 +286,40 @@ class voxel_detect(base_conv3):
         diff = np.abs(pose_raw - pose_yank)
         print(diff)
         print(np.min(diff, axis=0), np.max(diff, axis=0))
-        voxel_crop = self.crop_size
-        voxel_hmap = self.hmap_size
+        voxize_crop = self.crop_size
+        voxize_hmap = self.hmap_size
         grid = regu_grid()
-        grid.from_cube(cube, voxel_crop)
-        vxmap_crop = frame_h5
+        grid.from_cube(cube, voxize_crop)
+        vxcnt_crop = frame_h5
 
         def draw_voxel_pose(ax, poses, roll=0):
             pose3d = cube.transform_center_shrink(poses)
             pose2d, _ = cube.project_ortho(pose3d, roll=roll, sort=False)
-            pose2d *= voxel_crop
+            pose2d *= voxize_crop
             args.data_draw.draw_pose2d(
                 ax, thedata,
                 pose2d,
             )
-            coord = grid.slice_ortho(vxmap_crop, roll=roll)
+            coord = grid.slice_ortho(vxcnt_crop, roll=roll)
             grid.draw_slice(ax, coord, 1.)
-            ax.set_xlim([0, voxel_crop])
-            ax.set_ylim([0, voxel_crop])
+            ax.set_xlim([0, voxize_crop])
+            ax.set_ylim([0, voxize_crop])
             ax.set_aspect('equal', adjustable='box')
             ax.invert_yaxis()
 
         ax = mpplot.subplot(2, 4, 5)
         draw_voxel_pose(ax, pose_raw, roll=0)
 
-        roll = 2
+        roll = 1
         ax = mpplot.subplot(2, 4, 6)
         draw_voxel_pose(ax, pose_yank, roll=roll)
 
-        from utils.image_ops import draw_vxhit
+        from utils.image_ops import draw_vxlab
         ax = mpplot.subplot(2, 4, 7)
-        draw_vxhit(fig, ax, vxmap_crop, vxhit_h5, voxel_hmap, roll=0)
+        draw_vxlab(fig, ax, vxcnt_crop, vxhit_h5, voxize_hmap, roll=0)
 
         ax = mpplot.subplot(2, 4, 8)
-        draw_vxhit(fig, ax, vxmap_crop, vxhit_h5, voxel_hmap, roll=roll)
+        draw_vxlab(fig, ax, vxcnt_crop, vxhit_h5, voxize_hmap, roll=roll)
 
         # if self.args.show_draw:
         #     mlab.figure(size=(800, 800))
@@ -453,21 +453,6 @@ class voxel_detect(base_conv3):
                 batch_size,
                 self.crop_size, self.crop_size, self.crop_size,
                 1))
-        # hmap2_tf = tf.placeholder(
-        #     tf.float32, shape=(
-        #         batch_size,
-        #         self.hmap_size, self.hmap_size,
-        #         self.out_dim))
-        # olmap_tf = tf.placeholder(
-        #     tf.float32, shape=(
-        #         batch_size,
-        #         self.hmap_size, self.hmap_size,
-        #         self.out_dim))
-        # uomap_tf = tf.placeholder(
-        #     tf.float32, shape=(
-        #         batch_size,
-        #         self.hmap_size, self.hmap_size,
-        #         self.out_dim * 3))
         poses_tf = tf.placeholder(
             tf.int32, shape=(
                 batch_size,
