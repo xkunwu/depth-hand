@@ -26,6 +26,7 @@ class voxel_detect(base_conv3):
         self.num_appen = 4
         self.crop_size = 64
         self.hmap_size = 32
+        self.map_scale = 2
 
     def receive_data(self, thedata, args):
         """ Receive parameters specific to the data """
@@ -128,7 +129,7 @@ class voxel_detect(base_conv3):
                 ' ', progressbar.ETA()]
         ).start()
         crop_size = self.crop_size
-        hmap_size = self.hmap_size
+        # hmap_size = self.hmap_size
         out_dim = self.out_dim
         num_channel = self.num_channel
         num_appen = self.num_appen
@@ -245,7 +246,7 @@ class voxel_detect(base_conv3):
         ax.view_init(azim=-90, elev=-75)
 
         ax = mpplot.subplot(2, 4, 1)
-        ax.imshow(img, cmap='bone')
+        ax.imshow(img, cmap=mpplot.cm.bone_r)
         pose_raw = self.yanker(poses_h5, resce_h5)
         args.data_draw.draw_pose2d(
             ax, thedata,
@@ -278,7 +279,31 @@ class voxel_detect(base_conv3):
         # grid.from_cube(cube, self.crop_size)
         # grid.draw_map(ax, frame_h5)
         args.data_draw.draw_raw3d_pose(ax, thedata, pose_raw)
+        # from cv2 import resize as cv2resize
+        # import cv2
+        # img_hmap = cv2resize(img, (241, 241))
+        # img_hmap = (img_hmap / np.max(img_hmap)) * 255
+        # # fig2d, _ = mpplot.subplots()
+        # # ax2d = mpplot.subplot(1, 1, 1)
+        # # ax2d.imshow(img)
+        # # img_hmap = fig2data(fig2d)
+        # # img_hmap = (255. * img_hmap / np.max(img_hmap)).astype(int)
+        # # img_hmap = img_hmap / np.max(img_hmap)
+        # img_hmap = cv2.cvtColor(img_hmap, cv2.COLOR_GRAY2RGB)
+        # # x, y = np.ogrid[0:cube.sidelen, 0:cube.sidelen]
+        # x, y = np.mgrid[-cube.sidelen:cube.sidelen, -cube.sidelen:cube.sidelen]
+        # ax.plot_surface(
+        #     # x, y, cube.sidelen,
+        #     x, y,
+        #     np.ones_like(x) * cube.sidelen,
+        #     rstride=2, cstride=2,
+        #     facecolors=img_hmap)
         ax.view_init(azim=-90, elev=-75)
+        # axlim = cube.sidelen * 0.8
+        # ax.set_xlim([-axlim, axlim])
+        # ax.set_ylim([-axlim, axlim])
+        # ax.set_zlim([-axlim, axlim])
+        # ax.set_aspect('equal', adjustable='box')
         ax.set_zlabel('depth (mm)', labelpad=15)
 
         pose_yank = self.yanker_hmap(
@@ -330,17 +355,18 @@ class voxel_detect(base_conv3):
         #         color=Color('lightsteelblue').rgb)
         #     mlab.outline()
 
-        # if self.args.show_draw:
-        #     mlab.figure(size=(800, 800))
-        #     # mlab.contour3d(frame_h5)
-        #     mlab.pipeline.volume(mlab.pipeline.scalar_field(frame_h5))
-        #     mlab.pipeline.image_plane_widget(
-        #         mlab.pipeline.scalar_field(frame_h5),
-        #         plane_orientation='z_axes',
-        #         slice_index=self.crop_size / 2)
-        #     np.set_printoptions(precision=4)
-        #     # print(frame_h5[12:20, 12:20, 16])
-        #     mlab.outline()
+        # if not self.args.show_draw:
+        #     mlab.options.offscreen = True
+        # mlab.figure(size=(800, 800))
+        # # mlab.contour3d(frame_h5)
+        # mlab.pipeline.volume(mlab.pipeline.scalar_field(frame_h5))
+        # mlab.pipeline.image_plane_widget(
+        #     mlab.pipeline.scalar_field(frame_h5),
+        #     plane_orientation='z_axes',
+        #     slice_index=self.crop_size / 2)
+        # np.set_printoptions(precision=4)
+        # # print(frame_h5[12:20, 12:20, 16])
+        # mlab.outline()
 
         mpplot.savefig(os.path.join(
             args.predict_dir,
@@ -412,7 +438,7 @@ class voxel_detect(base_conv3):
                     normalizer_fn=slim.batch_norm):
                 with tf.variable_scope('stage64'):
                     sc = 'stage64'
-                    net = slim.conv3d(input_tensor, 16, 3)
+                    net = slim.conv3d(input_tensor, 8, 3)
                     net = inresnet3d.conv_maxpool(net, scope=sc)
                     self.end_point_list.append(sc)
                     if add_and_check_final(sc, net):
@@ -465,16 +491,15 @@ class voxel_detect(base_conv3):
             echt: BxJ
         """
         loss = 0
-        # pred_shape = pred.shape
         for name, net in end_points.items():
             if not name.startswith('hourglass_'):
                 continue
             echt_l = tf.unstack(echt, axis=-1)
-            pred_l = tf.unstack(pred, axis=-1)
-            vxhit_losses = [
+            pred_l = tf.unstack(net, axis=-1)
+            losses_vxhit = [
                 tf.nn.sparse_softmax_cross_entropy_with_logits(
                     labels=e, logits=p) for e, p in zip(echt_l, pred_l)]
-            loss += tf.reduce_sum(tf.add_n(vxhit_losses))
-        reg_losses = tf.add_n(tf.get_collection(
+            loss += tf.reduce_sum(tf.add_n(losses_vxhit))
+        losses_reg = tf.add_n(tf.get_collection(
             tf.GraphKeys.REGULARIZATION_LOSSES))
-        return loss + reg_losses
+        return loss + losses_reg

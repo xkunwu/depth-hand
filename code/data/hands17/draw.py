@@ -123,56 +123,56 @@ def draw_pose_raw(ax, thedata, img, pose_raw, show_margin=False):
     return img_posed
 
 
-def draw_prediction_poses(thedata, image_dir, annot_echt, annot_pred):
-    # mpplot.subplots(nrows=2, ncols=2, figsize=(2 * 4, 2 * 4))
-    img_id = 4
-    line_echt = linecache.getline(annot_echt, img_id)
-    line_pred = linecache.getline(annot_pred, img_id)
-    img_name, pose_echt = dataio.parse_line_annot(line_echt)
-    _, pose_pred = dataio.parse_line_annot(line_pred)
-    img_path = os.path.join(image_dir, img_name)
-    print('drawing image #{:d}: {}'.format(img_id, img_path))
-    img = dataio.read_image(img_path)
-
-    ax = mpplot.subplot(2, 2, 1)
-    ax.imshow(img, cmap='bone')
-    draw_pose_raw(
-        ax, thedata, img,
-        pose_echt,
-        show_margin=True)
-    ax.set_title('Ground truth #{:d}'.format(img_id))
-    ax = mpplot.subplot(2, 2, 2)
-    ax.imshow(img, cmap='bone')
-    draw_pose_raw(
-        ax, thedata, img,
-        pose_pred,
-        show_margin=True)
-    ax.set_title('Prediction')
-
-    img_id = np.random.randint(1, high=sum(1 for _ in open(annot_pred, 'r')))
-    line_echt = linecache.getline(annot_echt, img_id)
-    line_pred = linecache.getline(annot_pred, img_id)
-    img_name, pose_echt = dataio.parse_line_annot(line_echt)
-    _, pose_pred = dataio.parse_line_annot(line_pred)
-    img_path = os.path.join(image_dir, img_name)
-    print('drawing image #{:d}: {}'.format(img_id, img_path))
-    img = dataio.read_image(img_path)
-    ax = mpplot.subplot(2, 2, 3)
-    ax.imshow(img, cmap='bone')
-    draw_pose_raw(
-        ax, thedata, img,
-        pose_echt,
-        show_margin=True)
-    ax.set_title('Ground truth #{:d}'.format(img_id))
-    ax = mpplot.subplot(2, 2, 4)
-    ax.imshow(img, cmap='bone')
-    draw_pose_raw(
-        ax, thedata, img,
-        pose_pred,
-        show_margin=True)
-    ax.set_title('Prediction')
-    mpplot.tight_layout()
-    return img_id
+# def draw_prediction_poses(thedata, image_dir, annot_echt, annot_pred):
+#     # mpplot.subplots(nrows=2, ncols=2, figsize=(2 * 4, 2 * 4))
+#     img_id = 4
+#     line_echt = linecache.getline(annot_echt, img_id)
+#     line_pred = linecache.getline(annot_pred, img_id)
+#     img_name, pose_echt = dataio.parse_line_annot(line_echt)
+#     _, pose_pred = dataio.parse_line_annot(line_pred)
+#     img_path = os.path.join(image_dir, img_name)
+#     print('drawing image #{:d}: {}'.format(img_id, img_path))
+#     img = dataio.read_image(img_path)
+#
+#     ax = mpplot.subplot(2, 2, 1)
+#     ax.imshow(img, cmap=mpplot.cm.bone_r)
+#     draw_pose_raw(
+#         ax, thedata, img,
+#         pose_echt,
+#         show_margin=True)
+#     ax.set_title('Ground truth #{:d}'.format(img_id))
+#     ax = mpplot.subplot(2, 2, 2)
+#     ax.imshow(img, cmap=mpplot.cm.bone_r)
+#     draw_pose_raw(
+#         ax, thedata, img,
+#         pose_pred,
+#         show_margin=True)
+#     ax.set_title('Prediction')
+#
+#     img_id = np.random.randint(1, high=sum(1 for _ in open(annot_pred, 'r')))
+#     line_echt = linecache.getline(annot_echt, img_id)
+#     line_pred = linecache.getline(annot_pred, img_id)
+#     img_name, pose_echt = dataio.parse_line_annot(line_echt)
+#     _, pose_pred = dataio.parse_line_annot(line_pred)
+#     img_path = os.path.join(image_dir, img_name)
+#     print('drawing image #{:d}: {}'.format(img_id, img_path))
+#     img = dataio.read_image(img_path)
+#     ax = mpplot.subplot(2, 2, 3)
+#     ax.imshow(img, cmap=mpplot.cm.bone_r)
+#     draw_pose_raw(
+#         ax, thedata, img,
+#         pose_echt,
+#         show_margin=True)
+#     ax.set_title('Ground truth #{:d}'.format(img_id))
+#     ax = mpplot.subplot(2, 2, 4)
+#     ax.imshow(img, cmap=mpplot.cm.bone_r)
+#     draw_pose_raw(
+#         ax, thedata, img,
+#         pose_pred,
+#         show_margin=True)
+#     ax.set_title('Prediction')
+#     mpplot.tight_layout()
+#     return img_id
 
 
 def draw_pose_raw_random(thedata, image_dir, annot_txt, img_id=-1):
@@ -196,7 +196,7 @@ def draw_pose_raw_random(thedata, image_dir, annot_txt, img_id=-1):
     print('drawing image #{:d}: {}'.format(img_id, img_path))
     img = dataio.read_image(img_path)
 
-    mpplot.imshow(img, cmap='bone')
+    mpplot.imshow(img, cmap=mpplot.cm.bone_r)
     ax = mpplot.gca()
     # if resce is None:
     draw_pose_raw(ax, thedata, img, pose_raw)
@@ -218,7 +218,7 @@ def draw_pose_stream(thedata, gif_file, max_draw=100):
                     # raise coder.break_with.Break
                 img_name, pose_raw, resce = dataio.parse_line_annot(annot_line)
                 img = dataio.read_image(os.path.join(thedata.training_images, img_name))
-                mpplot.imshow(img, cmap='bone')
+                mpplot.imshow(img, cmap=mpplot.cm.bone_r)
                 ax = mpplot.gca()
                 img_posed = draw_pose_raw(ax, img, pose_raw)
                 # mpplot.show()
@@ -307,7 +307,7 @@ def draw_raw3d(thedata, img, pose_raw):
         img = cube.print_image(coord, depth, thedata.crop_size)
         pose2d, _ = cube.project_ortho(pose_trans, roll=spi, sort=False)
         draw_pose2d(ax, thedata, pose2d)
-        ax.imshow(img, cmap='bone')
+        ax.imshow(img, cmap=mpplot.cm.bone_r)
         ax.axis('off')
     mpplot.tight_layout()
     mpplot.show()
@@ -334,12 +334,12 @@ def draw_raw3d_random(thedata, image_dir, annot_txt, img_id=-1):
     fig_size = (3 * 5, 5)
     mpplot.subplots(nrows=1, ncols=2, figsize=fig_size)
     ax = mpplot.subplot(1, 3, 1)
-    ax.imshow(img, cmap='bone')
+    ax.imshow(img, cmap=mpplot.cm.bone_r)
     draw_pose_raw(thedata, img, pose_raw)
     ax = mpplot.subplot(1, 3, 2)
     img_crop_resize, resce = dataops.crop_resize(
         img, pose_raw, thedata)
-    ax.imshow(img_crop_resize, cmap='bone')
+    ax.imshow(img_crop_resize, cmap=mpplot.cm.bone_r)
     draw_pose2d(
         ax, thedata,
         dataops.raw_to_2d(pose_raw, thedata, resce))
@@ -347,7 +347,7 @@ def draw_raw3d_random(thedata, image_dir, annot_txt, img_id=-1):
     ax = mpplot.subplot(1, 3, 3)
     img_crop_resize, resce = dataops.crop_resize_pca(
         img, pose_raw, thedata)
-    ax.imshow(img_crop_resize, cmap='bone')
+    ax.imshow(img_crop_resize, cmap=mpplot.cm.bone_r)
     draw_pose2d(
         ax, thedata,
         dataops.raw_to_2d(pose_raw, thedata, resce))
@@ -371,7 +371,7 @@ def draw_bbox_random(thedata):
     img_path = os.path.join(thedata.frame_images, img_name)
     print('drawing BoundingBox #{:d}: {}'.format(img_id, img_path))
     img = dataio.read_image(img_path)
-    mpplot.imshow(img, cmap='bone')
+    mpplot.imshow(img, cmap=mpplot.cm.bone_r)
     # rect = bbox.astype(int)
     rect = bbox
     mpplot.gca().add_patch(mppatches.Rectangle(
@@ -394,7 +394,7 @@ def draw_hist_random(thedata, image_dir, img_id=-1):
 
     mpplot.subplots(nrows=2, ncols=2)
     mpplot.subplot(2, 2, 1)
-    mpplot.imshow(img, cmap='bone')
+    mpplot.imshow(img, cmap=mpplot.cm.bone_r)
     mpplot.subplot(2, 2, 2)
     img_val = img.flatten()
     # img_val = [v for v in img.flatten() if (10 > v)]
@@ -402,7 +402,7 @@ def draw_hist_random(thedata, image_dir, img_id=-1):
     mpplot.subplot(2, 2, 3)
     img_matt = img
     img_matt[2 > img_matt] = thedata.z_max
-    mpplot.imshow(img_matt, cmap='bone')
+    mpplot.imshow(img_matt, cmap=mpplot.cm.bone_r)
     mpplot.subplot(2, 2, 4)
     img_val = [v for v in img_matt.flatten() if (10 > v)]
     mpplot.hist(img_val)

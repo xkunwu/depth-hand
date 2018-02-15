@@ -196,7 +196,7 @@ class localizer3(base_conv3):
             thedata.training_annot_cleaned, img_id)
         img_name, pose_raw = args.data_io.parse_line_annot(annot_line)
         img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
-        ax.imshow(img, cmap='bone')
+        ax.imshow(img, cmap=mpplot.cm.bone_r)
         args.data_draw.draw_pose2d(
             ax, thedata,
             args.data_ops.raw_to_2d(pose_raw, self.caminfo))
@@ -227,7 +227,7 @@ class localizer3(base_conv3):
         mpplot.gca().set_title('test output')
         img_name = args.data_io.index2imagename(img_id)
         img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
-        ax.imshow(img, cmap='bone')
+        ax.imshow(img, cmap=mpplot.cm.bone_r)
 
         ax = mpplot.subplot(2, 2, 2, projection='3d')
         mpplot.gca().set_title('test storage write')
@@ -406,6 +406,6 @@ class localizer3(base_conv3):
         """
         scale = self.crop_range / self.region_size
         loss = tf.nn.l2_loss((pred - echt) * scale)
-        reg_losses = tf.add_n(tf.get_collection(
+        losses_reg = tf.add_n(tf.get_collection(
             tf.GraphKeys.REGULARIZATION_LOSSES))
-        return loss + reg_losses
+        return loss + losses_reg

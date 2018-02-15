@@ -37,7 +37,7 @@ class dense_regre(base_regre):
         img_name, pose_raw = self.data_module.io.parse_line_annot(line)
         img = self.data_module.io.read_image(os.path.join(image_dir, img_name))
         img_crop_resize, resce = self.data_module.ops.crop_resize_pca(
-            img, pose_raw, caminfo)
+            img, pose_raw, caminfo, sort=True)  # have to fix order
         resce3 = resce[0:4]
         cube = iso_cube()
         cube.load(resce3)
@@ -276,7 +276,7 @@ class dense_regre(base_regre):
         depth_crop = cv2resize(frame_h5, (sizel, sizel))
 
         ax = mpplot.subplot(2, 3, 1)
-        ax.imshow(depth_crop, cmap='bone')
+        ax.imshow(depth_crop, cmap=mpplot.cm.bone_r)
         pose3d = cube.trans_scale_to(poses_h5)
         pose2d, _ = cube.project_ortho(pose3d, roll=0, sort=False)
         pose2d *= sizel
@@ -298,10 +298,10 @@ class dense_regre(base_regre):
         pose_out = self.yanker_hmap(
             resce_h5, hmap2_h5, olmap_h5, uomap_h5,
             frame_h5, self.hmap_size, self.caminfo)
-        print('reprojection error: {}'.format(
-            np.sum(np.abs(pose_out - cube.transform_add_center(poses_h5))))
-        )
-        ax.imshow(depth_crop, cmap='bone')
+        err_re = np.sum(np.abs(pose_out - cube.transform_add_center(poses_h5)))
+        if 1e-2 < err_re:
+            print('ERROR: reprojection error: {}'.format(err_re))
+        ax.imshow(depth_crop, cmap=mpplot.cm.bone_r)
         pose3d = cube.transform_center_shrink(pose_out)
         pose2d, _ = cube.project_ortho(pose3d, roll=0, sort=False)
         pose2d *= sizel
@@ -315,7 +315,7 @@ class dense_regre(base_regre):
             thedata.training_annot_cleaned, img_id)
         img_name, pose_raw = args.data_io.parse_line_annot(annot_line)
         img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
-        ax.imshow(img, cmap='bone')
+        ax.imshow(img, cmap=mpplot.cm.bone_r)
         args.data_draw.draw_pose2d(
             ax, thedata,
             args.data_ops.raw_to_2d(pose_raw, thedata))
@@ -343,7 +343,7 @@ class dense_regre(base_regre):
 
     def get_model(
             self, input_tensor, is_training, bn_decay,
-            hg_repeat=2, scope=None):
+            hg_repeat=1, scope=None):
         """ input_tensor: BxHxWxC
             out_dim: BxHxWx(J*5), where J is number of joints
         """
@@ -353,6 +353,8 @@ class dense_regre(base_regre):
         num_joint = self.out_dim
         # num_out_map = num_joint * 5  # hmap2, olmap, uomap
         num_feature = 128
+        num_vol = self.hmap_size * self.hmap_size * self.hmap_size
+        vol_shape = (self.hmap_size, self.hmap_size, self.hmap_size)
 
         def add_and_check_final(name, net):
             end_points[name] = net
@@ -402,10 +404,9 @@ class dense_regre(base_regre):
                     normalizer_fn=slim.batch_norm):
                 with tf.variable_scope('stage128'):
                     sc = 'stage128_image'
-                    net = slim.conv2d(
-                        input_tensor, 32, [1, 7])
-                    net = slim.conv2d(net, 32, [7, 1])
-                    net = slim.max_pool2d(net, 3)
+                    net = slim.conv2d(input_tensor, 16, 3)
+                    net = incept_resnet.conv_maxpool(net, scope=sc)
+                    print(net.shape)
                     self.end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points
@@ -414,6 +415,7 @@ class dense_regre(base_regre):
                         net, scope='stage64_residual')
                     net = incept_resnet.reduce_net(
                         net, scope='stage64_reduce')
+                    print(net.shape)
                     self.end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points
@@ -429,14 +431,14 @@ class dense_regre(base_regre):
                     sc = 'hourglass_{}'.format(hg)
                     with tf.variable_scope(sc):
                         branch0 = hourglass.hg_net(
-                            net, 4, scope=sc + '_hg')
+                            net, 2, scope=sc + '_hg')
                         branch0 = incept_resnet.resnet_k(
                             branch0, scope='_res')
                         branch_hm2 = slim.conv2d(
                             branch0, num_joint, 1,
                             # normalizer_fn=None, activation_fn=tf.nn.softmax)
                             normalizer_fn=None, activation_fn=None)
-                        branch_hm3 = slim.conv2d(
+                        branch_olm = slim.conv2d(
                             branch0, num_joint, 1,
                             # normalizer_fn=None, activation_fn=tf.nn.relu)
                             normalizer_fn=None, activation_fn=None)
@@ -445,10 +447,16 @@ class dense_regre(base_regre):
                             # normalizer_fn=None, activation_fn=tf.nn.sigmoid)
                             normalizer_fn=None, activation_fn=None)
                         net_maps = tf.concat(
-                            [branch_hm2, branch_hm3, branch_uom],
+                            [branch_hm2, branch_olm, branch_uom],
                             axis=-1)
                         self.end_point_list.append(sc)
                         if add_and_check_final(sc, net_maps):
+                            # branch_hm2 = tf.reshape(tf.nn.softmax(
+                            #     tf.reshape(branch_hm2, [-1, num_vol, num_joint]),
+                            #     dim=1), [-1, vol_shape, num_joint])
+                            # net_maps = tf.concat(
+                            #     [branch_hm2, branch_olm, branch_uom],
+                            #     axis=-1)
                             return net_maps, end_points
                         branch1 = slim.conv2d(
                             net_maps, num_feature, 1)
@@ -499,6 +507,6 @@ class dense_regre(base_regre):
             #         logits=pred[:, :num_joint])
             # )
             loss += tf.nn.l2_loss(net - echt)  # already divided by 2
-        reg_losses = tf.add_n(tf.get_collection(
+        losses_reg = tf.add_n(tf.get_collection(
             tf.GraphKeys.REGULARIZATION_LOSSES))
-        return loss + reg_losses
+        return loss + losses_reg

@@ -55,7 +55,7 @@ class ortho3view(base_regre):
             print(np.histogram(frame_h5, range=(1e-4, np.max(frame_h5))))
 
         print('[{}] drawing image #{:d} ...'.format(self.name_desc, img_id))
-        mpplot.subplots(nrows=2, ncols=2, figsize=(3 * 5, 3 * 5))
+        mpplot.subplots(nrows=3, ncols=3, figsize=(3 * 5, 3 * 5))
 
         resce3 = resce_h5[0:4]
         cube = iso_cube()
@@ -67,7 +67,7 @@ class ortho3view(base_regre):
             img = frame_h5[..., spi]
             ax.imshow(
                 cv2resize(img, (sizel, sizel)),
-                cmap='bone')
+                cmap=mpplot.cm.bone_r)
             pose3d = cube.trans_scale_to(poses_h5)
             pose2d, _ = cube.project_ortho(pose3d, roll=spi, sort=False)
             pose2d *= sizel
@@ -75,12 +75,12 @@ class ortho3view(base_regre):
                 ax, thedata,
                 pose2d,
             )
-            mpplot.gca().axis('off')
+            ax.axis('off')
 
         ax = mpplot.subplot(3, 3, 3)
         img_name = args.data_io.index2imagename(img_id)
         img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
-        ax.imshow(img, cmap='bone')
+        ax.imshow(img, cmap=mpplot.cm.bone_r)
         pose_raw = self.yanker(poses_h5, resce_h5, self.caminfo)
         args.data_draw.draw_pose2d(
             ax, thedata,
@@ -92,7 +92,7 @@ class ortho3view(base_regre):
             thedata.training_annot_cleaned, img_id)
         img_name, pose_raw = args.data_io.parse_line_annot(annot_line)
         img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
-        ax.imshow(img, cmap='bone')
+        ax.imshow(img, cmap=mpplot.cm.bone_r)
         args.data_draw.draw_pose2d(
             ax, thedata,
             args.data_ops.raw_to_2d(pose_raw, thedata))
@@ -126,7 +126,7 @@ class ortho3view(base_regre):
             img = frame[..., spi]
             ax.imshow(
                 cv2resize(img, (sizel, sizel)),
-                cmap='bone')
+                cmap=mpplot.cm.bone_r)
             pose3d = cube.trans_scale_to(poses)
             pose2d, _ = cube.project_ortho(pose3d, roll=spi, sort=False)
             pose2d *= sizel
@@ -134,7 +134,7 @@ class ortho3view(base_regre):
                 ax, thedata,
                 pose2d,
             )
-            mpplot.gca().axis('off')
+            ax.axis('off')
 
         mpplot.savefig(os.path.join(
             args.predict_dir,

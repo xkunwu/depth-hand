@@ -96,7 +96,7 @@ class capture:
         corners = cube.get_corners()
         iso_cube.draw_cube_wire(ax, corners)
         ax = mpplot.subplot(1, 2, 2)
-        ax.imshow(img, cmap='bone')
+        ax.imshow(img, cmap=mpplot.cm.bone_r)
         rects = cube.proj_rects_3(
             self.args.data_ops.raw_to_2d,
             # self.args.data_inst

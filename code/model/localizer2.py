@@ -160,7 +160,7 @@ class localizer2(base_regre):
             frame_h5, self.caminfo)
         colors = [Color('orange').rgb, Color('red').rgb, Color('lime').rgb]
         ax = mpplot.subplot(1, 2, 1)
-        ax.imshow(frame_h5, cmap='bone')
+        ax.imshow(frame_h5, cmap=mpplot.cm.bone_r)
         resce3 = resce_h5[0:4]
         cube = iso_cube()
         cube.load(resce3)
@@ -173,7 +173,7 @@ class localizer2(base_regre):
         mpplot.gca().set_title('Ground truth')
 
         ax = mpplot.subplot(1, 2, 2)
-        ax.imshow(frame_h5, cmap='bone')
+        ax.imshow(frame_h5, cmap=mpplot.cm.bone_r)
         cube, index, confidence = self.convert_output(
             pred_val, self.args, self.caminfo)
         cube.show_dims()
@@ -208,7 +208,7 @@ class localizer2(base_regre):
             thedata.training_annot_cleaned, img_id)
         img_name, _ = args.data_io.parse_line_annot(annot_line)
         img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
-        ax.imshow(img, cmap='bone')
+        ax.imshow(img, cmap=mpplot.cm.bone_r)
         resce3 = resce_h5[0:4]
         cube = iso_cube()
         cube.load(resce3)
@@ -222,7 +222,7 @@ class localizer2(base_regre):
 
         ax = mpplot.subplot(1, 2, 2)
         img = frame_h5
-        ax.imshow(img, cmap='bone')
+        ax.imshow(img, cmap=mpplot.cm.bone_r)
         line_pred = linecache.getline(self.predict_file, frame_id)
         pred_list = re.split(r'\s+', line_pred.strip())
         centre = np.array([float(i) for i in pred_list[1:4]])
@@ -255,7 +255,7 @@ class localizer2(base_regre):
             thedata.training_annot_cleaned, img_id)
         img_name, pose_raw = args.data_io.parse_line_annot(annot_line)
         img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
-        ax.imshow(img, cmap='bone')
+        ax.imshow(img, cmap=mpplot.cm.bone_r)
         args.data_draw.draw_pose2d(
             ax, thedata,
             args.data_ops.raw_to_2d(pose_raw, thedata))
@@ -286,7 +286,7 @@ class localizer2(base_regre):
         mpplot.gca().set_title('test output')
         img_name = args.data_io.index2imagename(img_id)
         img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
-        ax.imshow(img, cmap='bone')
+        ax.imshow(img, cmap=mpplot.cm.bone_r)
         anchor_num = self.anchor_num ** 2
         pcnt = poses_h5[:anchor_num].reshape(
             (self.anchor_num, self.anchor_num))
@@ -321,7 +321,7 @@ class localizer2(base_regre):
             print(np.linalg.norm(frame_h5 - frame))
             print(np.linalg.norm(poses_h5 - poses))
             print('ERROR - h5 storage corrupted!')
-        ax.imshow(frame, cmap='bone')
+        ax.imshow(frame, cmap=mpplot.cm.bone_r)
         resce3 = resce[0:4]
         cube = iso_cube()
         cube.load(resce3)
@@ -518,6 +518,6 @@ class localizer2(base_regre):
         loss = loss_cls + self.loss_lambda * loss_reg
         # loss = loss_cls
         # loss = loss_reg
-        reg_losses = tf.add_n(tf.get_collection(
+        losses_reg = tf.add_n(tf.get_collection(
             tf.GraphKeys.REGULARIZATION_LOSSES))
-        return loss + reg_losses
+        return loss + losses_reg

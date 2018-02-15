@@ -77,7 +77,7 @@ class base_clean(base_regre):
         sizel = np.floor(resce3[0]).astype(int)
         ax.imshow(
             cv2resize(frame_h5, (sizel, sizel)),
-            cmap='bone')
+            cmap=mpplot.cm.bone_r)
         pose3d = cube.trans_scale_to(poses_h5)
         pose2d, _ = cube.project_ortho(pose3d, roll=0, sort=False)
         pose2d *= sizel
@@ -90,7 +90,7 @@ class base_clean(base_regre):
         mpplot.gca().set_title('test output')
         img_name = args.data_io.index2imagename(img_id)
         img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
-        ax.imshow(img, cmap='bone')
+        ax.imshow(img, cmap=mpplot.cm.bone_r)
         pose_raw = self.yanker(poses_h5, resce_h5, self.caminfo)
         args.data_draw.draw_pose2d(
             ax, thedata,
@@ -108,7 +108,7 @@ class base_clean(base_regre):
             thedata.training_annot_cleaned, img_id)
         img_name, pose_raw = args.data_io.parse_line_annot(annot_line)
         img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
-        ax.imshow(img, cmap='bone')
+        ax.imshow(img, cmap=mpplot.cm.bone_r)
         args.data_draw.draw_pose2d(
             ax, thedata,
             args.data_ops.raw_to_2d(pose_raw, thedata))
@@ -132,7 +132,7 @@ class base_clean(base_regre):
         sizel = np.floor(resce3[0]).astype(int)
         ax.imshow(
             cv2resize(frame, (sizel, sizel)),
-            cmap='bone')
+            cmap=mpplot.cm.bone_r)
         pose3d = cube.trans_scale_to(poses)
         pose2d, _ = cube.project_ortho(pose3d, roll=0, sort=False)
         pose2d *= sizel

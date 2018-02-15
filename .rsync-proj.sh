@@ -1,5 +1,5 @@
 #/bin/sh
-OUT_DIR=projects/univue-hand-pose/output/hands17
+OUT_DIR=data/univue/output/hands17
 SERVER=${1:-palau}
 MODEL=${2:-base_regre}
 ## upload code

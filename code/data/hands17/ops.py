@@ -14,6 +14,29 @@ from utils.regu_grid import regu_grid
 from utils.regu_grid import latice_image
 
 
+def softmax(x):
+    '''
+    # producing 2d array
+    # each row should be a probability
+    >>> res = softmax(np.array([0, 200, 10]))
+    >>> np.sum(res)
+    1.0
+    >>> np.all(np.abs(res - np.array([0, 1, 0])) < 0.0001)
+    True
+    >>> res = softmax(np.array([[0, 200, 10], [0, 10, 200], [200, 0, 10]]))
+    >>> np.sum(res, axis=1)
+    array([ 1.,  1.,  1.])
+    >>> res = softmax(np.array([[0, 200, 10], [0, 10, 200]]))
+    >>> np.sum(res, axis=1)
+    array([ 1.,  1.])
+    '''
+    if x.ndim == 1:
+        x = x.reshape((1, -1))
+    max_x = np.max(x, axis=1).reshape((-1, 1))
+    exp_x = np.exp(x - max_x)
+    return exp_x / np.sum(exp_x, axis=1).reshape((-1, 1))
+
+
 def raw_to_pca(points3, resce=np.array([1, 0, 0, 0])):
     cube = iso_cube()
     cube.load(resce)
@@ -84,7 +107,7 @@ def raw_to_heatmap2(pose_raw, cube, hmap_size, caminfo):
             img, sigma=0.8)
         # img /= np.max(img)
         # mpplot = import_module('matplotlib.pyplot')
-        # mpplot.imshow(img, cmap='bone')
+        # mpplot.imshow(img, cmap=mpplot.cm.bone_r)
         # mpplot.show()
         img_l.append(img)
     return np.stack(img_l, axis=2)
@@ -116,7 +139,7 @@ def raw_to_offset(image_crop, pose_raw, cube, hmap_size, caminfo):
         #     from colour import Color
         #     mpplot.subplots(nrows=1, ncols=2)
         #     ax = mpplot.subplot(1, 2, 1)
-        #     ax.imshow(image_crop, cmap='bone')
+        #     ax.imshow(image_crop, cmap=mpplot.cm.bone_r)
         #     data_draw.draw_pose2d(
         #         ax, caminfo,
         #         raw_to_2d(pose_raw, caminfo))
@@ -151,14 +174,14 @@ def raw_to_offset(image_crop, pose_raw, cube, hmap_size, caminfo):
             um = cube.print_image(coord_valid, unit_off[:, dim], hmap_size)
             umap_l.append(um)
             # mpplot.subplot(3, 3, 4 + dim)
-            # mpplot.imshow(om, cmap='bone')
+            # mpplot.imshow(om, cmap=mpplot.cm.bone_r)
             # mpplot.subplot(3, 3, 7 + dim)
-            # mpplot.imshow(um, cmap='bone')
+            # mpplot.imshow(um, cmap=mpplot.cm.bone_r)
         hm = cube.print_image(coord_valid, dist, hmap_size)
         hmap_l.append(hm)
         # print(np.histogram(dist, range=(1e-4, np.max(dist))))
         # mpplot.subplot(3, 3, 1)
-        # mpplot.imshow(hm, cmap='bone')
+        # mpplot.imshow(hm, cmap=mpplot.cm.bone_r)
         # mpplot.subplot(3, 3, 3)
         # mpplot.imshow(img, cmap=mpplot.cm.jet)
         # mpplot.show()
@@ -179,13 +202,14 @@ def offset_to_raw(
     image_hmap = image_crop[::4, ::4]
     for joint in range(num_joint):
         # restore from 3d
-        hm3 = olmap[..., joint]
-        hm3[np.where(1e-2 > image_hmap)] = 0  # mask out void
-        hm3[np.where(0 > hm3)] = 0  # not training goal
-        top_id = hm3.argpartition(-nn, axis=None)[-nn:]  # top elements
-        x3, y3 = np.unravel_index(top_id, hm3.shape)
-        conf3 = hm3[x3, y3]
-        dist = theta - conf3 * theta  # inverse propotional
+        hm = hmap2[..., joint]
+        om = olmap[..., joint]
+        # hm[np.where(1e-2 > image_hmap)] = 0  # mask out void is wrong - joint not on the surface
+        hm[np.where(1e-2 > om)] = 0  # consistent 2d-3d prediction
+        top_id = hm.argpartition(-nn, axis=None)[-nn:]  # top elements
+        x3, y3 = np.unravel_index(top_id, hm.shape)
+        conf = hm[x3, y3]
+        dist = theta - om[x3, y3] * theta  # inverse propotional
         uom = uomap[..., 3 * joint:3 * (joint + 1)]
         unit_off = uom[x3, y3, :]
         unit_off = normalize(unit_off, norm='l2')
@@ -194,37 +218,9 @@ def offset_to_raw(
             np.vstack([x3, y3]).astype(float).T / hmap_size,
             image_hmap[x3, y3])
         pred3 = p0 + offset
-        # restore from 2d
-        hm2 = hmap2[..., joint]
-        coord, _ = cube.raw_to_unit(pred3)
-        coord = cube.unit_to_image(coord, hmap_size)
-        x2, y2 = coord[:, 0], coord[:, 1]
-        conf = hm2[x2, y2]
-        if 1e-2 > np.sum(conf):
-            pred32 = np.sum(
-                pred3 * np.tile(conf3, [3, 1]).T, axis=0
-            ) / np.sum(conf3)
-            # from utils.image_ops import draw_hmap2, draw_olmap, draw_uomap
-            # fig, _ = mpplot.subplots(nrows=2, ncols=2)
-            # ax = mpplot.subplot(2, 2, 1)
-            # c0, _ = cube.raw_to_unit(p0)
-            # c0 = cube.unit_to_image(coord, hmap_size)
-            # x0, y0 = c0[:, 0], c0[:, 1]
-            # ax.quiver(
-            #     x0, y0, (x2 - x0), (y2 - y0),
-            #     color='r', width=0.004, scale=20)
-            # ax.imshow(image_hmap, cmap='bone')
-            # ax = mpplot.subplot(2, 2, 2)
-            # draw_hmap2(fig, ax, image_crop, hm2)
-            # ax = mpplot.subplot(2, 2, 3)
-            # draw_olmap(fig, ax, image_crop, hm3)
-            # ax = mpplot.subplot(2, 2, 4)
-            # draw_uomap(fig, ax, image_crop, uom)
-            # mpplot.show()
-        else:
-            pred32 = np.sum(
-                pred3 * np.tile(conf, [3, 1]).T, axis=0
-            ) / np.sum(conf)
+        pred32 = np.sum(
+            pred3 * np.tile(conf, [3, 1]).T, axis=0
+        ) / np.sum(conf)
         pose_out[joint, :] = pred32
     return pose_out
 
@@ -419,7 +415,7 @@ def generate_anchors_2d(img, pose_raw, anchor_num, caminfo):
     #     index,
     #     anchors
     # ))
-    # mpplot.imshow(img, cmap='bone')
+    # mpplot.imshow(img, cmap=mpplot.cm.bone_r)
     # rect.show_dims()
     # rect.draw(ax)
     # mpplot.show()
@@ -482,8 +478,6 @@ def fill_grid(img, pose_raw, step, caminfo):
 
 def raw_to_vxoff(vxcnt, pose_raw, cube, step, caminfo):
     """ offset map from voxel center to each joint
-        Args:
-            img: should be size of 128
     """
     grid = regu_grid()
     grid.from_cube(cube, step)
@@ -493,7 +487,14 @@ def raw_to_vxoff(vxcnt, pose_raw, cube, step, caminfo):
     hmap_l = []
     umap_l = []
     theta = caminfo.region_size * 2  # maximal - cube size
-    vxcnt_hmap = vxcnt[::2, ::2, ::2]
+    # # vxcnt_hmap = vxcnt[::2, ::2, ::2]
+    # from itertools import product
+    # r = [0, 1]
+    # vxcnt_hmap = np.zeros(vol_shape)
+    # for i0 in np.array(list(product(r, r, r))):
+    #     vxcnt_hmap += vxcnt[i0[0]::2, i0[1]::2, i0[2]::2]
+    # # print(np.sum(vxcnt_hmap), np.sum(vxcnt))
+    vxcnt_hmap = vxcnt
     for jj, joint in enumerate(pose_raw):
         indices = np.argwhere(1e-2 < vxcnt_hmap)
         voxcens = grid.voxen(indices)
@@ -532,19 +533,22 @@ def vxoff_to_raw(
     grid = regu_grid()
     grid.from_cube(cube, step)
     vol_shape = (step, step, step)
-    vxcnt_hmap = vxcnt[::2, ::2, ::2]
     num_joint = olmap.shape[-1]
     theta = caminfo.region_size * 2
     pose_out = np.empty([num_joint, 3])
     for joint in range(num_joint):
         # restore from 3d
-        hm3 = olmap[..., joint]
-        hm3[np.where(1e-2 > vxcnt_hmap)] = 0  # mask out void
-        hm3[np.where(0 > hm3)] = 0  # not training goal
-        top_id = hm3.argpartition(-nn, axis=None)[-nn:]  # top elements
+        hm = vxhit[..., joint]
+        # hm = softmax(vxhit[..., joint].flatten()).flatten()
+        # hm[np.where(1e-2 > vxcnt_hmap)] = 0  # mask out void is wrong - joint not on the surface
+        hm[np.where(0 > hm)] = 0  # not training goal
+        top_id = hm.argpartition(-nn, axis=None)[-nn:]  # top elements
         x3, y3, z3 = np.unravel_index(top_id, vol_shape)
-        conf3 = hm3[x3, y3, z3]
-        dist = theta - conf3 * theta  # inverse propotional
+        conf3 = hm[x3, y3, z3]
+        # conf3 = hm[top_id]
+        print(conf3)
+        dist = olmap[x3, y3, z3, joint]
+        dist = theta - dist * theta  # inverse propotional
         uom = uomap[..., 3 * joint:3 * (joint + 1)]
         unit_off = uom[x3, y3, z3, :]
         unit_off = normalize(unit_off, norm='l2')
@@ -650,14 +654,13 @@ def get_rect3(cube, caminfo):
     return rect
 
 
-def crop_resize_pca(img, pose_raw, caminfo):
+def crop_resize_pca(img, pose_raw, caminfo, sort=False):
     cube = iso_cube(
         (np.max(pose_raw, axis=0) + np.min(pose_raw, axis=0)) / 2,
         caminfo.region_size
     )
     points3_pick = cube.pick(img_to_raw(img, caminfo))
-    points3_norm = cube.transform_center_shrink(points3_pick)
-    coord, depth = cube.project_ortho(points3_norm)
+    coord, depth = cube.raw_to_unit(points3_pick, sort=sort)
     img_crop_resize = cube.print_image(
         coord, depth, caminfo.crop_size)
     # I0 = np.zeros((8, 8))
@@ -674,7 +677,7 @@ def crop_resize_pca(img, pose_raw, caminfo):
     # from numpy import linalg
     # print(linalg.norm(c0 - c1), linalg.norm(d0 - d1))
     # mpplot = import_module('matplotlib.pyplot')
-    # mpplot.imshow(img_crop_resize, cmap='bone')
+    # mpplot.imshow(img_crop_resize, cmap=mpplot.cm.bone_r)
     # mpplot.show()
     resce = cube.dump()
     return img_crop_resize, resce
@@ -703,7 +706,7 @@ def crop_resize(img, pose_raw, caminfo):
     )
     rect = get_rect2(cube, caminfo)
     # import matplotlib.pyplot as mpplot
-    # mpplot.imshow(img, cmap='bone')
+    # mpplot.imshow(img, cmap=mpplot.cm.bone_r)
     # rect.show_dims()
     # rect.draw(ax)
     # rect = proj_cube_to_rect(cube, caminfo.region_size, caminfo)

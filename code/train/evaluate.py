@@ -102,7 +102,7 @@ def test_dataops(args):
 
 
 if __name__ == "__main__":
-    # python -m train.evaluate --max_epoch=1 --batch_size=20 --bn_decay=0.94 --model_name=base_clean
+    # python -m train.evaluate --max_epoch=1 --batch_size=10 --bn_decay=0.94 --model_name=base_clean
     # import pdb; pdb.set_trace()
 
     from args_holder import args_holder
@@ -112,32 +112,33 @@ if __name__ == "__main__":
     # with_eval = True
     with_eval = False
 
-    # # mpl = import_module('matplotlib')
-    # # mpl.use('Agg')
-    # with args_holder() as argsholder:
-    #     argsholder.parse_args()
-    #     args = argsholder.args
-    #     argsholder.create_instance()
-    #     # import shutil
-    #     # shutil.rmtree(args.out_dir)
-    #     # os.makedirs(args.out_dir)
-    #
-    #     test_dataops(args)
-    #
-    #     run_one(args, with_train, with_eval)
-    #
-    #     # draw_compare(args)
-    # sys.exit()
-
     # mpl = import_module('matplotlib')
     # mpl.use('Agg')
+    with args_holder() as argsholder:
+        argsholder.parse_args()
+        args = argsholder.args
+        argsholder.create_instance()
+        # import shutil
+        # shutil.rmtree(args.out_dir)
+        # os.makedirs(args.out_dir)
+
+        test_dataops(args)
+
+        run_one(args, with_train, with_eval)
+        argsholder.append_log()
+
+        # draw_compare(args)
+    sys.exit()
+
+    mpl = import_module('matplotlib')
+    mpl.use('Agg')
     methlist = [
         # # 'localizer2',
-        # 'dense_regre',
+        # 'voxel_regre',
+        # 'voxel_detect',
+        'dense_regre',
         # 'direc_tsdf',
         # 'trunc_dist',
-        'voxel_regre',
-        # 'voxel_detect',
         # 'base_conv3',
         # 'base_conv3_inres',
         # 'ortho3view',
@@ -158,12 +159,14 @@ if __name__ == "__main__":
             run_one(args, with_train, with_eval)
             # run_one(args, True, True)
             # run_one(args, False, False)
+            argsholder.append_log()
     with args_holder() as argsholder:
         argsholder.parse_args()
         argsholder.create_instance()
         args = argsholder.args
         draw_compare(args)
+        # args.model_inst.detect_write_images()
     copyfile(
-        os.path.join(args.out_dir, 'log', 'univue.log'),
+        os.path.join(args.log_dir, 'univue.log'),
         os.path.join(args.predict_dir, 'univue.log')
     )

@@ -8,6 +8,7 @@ import matplotlib.pyplot as mpplot
 from cv2 import resize as cv2resize
 from utils.coder import file_pack
 from utils.iso_boxes import iso_rect
+from utils.iso_boxes import iso_cube
 
 
 class base_regre(object):
@@ -109,13 +110,61 @@ class base_regre(object):
             pred_val
         )
 
+    def draw_image_pose(self, ax, line, image_dir, caminfo):
+        img_name, pose = self.data_module.io.parse_line_annot(line)
+        img_path = os.path.join(image_dir, img_name)
+        img = self.data_module.io.read_image(img_path)
+        cube = iso_cube(
+            (np.max(pose, axis=0) + np.min(pose, axis=0)) / 2,
+            caminfo.region_size
+        )
+        points3_pick = cube.pick(self.data_module.ops.img_to_raw(
+            img, caminfo))
+        coord, depth = cube.raw_to_unit(points3_pick, sort=False)
+        image_size = np.floor(caminfo.region_size * 1.5).astype(int)
+        img_crop_resize = cube.print_image(
+            coord, depth, image_size)
+        ax.imshow(img_crop_resize, cmap=mpplot.cm.bone_r)
+        pose2d, _ = cube.raw_to_unit(pose, sort=False)
+        pose2d *= image_size
+        self.data_module.draw.draw_pose2d(
+            ax, caminfo, pose2d)
+        ax.axis('off')
+        return img_name
+
+    def draw_prediction_poses(self, image_dir, annot_echt, annot_pred, caminfo):
+        import linecache
+        img_id = 4
+        line_echt = linecache.getline(annot_echt, img_id)
+        line_pred = linecache.getline(annot_pred, img_id)
+        ax = mpplot.subplot(2, 2, 1)
+        img_name = self.draw_image_pose(ax, line_echt, image_dir, caminfo)
+        ax = mpplot.subplot(2, 2, 2)
+        img_name = self.draw_image_pose(ax, line_pred, image_dir, caminfo)
+        print('draw predition #{:d}: {}'.format(img_id, img_name))
+        img_id = np.random.randint(1, high=sum(1 for _ in open(annot_pred, 'r')))
+        line_echt = linecache.getline(annot_echt, img_id)
+        line_pred = linecache.getline(annot_pred, img_id)
+        ax = mpplot.subplot(2, 2, 3)
+        img_name = self.draw_image_pose(ax, line_echt, image_dir, caminfo)
+        ax = mpplot.subplot(2, 2, 4)
+        img_name = self.draw_image_pose(ax, line_pred, image_dir, caminfo)
+        print('draw predition #{:d}: {}'.format(img_id, img_name))
+        return img_id
+
     def end_evaluate(self, thedata, args):
         fig = mpplot.figure(figsize=(2 * 5, 2 * 5))
-        img_id = args.data_draw.draw_prediction_poses(
-            thedata,
+        # img_id = args.data_draw.draw_prediction_poses(
+        #     thedata,
+        #     thedata.training_images,
+        #     thedata.training_annot_test,
+        #     self.predict_file
+        # )
+        img_id = self.draw_prediction_poses(
             thedata.training_images,
             thedata.training_annot_test,
-            self.predict_file
+            self.predict_file,
+            thedata
         )
         fname = 'detection_{}_{:d}.png'.format(self.name_desc, img_id)
         mpplot.savefig(os.path.join(self.predict_dir, fname))
@@ -126,6 +175,34 @@ class base_regre(object):
         self.logger.info('maximal per-joint mean error: {}'.format(
             error_maxj
         ))
+
+    def detect_write_images(self):
+        outdir = os.path.join(self.args.log_dir_t, 'images')
+        if not os.path.exists(outdir):
+            os.makedirs(outdir)
+        with open(self.predict_file, 'r') as f:
+            fig = mpplot.figure(figsize=(5, 5))
+            ax = fig.add_axes([0, 0, 1, 1])
+            num_line = int(sum(1 for line in f))
+            f.seek(0)
+            print('start writing {} images ...'.format(num_line))
+            timerbar = progressbar.ProgressBar(
+                maxval=num_line,
+                widgets=[
+                    progressbar.Percentage(),
+                    ' ', progressbar.Bar('=', '[', ']'),
+                    ' ', progressbar.ETA()]
+            ).start()
+            for li, line in enumerate(f):
+                img_name = self.draw_image_pose(
+                    ax, line,
+                    self.args.data_inst.training_images,
+                    self.caminfo)
+                mpplot.savefig(os.path.join(outdir, img_name))
+                ax.clear()
+                timerbar.update(li)
+            timerbar.finish()
+            mpplot.close(fig)
 
     def provider_worker(self, line, image_dir, caminfo):
         img_name, pose_raw = self.data_module.io.parse_line_annot(line)
@@ -319,7 +396,7 @@ class base_regre(object):
         resce_cp[0] = 1
         ax.imshow(
             cv2resize(frame_h5, (sizel, sizel)),
-            cmap='bone')
+            cmap=mpplot.cm.bone_r)
         pose_raw = args.data_ops.local_to_raw(poses_h5, resce3)
         args.data_draw.draw_pose2d(
             ax, thedata,
@@ -330,7 +407,7 @@ class base_regre(object):
         mpplot.gca().set_title('test output')
         img_name = args.data_io.index2imagename(img_id)
         img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
-        ax.imshow(img, cmap='bone')
+        ax.imshow(img, cmap=mpplot.cm.bone_r)
         pose_raw = self.yanker(
             poses_h5, resce_h5, self.caminfo)
         args.data_draw.draw_pose2d(
@@ -347,7 +424,7 @@ class base_regre(object):
             thedata.training_annot_cleaned, img_id)
         img_name, pose_raw = args.data_io.parse_line_annot(annot_line)
         img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
-        ax.imshow(img, cmap='bone')
+        ax.imshow(img, cmap=mpplot.cm.bone_r)
         args.data_draw.draw_pose2d(
             ax, thedata,
             args.data_ops.raw_to_2d(pose_raw, thedata))
@@ -372,7 +449,7 @@ class base_regre(object):
         resce_cp[0] = 1
         ax.imshow(
             cv2resize(frame, (sizel, sizel)),
-            cmap='bone')
+            cmap=mpplot.cm.bone_r)
         pose_raw = args.data_ops.local_to_raw(poses, resce3)
         args.data_draw.draw_pose2d(
             ax, thedata,
@@ -546,9 +623,9 @@ class base_regre(object):
         # loss = tf.reduce_sum(tf.pow(tf.subtract(pred, anno), 2)) / 2
         loss = tf.nn.l2_loss(pred - anno)  # already divided by 2
         # loss = tf.reduce_mean(tf.squared_difference(pred, anno)) / 2
-        reg_losses = tf.add_n(tf.get_collection(
+        losses_reg = tf.add_n(tf.get_collection(
             tf.GraphKeys.REGULARIZATION_LOSSES))
-        return loss + reg_losses
+        return loss + losses_reg
 
     # @staticmethod
     # def base_arg_scope(is_training,

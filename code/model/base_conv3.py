@@ -175,7 +175,7 @@ class base_conv3(base_regre):
             thedata.training_annot_cleaned, img_id)
         img_name, pose_raw = args.data_io.parse_line_annot(annot_line)
         img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
-        ax.imshow(img, cmap='bone')
+        ax.imshow(img, cmap=mpplot.cm.bone_r)
         args.data_draw.draw_pose2d(
             ax, thedata,
             args.data_ops.raw_to_2d(pose_raw, self.caminfo))
@@ -203,7 +203,7 @@ class base_conv3(base_regre):
         ax = mpplot.subplot(2, 2, 4)
         img_name = args.data_io.index2imagename(img_id)
         img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
-        ax.imshow(img, cmap='bone')
+        ax.imshow(img, cmap=mpplot.cm.bone_r)
         pose_raw = self.yanker(poses_h5, resce_h5, self.caminfo)
         args.data_draw.draw_pose2d(
             ax, thedata,
@@ -231,7 +231,8 @@ class base_conv3(base_regre):
         corners = cube.get_corners()
         iso_cube.draw_cube_wire(ax, corners)
 
-        # if self.args.show_draw:
+        # if not self.args.show_draw:
+        #     mlab.options.offscreen = True
         #     mlab.figure(size=(800, 800))
         #     points3_trans = cube.transform_to_center(points3_sam)
         #     mlab.points3d(
@@ -266,7 +267,8 @@ class base_conv3(base_regre):
         cube.load(resce3)
         cube.show_dims()
 
-        if self.args.show_draw:
+        if not self.args.show_draw:
+            mlab.options.offscreen = True
             mlab.figure(size=(800, 800))
             # mlab.contour3d(frame)
             mlab.pipeline.volume(mlab.pipeline.scalar_field(frame))

@@ -113,8 +113,8 @@ class args_holder:
             help='Decay rate for lr decay [default: 0.94]')
 
     def make_new_log(self):
-        log_dir = os.path.join(self.args.out_dir, 'log')
-        blinks = os.path.join(log_dir, 'blinks')
+        self.args.log_dir = os.path.join(self.args.out_dir, 'log')
+        blinks = os.path.join(self.args.log_dir, 'blinks')
         if not os.path.exists(blinks):
             os.makedirs(blinks)
         log_dir_ln = os.path.join(
@@ -125,7 +125,9 @@ class args_holder:
             # git_hash = subprocess.check_output(
             #     ['git', 'rev-parse', '--short', 'HEAD'])
             self.args.log_dir_t = os.path.join(
-                log_dir, 'log-{}'.format(log_time)
+                self.args.log_dir, 'log-{}-{}'.format(
+                    self.args.model_name + self.args.model_desc,
+                    log_time)
             )
             os.makedirs(self.args.log_dir_t)
             os.symlink(self.args.log_dir_t, log_dir_ln + '-tmp')
@@ -138,8 +140,8 @@ class args_holder:
         logger.setLevel(logging.INFO)
         fileHandler = logging.FileHandler(
             os.path.join(
-                self.args.out_dir, 'log', 'univue.log'),
-            mode='a'
+                self.args.log_dir_t, 'univue.log'),
+            mode='w'  # write seperately for multi-processing
         )
         fileHandler.setFormatter(self.logFormatter)
         logger.addHandler(fileHandler)
@@ -164,9 +166,18 @@ class args_holder:
             )
         fileHandler.setFormatter(self.logFormatter)
         logger.addHandler(fileHandler)
+        if 0 < self.args.gpu_id:  # do not messy console
+            return
         consoleHandler = logging.StreamHandler(stream=sys.stdout)
         consoleHandler.setFormatter(self.logFormatter)
         logger.addHandler(consoleHandler)
+
+    def append_log(self):
+        with open(os.path.join(
+                self.args.log_dir, 'univue.log'), mode='a') as outfile:
+            with open(os.path.join(
+                    self.args.log_dir_t, 'univue.log'), mode='r') as infile:
+                outfile.write(infile.read())
 
     @staticmethod
     def write_args(args):
@@ -224,6 +235,7 @@ class args_holder:
     # this is called after hard coded parameter tweakings
     def create_instance(self):
         # logging system
+        self.args.log_dir = os.path.join(self.args.out_dir, 'log')
         self.make_new_log()
         if not os.path.exists(os.path.join(
                 self.args.log_dir_t, 'model.ckpt.meta')):

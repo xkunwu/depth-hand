@@ -7,6 +7,13 @@ import tfplot
 from utils.regu_grid import regu_grid
 
 
+def depth_cmap(cmap):
+    mycmap = cmap
+    mycmap._init()
+    mycmap.set_under('y')
+    return mycmap
+
+
 def transparent_cmap(cmap, tmax=0.99, N=255):
     mycmap = cmap
     mycmap._init()
@@ -16,22 +23,23 @@ def transparent_cmap(cmap, tmax=0.99, N=255):
 
 def draw_uomap3d(fig, ax, vxcnt_crop, uomap):
     crop_size = vxcnt_crop.shape[0]
-    vxcnt_hmap = vxcnt_crop[::2, ::2, ::2]
-    grid = regu_grid(step=32)
-    coord = grid.slice_ortho(vxcnt_hmap)
-    grid.draw_slice(ax, coord, 2.)
-    xx, yy = np.meshgrid(
-        np.arange(0, crop_size, 2),
-        np.arange(0, crop_size, 2))
+    hmap_size = uomap.shape[0]
+    map_scale = crop_size / hmap_size
+    # vxcnt_hmap = vxcnt_crop[::2, ::2, ::2]
+    # grid = regu_grid(step=32)
+    # coord = grid.slice_ortho(vxcnt_hmap)
+    # grid.draw_slice(ax, coord, 2.)
+    xx, yy, zz = np.meshgrid(
+        np.arange(0, crop_size, map_scale),
+        np.arange(0, crop_size, map_scale),
+        np.arange(0, crop_size, map_scale))
     ax.quiver(
-        xx, yy,
-        # np.squeeze(uomap[:, :, 15, 0]),
-        # -np.squeeze(uomap[:, :, 15, 1]),
-        np.max(uomap[:, :, :, 0], axis=0) + np.min(uomap[:, :, :, 0], axis=0),
-        -np.max(uomap[:, :, :, 1], axis=0) + np.min(uomap[:, :, :, 1], axis=0),
-        color='r', width=0.004, scale=20)
+        xx, yy, zz,
+        uomap[..., 0], uomap[..., 1], uomap[..., 2],
+        color='r', length=0.9)
     ax.set_xlim([0, crop_size])
     ax.set_ylim([0, crop_size])
+    ax.view_init(azim=180, elev=-90)
     ax.set_aspect('equal', adjustable='box')
     ax.invert_yaxis()
 
@@ -39,7 +47,10 @@ def draw_uomap3d(fig, ax, vxcnt_crop, uomap):
 def draw_vxmap(
     fig, ax, vxcnt_crop, vxmap,
         voxize_hmap, reduce_fn=np.sum, roll=0):
-    vxcnt_hmap = vxcnt_crop[::2, ::2, ::2]
+    crop_size = vxcnt_crop.shape[0]
+    hmap_size = vxmap.shape[0]
+    map_scale = crop_size / hmap_size
+    vxcnt_hmap = vxcnt_crop[::map_scale, ::map_scale, ::map_scale]
     grid = regu_grid(step=voxize_hmap)
     coord = grid.slice_ortho(vxcnt_hmap, roll=roll)
     grid.draw_slice(ax, coord, 1.)
@@ -55,6 +66,15 @@ def draw_vxmap(
     ax.set_ylim([0, voxize_hmap])
     ax.set_aspect('equal', adjustable='box')
     ax.invert_yaxis()
+
+
+def figure_vxmap(vxcnt_crop, vxmap, voxize_hmap, reduce_fn=np.sum, roll=0):
+    fig, ax = tfplot.subplots(figsize=(4, 4))
+    draw_vxmap(fig, ax, vxcnt_crop, vxmap, voxize_hmap, reduce_fn, roll)
+    ax.axis('off')
+    return fig
+
+tfplot_vxmap = tfplot.wrap(figure_vxmap, batch=False)
 
 
 def draw_vxlab(
@@ -91,7 +111,7 @@ def figure_vxlab(vxcnt_crop, vxlab, voxize_hmap):
 tfplot_vxlab = tfplot.wrap(figure_vxlab, batch=False)
 
 
-def draw_vxmap_flat(
+def draw_vxflt(
     fig, ax, vxcnt_crop, vxmap_flat,
         voxize_hmap, roll=0):
     vxmap = vxmap_flat.reshape((voxize_hmap, voxize_hmap, voxize_hmap))
@@ -114,18 +134,21 @@ def draw_vxmap_flat(
     # ax.invert_yaxis()
 
 
-def figure_vxmap_flat(vxcnt_crop, vxmap_flat, voxize_hmap):
+def figure_vxflt(vxcnt_crop, vxmap_flat, voxize_hmap):
     fig, ax = tfplot.subplots(figsize=(4, 4))
-    draw_vxmap_flat(fig, ax, vxcnt_crop, vxmap_flat, voxize_hmap)
+    draw_vxflt(fig, ax, vxcnt_crop, vxmap_flat, voxize_hmap)
     ax.axis('off')
     return fig
 
-tfplot_vxmap_flat = tfplot.wrap(figure_vxmap_flat, batch=False)
+tfplot_vxflt = tfplot.wrap(figure_vxflt, batch=False)
 
 
 def draw_hmap2(fig, ax, image_crop, hmap2):
-    image_hmap = image_crop[::4, ::4]
-    ax.imshow(image_hmap, cmap='bone')
+    crop_size = image_crop.shape[0]
+    hmap_size = hmap2.shape[0]
+    map_scale = crop_size / hmap_size
+    image_hmap = image_crop[::map_scale, ::map_scale]
+    ax.imshow(image_hmap, cmap=mpplot.cm.bone_r)
     img_h2 = ax.imshow(
         hmap2, cmap=transparent_cmap(mpplot.cm.jet))
     divider = make_axes_locatable(ax)
@@ -134,8 +157,11 @@ def draw_hmap2(fig, ax, image_crop, hmap2):
 
 
 def draw_olmap(fig, ax, image_crop, olmap):
-    image_hmap = image_crop[::4, ::4]
-    ax.imshow(image_hmap, cmap='bone')
+    crop_size = image_crop.shape[0]
+    hmap_size = olmap.shape[0]
+    map_scale = crop_size / hmap_size
+    image_hmap = image_crop[::map_scale, ::map_scale]
+    ax.imshow(image_hmap, cmap=mpplot.cm.bone_r)
     img_h3 = ax.imshow(
         olmap, cmap=transparent_cmap(mpplot.cm.jet))
     divider = make_axes_locatable(ax)
@@ -146,13 +172,13 @@ def draw_olmap(fig, ax, image_crop, olmap):
 def draw_uomap(fig, ax, image_crop, uomap):
     crop_size = image_crop.shape[0]
     hmap_size = uomap.shape[0]
-    step = crop_size / hmap_size
-    assert (128 == crop_size)
-    assert (4 == step)
-    ax.imshow(image_crop, cmap='bone')
+    map_scale = crop_size / hmap_size
+    # assert (128 == crop_size)
+    # assert (4 == map_scale)
+    ax.imshow(image_crop, cmap=mpplot.cm.bone_r)
     xx, yy = np.meshgrid(
-        np.arange(0, crop_size, step),
-        np.arange(0, crop_size, step))
+        np.arange(0, crop_size, map_scale),
+        np.arange(0, crop_size, map_scale))
     ax.quiver(
         xx, yy,
         np.squeeze(uomap[..., 0]),
@@ -223,7 +249,7 @@ def fig2data(fig, show_margin=False):
 def show_depth(file_name):
     """ show a depth image """
     img = mpimg.imread(file_name)
-    mpplot.imshow(img, cmap='bone')
+    mpplot.imshow(img, cmap=mpplot.cm.bone_r)
     mpplot.show()
 
 
