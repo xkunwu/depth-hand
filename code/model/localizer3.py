@@ -28,6 +28,23 @@ regu_grid = getattr(
 )
 
 
+# def prow_localizer3(line, image_dir, caminfo):
+#     img_name, pose_raw = dataio.parse_line_annot(line)
+#     img = dataio.read_image(os.path.join(image_dir, img_name))
+#     pcnt, anchors, resce = dataops.voxelize_depth(
+#         img, pose_raw, caminfo.crop_size, caminfo.anchor_num, caminfo)
+#     index = dataio.imagename2index(img_name)
+#     return (index, np.expand_dims(pcnt, axis=-1),
+#             anchors.T, resce)
+#
+#
+# def yank_localizer3(pose_local, resce, caminfo):
+#     cube = iso_cube()
+#     cube.load(resce)
+#     centre = cube.cen
+#     return centre
+
+
 class localizer3(base_conv3):
     def __init__(self, args):
         super(localizer3, self).__init__(args)

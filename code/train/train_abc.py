@@ -38,56 +38,53 @@ class train_abc():
         valid_loss = np.inf
         from timeit import default_timer as timer
         from datetime import timedelta
-        with file_pack() as filepack:
-            epoch = 0
-            time_all_s = timer()
-            self.args.model_inst.start_train(filepack)
-            while epoch < self.args.max_epoch:
-                epoch += 1
-                self.logger.info(
-                    '**** Epoch #{:03d} ****'.format(epoch))
-                sys.stdout.flush()
+        epoch = 0
+        time_all_s = timer()
+        self.args.model_inst.start_train()
+        while epoch < self.args.max_epoch:
+            epoch += 1
+            self.logger.info(
+                '**** Epoch #{:03d} ****'.format(epoch))
+            sys.stdout.flush()
 
-                split_beg, split_end = \
-                    self.args.data_inst.next_valid_split()
-                # print(split_beg, split_end)
+            # split_beg, split_end = \
+            #     self.args.data_inst.next_valid_split()
+            # # print(split_beg, split_end)
 
-                time_s = timer()
-                self.logger.info('** Training **')
-                self.args.model_inst.start_epoch_train(
-                    split_beg, split_end)
-                self.train_one_epoch(sess, ops, train_writer)
-                self.logger.info('** Validating **')
-                self.args.model_inst.start_epoch_valid(
-                    split_beg, split_end)
-                mean_loss = self.valid_one_epoch(
-                    sess, ops, valid_writer)
-                time_e = str(timedelta(
-                    seconds=(timer() - time_s)))
-                self.args.logger.info(
-                    'Epoch #{:03d} processing time: {}'.format(
-                        epoch, time_e))
-                if mean_loss > (valid_loss * 1.1):
-                    self.args.logger.info(
-                        'Break due to validation loss starts to grow: {} --> {}'.format(
-                            valid_loss, mean_loss))
-                    break
-                elif mean_loss > valid_loss:
-                    self.args.logger.info(
-                        'NOTE: validation loss starts to grow: {} --> {}'.format(
-                            valid_loss, mean_loss))
-                else:
-                    # only save model when validation loss decrease
-                    valid_loss = mean_loss
-                    save_path = saver.save(sess, model_path)
-                    self.logger.info(
-                        'Model saved in file: {}'.format(save_path))
-            self.args.model_inst.end_train()
-            time_all_e = timer() - time_all_s
+            time_s = timer()
+            self.logger.info('** Training **')
+            self.args.model_inst.start_epoch_train()
+            self.train_one_epoch(sess, ops, train_writer)
+            self.logger.info('** Validating **')
+            self.args.model_inst.start_epoch_valid()
+            mean_loss = self.valid_one_epoch(
+                sess, ops, valid_writer)
+            time_e = str(timedelta(
+                seconds=(timer() - time_s)))
             self.args.logger.info(
-                'Total training time: {} for {:d} epoches, average: {}.'.format(
-                    str(timedelta(seconds=time_all_e)), epoch,
-                    str(timedelta(seconds=(time_all_e / epoch)))))
+                'Epoch #{:03d} processing time: {}'.format(
+                    epoch, time_e))
+            if mean_loss > (valid_loss * 1.1):
+                self.args.logger.info(
+                    'Break due to validation loss starts to grow: {} --> {}'.format(
+                        valid_loss, mean_loss))
+                break
+            elif mean_loss > valid_loss:
+                self.args.logger.info(
+                    'NOTE: validation loss starts to grow: {} --> {}'.format(
+                        valid_loss, mean_loss))
+            else:
+                # only save model when validation loss decrease
+                valid_loss = mean_loss
+                save_path = saver.save(sess, model_path)
+                self.logger.info(
+                    'Model saved in file: {}'.format(save_path))
+        self.args.model_inst.end_train()
+        time_all_e = timer() - time_all_s
+        self.args.logger.info(
+            'Total training time: {} for {:d} epoches, average: {}.'.format(
+                str(timedelta(seconds=time_all_e)), epoch,
+                str(timedelta(seconds=(time_all_e / epoch)))))
 
     def train(self):
         self.logger.info('######## Training ########')
@@ -300,17 +297,16 @@ class train_abc():
                     'pred_op': pred_op
                 }
 
-                with file_pack() as filepack:
-                    writer = self.args.model_inst.start_evaluate(
-                        filepack)
-                    self.eval_one_epoch_write(sess, ops, writer)
+                self.args.model_inst.start_evaluate()
+                self.eval_one_epoch_write(sess, ops)
                 self.args.model_inst.end_evaluate(
                     self.args.data_inst, self.args)
 
-    def eval_one_epoch_write(self, sess, ops, writer):
+    def eval_one_epoch_write(self, sess, ops):
         batch_count = 0
         loss_sum = 0
         num_stores = self.args.model_inst.store_size
+        eval_size = 1
         timerbar = progressbar.ProgressBar(
             maxval=num_stores,
             widgets=[
@@ -319,7 +315,7 @@ class train_abc():
                 ' ', progressbar.ETA()]
         ).start()
         while True:
-            batch_data = self.args.model_inst.fetch_batch(1)
+            batch_data = self.args.model_inst.fetch_batch(eval_size)
             if batch_data is None:
                 break
             feed_dict = {
@@ -330,12 +326,10 @@ class train_abc():
             loss_val, pred_val = sess.run(
                 [ops['loss_op'], ops['pred_op']],
                 feed_dict=feed_dict)
-            self.args.model_inst.evaluate_batch(
-                writer, pred_val
-            )
+            self.args.model_inst.evaluate_batch(pred_val)
             loss_sum += loss_val
+            batch_count += eval_size
             timerbar.update(batch_count)
-            batch_count += 1
         timerbar.finish()
         mean_loss = loss_sum / batch_count
         self.args.logger.info(

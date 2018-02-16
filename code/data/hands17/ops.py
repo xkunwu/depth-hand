@@ -98,6 +98,7 @@ def raw_to_2d(points3, caminfo, resce=np.array([1, 0, 0])):
 
 def raw_to_heatmap2(pose_raw, cube, hmap_size, caminfo):
     """ 2d heatmap for each joint """
+    # return np.zeros((hmap_size, hmap_size, 21))
     coord, depth = cube.raw_to_unit(pose_raw)
     img_l = []
     for c, d in zip(coord, depth):
@@ -118,6 +119,7 @@ def raw_to_offset(image_crop, pose_raw, cube, hmap_size, caminfo):
         Args:
             img: should be size of 128
     """
+    # return np.zeros((hmap_size, hmap_size, 21)), np.zeros((hmap_size, hmap_size, 21)), np.zeros((hmap_size, hmap_size, 63))
     image_hmap = image_crop[::4, ::4]  # downsampling to 32x32
     coord, depth = cube.image_to_unit(image_hmap)
     depth_raw = cube.unit_to_raw(coord, depth)
@@ -240,18 +242,6 @@ def estimate_z(l3, l2, focal):
     #     np.sqrt(np.sum((p2[0] - p2[1]) ** 2)),
     #     ARGS.data_inst.focal[0]))
     return float(l3) * focal / l2  # assume same focal
-
-
-def proj_cube_to_rect(cube, region_size, caminfo):
-    """ central z-plane of 3D cube --> image plane """
-    c3a = np.array([
-        np.append(cube.cen[:2] - region_size, cube.cen[2]),
-        np.append(cube.cen[:2] + region_size, cube.cen[2])
-    ])  # central z-plane
-    c2a = raw_to_2d(c3a, caminfo)
-    cll = c2a[0, :]
-    ctr = c2a[1, :]
-    return iso_rect(cll, np.max(ctr - cll))
 
 
 def recover_from_rect(rect, region_size, caminfo):
@@ -405,7 +395,7 @@ def generate_anchors_2d(img, pose_raw, anchor_num, caminfo):
         caminfo.region_size
     )
     cen2d = raw_to_2d(cube.cen.reshape(1, -1), caminfo)
-    rect = proj_cube_to_rect(cube, caminfo.region_size, caminfo)
+    rect = cube.proj_to_rect(caminfo.region_size, raw_to_2d, caminfo)
     pcnt = lattice.fill(cen2d)  # only one-shot here
     anchors = lattice.prow_anchor_single(cen2d, rect.sidelen / 2)
     # import matplotlib.pyplot as mpplot
@@ -636,9 +626,9 @@ def proj_ortho3(img, pose_raw, caminfo):
     # resce = np.concatenate((
     #     resce,
     #     cube.evecs.flatten()))
-    img_crop_resize = np.stack(img_l, axis=2)
+    img_ortho3 = np.stack(img_l, axis=2)
     resce = cube.dump()
-    return img_crop_resize, resce
+    return img_ortho3, resce
 
 
 def get_rect3(cube, caminfo):
@@ -654,14 +644,10 @@ def get_rect3(cube, caminfo):
     return rect
 
 
-def crop_resize_pca(img, pose_raw, caminfo, sort=False):
-    cube = iso_cube(
-        (np.max(pose_raw, axis=0) + np.min(pose_raw, axis=0)) / 2,
-        caminfo.region_size
-    )
+def to_clean(img, cube, caminfo, sort=False):
     points3_pick = cube.pick(img_to_raw(img, caminfo))
     coord, depth = cube.raw_to_unit(points3_pick, sort=sort)
-    img_crop_resize = cube.print_image(
+    img_clean = cube.print_image(
         coord, depth, caminfo.crop_size)
     # I0 = np.zeros((8, 8))
     # I0[0, 1] = 10.
@@ -677,14 +663,24 @@ def crop_resize_pca(img, pose_raw, caminfo, sort=False):
     # from numpy import linalg
     # print(linalg.norm(c0 - c1), linalg.norm(d0 - d1))
     # mpplot = import_module('matplotlib.pyplot')
-    # mpplot.imshow(img_crop_resize, cmap=mpplot.cm.bone_r)
+    # mpplot.imshow(img_clean, cmap=mpplot.cm.bone_r)
     # mpplot.show()
+    return img_clean
+
+
+def crop_resize_pca(img, pose_raw, caminfo, sort=False):
+    # return np.zeros((caminfo.crop_size, caminfo.crop_size)), np.ones(4)
+    cube = iso_cube(
+        (np.max(pose_raw, axis=0) + np.min(pose_raw, axis=0)) / 2,
+        caminfo.region_size
+    )
+    img_clean = to_clean(img, cube, caminfo, sort=sort)
     resce = cube.dump()
-    return img_crop_resize, resce
+    return img_clean, resce
 
 
 def get_rect2(cube, caminfo):
-    rect = proj_cube_to_rect(cube, caminfo.region_size, caminfo)
+    rect = cube.proj_to_rect(caminfo.region_size, raw_to_2d, caminfo)
     rect = clip_image_border(rect, caminfo)
     return rect
 
@@ -698,18 +694,13 @@ def get_rect2(cube, caminfo):
 #     return rect
 
 
-def crop_resize(img, pose_raw, caminfo):
-    # cube.build(pose_raw)
-    cube = iso_cube(
-        (np.max(pose_raw, axis=0) + np.min(pose_raw, axis=0)) / 2,
-        caminfo.region_size
-    )
+def to_crop2(img, cube, caminfo):
     rect = get_rect2(cube, caminfo)
     # import matplotlib.pyplot as mpplot
     # mpplot.imshow(img, cmap=mpplot.cm.bone_r)
     # rect.show_dims()
     # rect.draw(ax)
-    # rect = proj_cube_to_rect(cube, caminfo.region_size, caminfo)
+    # rect = cube.proj_to_rect(caminfo.region_size, raw_to_2d, caminfo)
     # rect.show_dims()
     # cube.show_dims()
     # recover_from_rect(rect, caminfo.region_size, caminfo).show_dims()
@@ -720,9 +711,16 @@ def crop_resize(img, pose_raw, caminfo):
         cll_i[0]:cll_i[0] + sizel,
         cll_i[1]:cll_i[1] + sizel,
     ]
-    img_crop_resize = resize_localizer(img_crop, caminfo)
-    resce = np.concatenate((
-        cube.dump(),
-        rect.dump(),
-    ))
-    return img_crop_resize, resce
+    img_crop2 = resize_localizer(img_crop, caminfo)
+    return img_crop2
+
+
+def crop_resize(img, pose_raw, caminfo):
+    # cube.build(pose_raw)
+    cube = iso_cube(
+        (np.max(pose_raw, axis=0) + np.min(pose_raw, axis=0)) / 2,
+        caminfo.region_size
+    )
+    img_crop = to_crop2(img, cube, caminfo)
+    resce = cube.dump()
+    return img_crop, resce

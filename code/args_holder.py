@@ -3,6 +3,7 @@ import sys
 from importlib import import_module
 import argparse
 import logging
+from utils.coder import file_pack
 
 model_map = {
     'direc_tsdf': 'model.direc_tsdf',
@@ -173,26 +174,35 @@ class args_holder:
         logger.addHandler(consoleHandler)
 
     def append_log(self):
+        # logger = logging.getLogger('univue')
+        # for handler in logger.handlers[:]:
+        #     handler.close()
+        #     logger.removeHandler(handler)
         with open(os.path.join(
                 self.args.log_dir, 'univue.log'), mode='a') as outfile:
             with open(os.path.join(
                     self.args.log_dir_t, 'univue.log'), mode='r') as infile:
                 outfile.write(infile.read())
+        # self.make_central_logging()
 
     @staticmethod
     def write_args(args):
         import inspect
         with open(os.path.join(args.log_dir_t, 'args.txt'), 'w') as writer:
+            writer.write('###################################\n')
             for arg in vars(args):
                 att = getattr(args, arg)
                 if inspect.ismodule(att) or inspect.isclass(att):
                     continue
                 writer.write('--{}={}\n'.format(arg, att))
                 # print(arg, getattr(args, arg))
+            writer.write('###################################\n')
+            args.model_inst.write_args(writer)
 
     # parse arguments, and only perform very basic managements
     def parse_args(self):
         self.args = self.parser.parse_args()
+        self.args.filepack = file_pack()  # central file pack
         self.args.data_dir = os.path.join(
             self.args.data_root,
             self.args.data_name)
@@ -217,6 +227,7 @@ class args_holder:
         return self
 
     def __exit__(self, exc_type, exc_value, exc_traceback):
+        self.args.filepack = None
         logger = logging.getLogger('univue')
         for handler in logger.handlers[:]:
             handler.close()

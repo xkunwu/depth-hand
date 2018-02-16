@@ -260,23 +260,16 @@ class iso_cube:
         # coord[:, 1] = 1 - coord[:, 1]  # make y-axis pointing up
         return coord, depth
 
-    # def proj_rect(self, raw_to_2d_fn, caminfo):
-    #     # c3a = np.array([
-    #     #     np.append(
-    #     #         self.cen[:2] - self.sidelen,
-    #     #         self.cen[2] - self.sidelen),
-    #     #     np.append(
-    #     #         self.cen[:2] + self.sidelen,
-    #     #         self.cen[2] - self.sidelen)
-    #     # ])  # near z-plane
-    #     c3a = np.array([
-    #         np.append(self.cen[:2] - self.sidelen, self.cen[2]),
-    #         np.append(self.cen[:2] + self.sidelen, self.cen[2])
-    #     ])  # central z-plane
-    #     c2a = raw_to_2d_fn(c3a, caminfo)
-    #     cll = c2a[0, :]
-    #     ctr = c2a[1, :]
-    #     return iso_rect(cll, np.max(ctr - cll))
+    def proj_to_rect(self, region_size, raw_to_2d_fn, caminfo):
+        """ central z-plane of 3D cube --> image plane """
+        c3a = np.array([
+            np.append(self.cen[:2] - region_size, self.cen[2]),
+            np.append(self.cen[:2] + region_size, self.cen[2])
+        ])  # central z-plane
+        c2a = raw_to_2d_fn(c3a, caminfo)
+        cll = c2a[0, :]
+        ctr = c2a[1, :]
+        return iso_rect(cll, np.max(ctr - cll))
 
     def proj_rects_3(self, raw_to_2d_fn, caminfo):
         c3a_l = []

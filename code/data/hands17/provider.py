@@ -7,96 +7,66 @@ from utils.iso_boxes import iso_cube
 from utils.regu_grid import latice_image
 
 
-def prow_localizer2(line, image_dir, caminfo):
-    img_name, pose_raw = dataio.parse_line_annot(line)
-    img = dataio.read_image(os.path.join(image_dir, img_name))
-    img_rescale = dataops.resize_localizer(img, caminfo)
-    anchors, resce = dataops.generate_anchors_2d(
-        img, pose_raw, caminfo.anchor_num, caminfo)
-    index = dataio.imagename2index(img_name)
-    return (index,
-            np.expand_dims(img_rescale, axis=-1),
-            anchors.T, resce)
-
-
-def yank_localizer2_rect(index, anchors, caminfo):
-    lattice = latice_image(
-        np.array(caminfo.image_size).astype(float),
-        caminfo.anchor_num)
-    points2, wsizes = lattice.yank_anchor_single(
-        index,
-        anchors
-    )
-    z_cen = dataops.estimate_z(
-        caminfo.region_size, wsizes, caminfo.focal[0])
-    # print(np.append(points2, [wsizes, z_cen]).reshape(1, -1))
-    centre = dataops.d2z_to_raw(
-        np.append(points2, z_cen).reshape(1, -1),
-        caminfo
-    )
-    return points2, wsizes, centre.flatten()
-
-
-def yank_localizer2(pose_local, resce, caminfo):
-    anchor_num = caminfo.anchor_num ** 2
-    # label = np.argmax(pose_local[:anchor_num]).astype(int)
-    pcnt = pose_local[:anchor_num].reshape(
-        caminfo.anchor_num, caminfo.anchor_num)
-    index = np.array(np.unravel_index(np.argmax(pcnt), pcnt.shape))
-    # convert logits to probability, due to network design
-    logits = pcnt[index[0], index[1]]
-    confidence = 1 / (1 + np.exp(-logits))
-    anchors = pose_local[anchor_num:]
-    points2, wsizes, centre = yank_localizer2_rect(
-        index, anchors, caminfo)
-    return centre, index, confidence
-
-
-def prow_localizer3(line, image_dir, caminfo):
-    img_name, pose_raw = dataio.parse_line_annot(line)
-    img = dataio.read_image(os.path.join(image_dir, img_name))
-    pcnt, anchors, resce = dataops.voxelize_depth(
-        img, pose_raw, caminfo.crop_size, caminfo.anchor_num, caminfo)
-    index = dataio.imagename2index(img_name)
-    return (index, np.expand_dims(pcnt, axis=-1),
-            anchors.T, resce)
-
-
-def yank_localizer3(pose_local, resce, caminfo):
+def prow_pose_c(args, thedata, batchallot):
+    bi, poses, resce, = \
+        args[0], args[2], args[3]
     cube = iso_cube()
     cube.load(resce)
-    centre = cube.cen
-    return centre
+    pose_c = cube.transform_to_center(
+        poses.reshape(-1, 3))
+    batchallot.entry['pose_c'][bi, ...] = pose_c.flatten()
+
+
+def prow_crop2(args, thedata, batchallot):
+    bi, index, resce = \
+        args[0], args[1], args[3]
+    img_name = dataio.index2imagename(index)
+    img = dataio.read_image(os.path.join(
+        thedata.training_images, img_name))
+    cube = iso_cube()
+    cube.load(resce)
+    img_crop2 = dataops.to_crop2(img, cube, thedata)
+    batchallot.entry['crop2'][bi, ...] = img_crop2
+
+
+def prow_clean(args, thedata, batchallot):
+    bi, index, resce = \
+        args[0], args[1], args[3]
+    img_name = dataio.index2imagename(index)
+    img = dataio.read_image(os.path.join(
+        thedata.training_images, img_name))
+    cube = iso_cube()
+    cube.load(resce)
+    img_clean = dataops.to_clean(img, cube, thedata)
+    batchallot.entry['clean'][bi, ...] = img_clean
 
 
 def test_puttensor(
-    next_n_lines, put_worker, image_dir, model_inst,
-        caminfo, data_module, batchallot):
+        num_line, index, poses, resce, put_worker, thedata, batchallot):
     import copy
     test_copy = copy.deepcopy(batchallot)
-    for bi, line in enumerate(next_n_lines):
+    for bi, ii, pp, rr in zip(range(num_line), index, poses, resce):
         put_worker(
-            (bi, line), image_dir, model_inst,
-            caminfo, data_module, test_copy)
+            (bi, ii, pp, rr), thedata, batchallot)
     print('this is TEST only!!! DO NOT forget to write using mp version')
+    return test_copy
 
 
 def puttensor_mt(
-    fanno, put_worker, image_dir, model_inst,
-        caminfo, data_module, batchallot):
-    next_n_lines = list(islice(fanno, batchallot.store_size))
-    if not next_n_lines:
-        return -1
-    num_line = len(next_n_lines)
+    fanno, store_beg, store_end,
+        put_worker, thedata, batchallot):
+    num_line = store_end - store_beg
+    if 0 >= num_line:
+        return 0
+    index = fanno['index'][store_beg:store_end, 0]
+    poses = fanno['poses'][store_beg:store_end, :]
+    resce = fanno['resce'][store_beg:store_end, :]
 
     # from timeit import default_timer as timer
     # from datetime import timedelta
     # time_s = timer()
-    # # test_copy = test_puttensor(
-    # #     next_n_lines, worker, image_dir, caminfo, batchallot)
     # test_copy = test_puttensor(
-    #     next_n_lines, put_worker, image_dir, model_inst,
-    #     caminfo, data_module, batchallot)
+    #     num_line, index, poses, resce, put_worker, thedata, batchallot)
     # time_e = str(timedelta(seconds=timer() - time_s))
     # print('single tread time: {}'.format(time_e))
     # return num_line
@@ -106,11 +76,8 @@ def puttensor_mt(
     # time_s = timer()
     thread_pool = ThreadPool()
     thread_pool.map(
-        partial(
-            put_worker, image_dir=image_dir, model_inst=model_inst,
-            caminfo=caminfo, data_module=data_module,
-            batchallot=batchallot),
-        zip(range(num_line), next_n_lines))
+        partial(put_worker, thedata=thedata, batchallot=batchallot),
+        zip(range(num_line), index, poses, resce))
     thread_pool.close()
     thread_pool.join()
     # time_e = str(timedelta(seconds=timer() - time_s))

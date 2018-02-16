@@ -13,6 +13,51 @@ from utils.iso_boxes import iso_rect
 from utils.iso_boxes import iso_cube
 
 
+# def prow_localizer2(line, image_dir, caminfo):
+#     img_name, pose_raw = dataio.parse_line_annot(line)
+#     img = dataio.read_image(os.path.join(image_dir, img_name))
+#     img_rescale = dataops.resize_localizer(img, caminfo)
+#     anchors, resce = dataops.generate_anchors_2d(
+#         img, pose_raw, caminfo.anchor_num, caminfo)
+#     index = dataio.imagename2index(img_name)
+#     return (index,
+#             np.expand_dims(img_rescale, axis=-1),
+#             anchors.T, resce)
+#
+#
+# def yank_localizer2_rect(index, anchors, caminfo):
+#     lattice = latice_image(
+#         np.array(caminfo.image_size).astype(float),
+#         caminfo.anchor_num)
+#     points2, wsizes = lattice.yank_anchor_single(
+#         index,
+#         anchors
+#     )
+#     z_cen = dataops.estimate_z(
+#         caminfo.region_size, wsizes, caminfo.focal[0])
+#     # print(np.append(points2, [wsizes, z_cen]).reshape(1, -1))
+#     centre = dataops.d2z_to_raw(
+#         np.append(points2, z_cen).reshape(1, -1),
+#         caminfo
+#     )
+#     return points2, wsizes, centre.flatten()
+#
+#
+# def yank_localizer2(pose_local, resce, caminfo):
+#     anchor_num = caminfo.anchor_num ** 2
+#     # label = np.argmax(pose_local[:anchor_num]).astype(int)
+#     pcnt = pose_local[:anchor_num].reshape(
+#         caminfo.anchor_num, caminfo.anchor_num)
+#     index = np.array(np.unravel_index(np.argmax(pcnt), pcnt.shape))
+#     # convert logits to probability, due to network design
+#     logits = pcnt[index[0], index[1]]
+#     confidence = 1 / (1 + np.exp(-logits))
+#     anchors = pose_local[anchor_num:]
+#     points2, wsizes, centre = yank_localizer2_rect(
+#         index, anchors, caminfo)
+#     return centre, index, confidence
+
+
 class localizer2(base_regre):
     """ this is the 2D version of attention model """
     def __init__(self, args):

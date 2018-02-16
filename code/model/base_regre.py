@@ -25,25 +25,20 @@ class base_regre(object):
         self.net_type = 'poser'
         self.name_desc = self.__class__.__name__ + args.model_desc
         self.crop_size = 128
-        self.anchor_num = 16
+        # self.anchor_num = 16
         self.crop_range = 480.
         self.num_channel = 1
-        self.num_appen = 7
+        # self.num_appen = 7
         self.batch_allot = getattr(
             import_module('model.batch_allot'),
             'batch_allot'
         )
-        self.store_file = None
-        self.batch_data = None
+        self.batch_data = {}
         # receive arguments
+        self.store_name = {}
+        self.store_handle = {}
         self.args = args
         self.prepare_dir = args.prepare_dir
-        self.appen_train = os.path.join(
-            self.prepare_dir, 'train_{}'.format(
-                self.__class__.__name__))
-        self.appen_test = os.path.join(
-            self.prepare_dir, 'test_{}'.format(
-                self.__class__.__name__))
         self.predict_dir = args.predict_dir
         self.predict_file = os.path.join(
             self.predict_dir, 'predict_{}'.format(
@@ -53,62 +48,73 @@ class base_regre(object):
             args.out_dir, 'log', 'blinks',
             self.name_desc, 'model.ckpt')
 
+    def write_args(self, writer):
+        writer.write('--{}={}\n'.format('crop_size', self.crop_size))
+        writer.write('--{}={}\n'.format('crop_range', self.crop_range))
+        writer.write('--{}={}\n'.format('num_channel', self.num_channel))
+
     def tweak_arguments(self, args):
         args.crop_size = self.crop_size
-        args.anchor_num = self.anchor_num
+        # args.anchor_num = self.anchor_num
         args.crop_range = self.crop_range
 
-    def start_train(self, filepack):
-        self.store_file = filepack.push_h5(self.appen_train)
-        self.store_size = self.store_file['index'].shape[0]
+    def start_train(self):
+        self.store_size = self.args.data_inst.train_test_split
 
-    def start_epoch_train(self, split_beg, split_end):
-        # new round starting from next portion of data
-        self.batch_beg = split_end
-        self.split_end = split_beg  # + self.store_size
+    def start_epoch_train(self):
+        # # new round starting from next portion of data
+        # self.batch_beg = split_end
+        # self.split_end = split_beg  # + self.store_size
+        self.batch_beg = 0
+        self.split_end = self.args.data_inst.train_valid_split
 
-    def start_epoch_valid(self, split_beg, split_end):
-        self.batch_beg = split_beg
-        self.split_end = split_end \
-            if 0 != split_end \
-            else self.store_size
+    def start_epoch_valid(self):
+        self.batch_beg = self.args.data_inst.train_valid_split
+        self.split_end = self.args.data_inst.train_test_split
 
     def fetch_batch(self, fetch_size=None):
         if fetch_size is None:
             fetch_size = self.batch_size
         batch_end = self.batch_beg + fetch_size
-        if batch_end >= self.store_size:
-            self.batch_beg = batch_end
-            batch_end = self.batch_beg + fetch_size
-            self.split_end -= self.store_size
-        # print(self.batch_beg, batch_end, self.split_end)
+        # if batch_end >= self.store_size:
+        #     self.batch_beg = batch_end
+        #     batch_end = self.batch_beg + fetch_size
+        #     self.split_end -= self.store_size
+        # # print(self.batch_beg, batch_end, self.split_end)
         if batch_end >= self.split_end:
             return None
-        self.batch_data = {
-            'batch_index': self.store_file['index'][self.batch_beg:batch_end, ...],
-            'batch_frame': self.store_file['frame'][self.batch_beg:batch_end, ...],
-            'batch_poses': self.store_file['poses'][self.batch_beg:batch_end, ...],
-            'batch_resce': self.store_file['resce'][self.batch_beg:batch_end, ...]
-        }
+        self.batch_data['batch_frame'] = np.expand_dims(
+            self.store_handle['crop2'][self.batch_beg:batch_end, ...],
+            axis=-1)
+        self.batch_data['batch_poses'] = \
+            self.store_handle['pose_c'][self.batch_beg:batch_end, ...]
+        self.batch_data['batch_index'] = \
+            self.store_handle['index'][self.batch_beg:batch_end, ...]
+        self.batch_data['batch_resce'] = \
+            self.store_handle['resce'][self.batch_beg:batch_end, ...]
         self.batch_beg = batch_end
         return self.batch_data
 
     def end_train(self):
         pass
 
-    def start_evaluate(self, filepack):
-        self.store_file = filepack.push_h5(self.appen_test)
-        self.store_size = self.store_file['index'].shape[0]
-        self.batch_beg = 0
-        self.split_end = self.store_size
-        return filepack.write_file(self.predict_file)
+    def start_evaluate(self):
+        self.batch_beg = self.args.data_inst.train_test_split
+        self.split_end = self.args.data_inst.num_training
+        self.store_size = self.split_end - self.batch_beg
+        self.eval_pred = []
 
-    def evaluate_batch(self, writer, pred_val):
-        self.write_pred(
-            writer, self.caminfo,
-            self.batch_data['batch_index'], self.batch_data['batch_resce'],
-            pred_val
-        )
+    def evaluate_batch(self, pred_val):
+        batch_index = self.batch_data['batch_index']
+        batch_resce = self.batch_data['batch_resce']
+        batch_poses = pred_val
+        num_elem = batch_index.shape[0]
+        poses_out = np.empty(batch_poses.shape)
+        for ei, resce, poses in zip(range(num_elem), batch_resce, batch_poses):
+            pose_local = poses.reshape(-1, 3)
+            pose_raw = self.yanker(pose_local, resce, self.caminfo)
+            poses_out[ei] = pose_raw.reshape(1, -1)
+        self.eval_pred.append(poses_out)
 
     def draw_image_pose(self, ax, line, image_dir, caminfo):
         img_name, pose = self.data_module.io.parse_line_annot(line)
@@ -153,13 +159,16 @@ class base_regre(object):
         return img_id
 
     def end_evaluate(self, thedata, args):
+        index = self.store_handle['index'][
+            self.args.data_inst.train_test_split:, ...]
+        poses = np.vstack(self.eval_pred)
+        self.eval_pred = []
+        # with h5py.File(self.predict_file + '.h5', 'w') as writer:
+        #     self.data_module.io.write_h5(writer, index, poses)
+        with open(self.predict_file, 'w') as writer:
+            self.data_module.io.write_txt(writer, index[:, 0], poses)
+
         fig = mpplot.figure(figsize=(2 * 5, 2 * 5))
-        # img_id = args.data_draw.draw_prediction_poses(
-        #     thedata,
-        #     thedata.training_images,
-        #     thedata.training_annot_test,
-        #     self.predict_file
-        # )
         img_id = self.draw_prediction_poses(
             thedata.training_images,
             thedata.training_annot_test,
@@ -204,143 +213,68 @@ class base_regre(object):
             timerbar.finish()
             mpplot.close(fig)
 
-    def provider_worker(self, line, image_dir, caminfo):
-        img_name, pose_raw = self.data_module.io.parse_line_annot(line)
-        img = self.data_module.io.read_image(os.path.join(image_dir, img_name))
-        img_crop_resize, resce = self.data_module.ops.crop_resize(
-            img, pose_raw, caminfo)
-        resce3 = resce[0:4]
-        pose_local = self.data_module.ops.raw_to_local(pose_raw, resce3)
-        index = self.data_module.io.imagename2index(img_name)
-        return (index, np.expand_dims(img_crop_resize, axis=-1),
-                pose_local.flatten().T, resce)
-
     def yanker(self, pose_local, resce, caminfo):
         resce3 = resce[0:4]
         return self.data_module.ops.local_to_raw(pose_local, resce3)
 
-    @staticmethod
-    def put_worker(
-        args, image_dir, model_inst,
-            caminfo, data_module, batchallot):
-        bi = args[0]
-        line = args[1]
-        index, frame, poses, resce = model_inst.provider_worker(
-            line, image_dir, caminfo)
-        batchallot.batch_index[bi, :] = index
-        batchallot.batch_frame[bi, ...] = frame
-        batchallot.batch_poses[bi, :] = poses
-        batchallot.batch_resce[bi, :] = resce
-
-    def write_pred(self, fanno, caminfo,
-                   batch_index, batch_resce, batch_poses):
-        for ii in range(batch_index.shape[0]):
-            img_name = self.data_module.io.index2imagename(batch_index[ii, 0])
-            pose_local = batch_poses[ii, :].reshape(-1, 3)
-            resce = batch_resce[ii, :]
-            pose_raw = self.yanker(pose_local, resce, caminfo)
-            fanno.write(
-                img_name +
-                '\t' + '\t'.join("%.4f" % x for x in pose_raw.flatten()) +
-                '\n')
-
     def prepare_data(self, thedata, args,
-                     batchallot, file_annot, name_appen):
-        num_line = int(sum(1 for line in file_annot))
-        file_annot.seek(0)
-        batchallot.allot(num_line)
+                     filepack, prepare_h5file):
+        file_annot = filepack.push_h5(thedata.training_annot_train)
+        num_line = file_annot['index'].shape[0]
+        batchallot = self.batch_allot(self, num_line)
         store_size = batchallot.store_size
-        num_stores = int(np.ceil(float(num_line) / store_size))
-        self.logger.debug(
-            'preparing data [{}]: {:d} lines (producing {:.4f} GB for store size {:d}) ...'.format(
+        self.logger.info(
+            'preparing data [{}]: {:d} lines (producing {:.4f} MB for store size {:d}) ...'.format(
                 self.__class__.__name__, num_line,
-                float(batchallot.store_bytes) / (2 << 30),
+                float(batchallot.store_bytes) / (2 << 20),
                 store_size))
+        for key in prepare_h5file:
+            prepare_h5file[key] = batchallot.create_fn[key](
+                filepack, self.store_name[key], num_line)
         timerbar = progressbar.ProgressBar(
-            maxval=num_stores,
+            maxval=num_line,
             widgets=[
                 progressbar.Percentage(),
                 ' ', progressbar.Bar('=', '[', ']'),
                 ' ', progressbar.ETA()]
         ).start()
-        image_size = self.crop_size
-        out_dim = self.out_dim
-        num_channel = self.num_channel
-        num_appen = self.num_appen
-        with h5py.File(os.path.join(self.prepare_dir, name_appen), 'w') as h5file:
-            h5file.create_dataset(
-                'index',
-                (num_line, 1),
-                compression='lzf',
-                dtype=np.int32
-            )
-            h5file.create_dataset(
-                'frame',
-                (num_line,
-                    image_size, image_size,
-                    num_channel),
-                chunks=(1,
-                        image_size, image_size,
-                        num_channel),
-                compression='lzf',
-                # dtype=np.float32)
-                dtype=float)
-            h5file.create_dataset(
-                'poses',
-                (num_line, out_dim),
-                compression='lzf',
-                # dtype=np.float32)
-                dtype=float)
-            h5file.create_dataset(
-                'resce',
-                (num_line, num_appen),
-                compression='lzf',
-                # dtype=np.float32)
-                dtype=float)
-            bi = 0
-            store_beg = 0
-            while True:
+        store_beg = 0
+        li = 0
+        while True:
+            store_end = min(store_beg + store_size, num_line)
+            if store_beg >= num_line:
+                break
+            for key in prepare_h5file:
                 resline = self.data_module.provider.puttensor_mt(
-                    file_annot, self.put_worker, self.image_dir,
-                    self, thedata, self.data_module, batchallot
+                    file_annot, store_beg, store_end,
+                    thedata.store_prow[key], thedata, batchallot
                 )
-                if 0 > resline:
-                    break
-                h5file['index'][store_beg:store_beg + resline, ...] = \
-                    batchallot.batch_index[0:resline, ...]
-                h5file['frame'][store_beg:store_beg + resline, ...] = \
-                    batchallot.batch_frame[0:resline, ...]
-                h5file['poses'][store_beg:store_beg + resline, ...] = \
-                    batchallot.batch_poses[0:resline, ...]
-                h5file['resce'][store_beg:store_beg + resline, ...] = \
-                    batchallot.batch_resce[0:resline, ...]
-                timerbar.update(bi)
-                bi += 1
-                store_beg += resline
+                prepare_h5file[key][store_beg:store_end, ...] = \
+                    batchallot.entry[key]
+            store_beg = store_end
+            li += resline
+            timerbar.update(li)
         timerbar.finish()
 
     def check_dir(self, thedata, args):
-        first_run = False
-        if (
-                (not os.path.exists(self.appen_train)) or
-                (not os.path.exists(self.appen_test))
-        ):
-            first_run = True
-        if not first_run:
-            return
-        from timeit import default_timer as timer
-        from datetime import timedelta
-        time_s = timer()
-        batchallot = self.batch_allot(self)
-        with file_pack() as filepack:
-            file_annot = filepack.push_file(thedata.training_annot_train)
-            self.prepare_data(thedata, args, batchallot, file_annot, self.appen_train)
-        with file_pack() as filepack:
-            file_annot = filepack.push_file(thedata.training_annot_test)
-            self.prepare_data(thedata, args, batchallot, file_annot, self.appen_test)
-        time_e = str(timedelta(seconds=timer() - time_s))
-        self.logger.info('data prepared [{}], time: {}'.format(
-            self.__class__.__name__, time_e))
+        prepare_h5file = {}
+        for name, filename in self.store_name.items():
+            if not os.path.exists(filename):
+                prepare_h5file[name] = None
+        if prepare_h5file:
+            from timeit import default_timer as timer
+            from datetime import timedelta
+            time_s = timer()
+            with file_pack() as filepack:
+                self.prepare_data(thedata, args, filepack, prepare_h5file)
+            time_e = str(timedelta(seconds=timer() - time_s))
+            self.logger.info('data prepared [{}], time: {}'.format(
+                self.__class__.__name__, time_e))
+        self.store_handle = {}
+        for name, filename in self.store_name.items():
+            h5file = args.filepack.push_h5(filename)
+            self.store_handle[name] = h5file[name]
+            # print(self.store_handle[name])
 
     def receive_data(self, thedata, args):
         """ Receive parameters specific to the data """
@@ -350,6 +284,14 @@ class base_regre(object):
         self.image_dir = thedata.training_images
         self.caminfo = thedata
         self.region_size = thedata.region_size
+        self.train_file = args.data_inst.training_annot_train
+        self.store_name = {
+            'index': self.train_file,
+            'crop2': os.path.join(
+                self.prepare_dir, 'crop2_{}'.format(self.crop_size)),
+            'pose_c': os.path.join(self.prepare_dir, 'pose_c'),
+            'resce': self.train_file
+        }
 
     def debug_compare(self, batch_pred, logger):
         batch_echt = self.batch_data['batch_poses']
@@ -370,14 +312,14 @@ class base_regre(object):
             np.fabs(pcnt_echt - pcnt_pred)))
 
     def draw_random(self, thedata, args):
-        with h5py.File(self.appen_train, 'r') as h5file:
-            store_size = h5file['index'].shape[0]
-            frame_id = np.random.choice(store_size)
-            # frame_id = 0
-            img_id = h5file['index'][frame_id, 0]
-            frame_h5 = np.squeeze(h5file['frame'][frame_id, ...], -1)
-            poses_h5 = h5file['poses'][frame_id, ...].reshape(-1, 3)
-            resce_h5 = h5file['resce'][frame_id, ...]
+        index_h5 = self.store_handle['index']
+        store_size = index_h5.shape[0]
+        frame_id = np.random.choice(store_size)
+        # frame_id = 0
+        img_id = index_h5[frame_id, 0]
+        frame_h5 = self.store_handle['crop2'][frame_id, ...]
+        poses_h5 = self.store_handle['pose_c'][frame_id, ...].reshape(-1, 3)
+        resce_h5 = self.store_handle['resce'][frame_id, ...]
 
         print('[{}] drawing image #{:d} ...'.format(self.name_desc, img_id))
         print(np.min(frame_h5), np.max(frame_h5))
@@ -385,76 +327,55 @@ class base_regre(object):
         print(np.min(poses_h5, axis=0), np.max(poses_h5, axis=0))
         print(resce_h5)
         resce3 = resce_h5[0:4]
-        resce2 = resce_h5[4:7]
-        mpplot.subplots(nrows=2, ncols=2, figsize=(2 * 5, 2 * 5))
+        cube = iso_cube()
+        cube.load(resce3)
+        from colour import Color
+        colors = [Color('orange').rgb, Color('red').rgb, Color('lime').rgb]
+        mpplot.subplots(nrows=1, ncols=2, figsize=(2 * 5, 1 * 5))
 
-        ax = mpplot.subplot(2, 2, 3)
+        ax = mpplot.subplot(1, 2, 2)
         mpplot.gca().set_title('test storage read')
         # resize the cropped resion for eazier pose drawing in the commen frame
-        sizel = np.floor(resce2[0]).astype(int)
-        resce_cp = np.copy(resce2)
-        resce_cp[0] = 1
+        sizel = np.floor(resce3[0]).astype(int)
         ax.imshow(
             cv2resize(frame_h5, (sizel, sizel)),
             cmap=mpplot.cm.bone_r)
         pose_raw = args.data_ops.local_to_raw(poses_h5, resce3)
+        pose3d = cube.trans_scale_to(poses_h5)
+        pose2d, _ = cube.project_ortho(pose3d, roll=0, sort=False)
+        pose2d *= sizel
         args.data_draw.draw_pose2d(
             ax, thedata,
-            args.data_ops.raw_to_2d(pose_raw, thedata, resce_cp)
+            pose2d,
         )
 
-        ax = mpplot.subplot(2, 2, 4)
-        mpplot.gca().set_title('test output')
+        ax = mpplot.subplot(1, 2, 1)
+        mpplot.gca().set_title('test image - {:d}'.format(img_id))
         img_name = args.data_io.index2imagename(img_id)
         img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
         ax.imshow(img, cmap=mpplot.cm.bone_r)
-        pose_raw = self.yanker(
-            poses_h5, resce_h5, self.caminfo)
+        pose_raw = self.yanker(poses_h5, resce_h5, thedata)
         args.data_draw.draw_pose2d(
             ax, thedata,
             args.data_ops.raw_to_2d(pose_raw, thedata)
         )
-        rect = iso_rect()
-        rect.load(resce2)
-        rect.draw(ax)
-
-        ax = mpplot.subplot(2, 2, 1)
-        mpplot.gca().set_title('test input #{:d}'.format(img_id))
-        annot_line = args.data_io.get_line(
-            thedata.training_annot_cleaned, img_id)
-        img_name, pose_raw = args.data_io.parse_line_annot(annot_line)
-        img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
-        ax.imshow(img, cmap=mpplot.cm.bone_r)
-        args.data_draw.draw_pose2d(
-            ax, thedata,
-            args.data_ops.raw_to_2d(pose_raw, thedata))
-
-        ax = mpplot.subplot(2, 2, 2)
-        mpplot.gca().set_title('test storage write')
-        img_name, frame, poses, resce = self.provider_worker(
-            annot_line, self.image_dir, thedata)
-        frame = np.squeeze(frame, axis=-1)
-        poses = poses.reshape(-1, 3)
-        if (
-                (1e-4 < np.linalg.norm(frame_h5 - frame)) or
-                (1e-4 < np.linalg.norm(poses_h5 - poses))
-        ):
-            print(np.linalg.norm(frame_h5 - frame))
-            print(np.linalg.norm(poses_h5 - poses))
-            print('ERROR - h5 storage corrupted!')
-        resce3 = resce[0:4]
-        resce2 = resce[4:7]
-        sizel = np.floor(resce2[0]).astype(int)
-        resce_cp = np.copy(resce2)
-        resce_cp[0] = 1
-        ax.imshow(
-            cv2resize(frame, (sizel, sizel)),
-            cmap=mpplot.cm.bone_r)
-        pose_raw = args.data_ops.local_to_raw(poses, resce3)
-        args.data_draw.draw_pose2d(
-            ax, thedata,
-            args.data_ops.raw_to_2d(pose_raw, thedata, resce_cp)
+        rects = cube.proj_rects_3(
+            args.data_ops.raw_to_2d, thedata
         )
+        for ii, rect in enumerate(rects):
+            rect.draw(ax, colors[ii])
+
+        # img_name, frame, poses, resce = self.provider_worker(
+        #     annot_line, self.image_dir, thedata)
+        # frame = np.squeeze(frame, axis=-1)
+        # poses = poses.reshape(-1, 3)
+        # if (
+        #         (1e-4 < np.linalg.norm(frame_h5 - frame)) or
+        #         (1e-4 < np.linalg.norm(poses_h5 - poses))
+        # ):
+        #     print(np.linalg.norm(frame_h5 - frame))
+        #     print(np.linalg.norm(poses_h5 - poses))
+        #     print('ERROR - h5 storage corrupted!')
 
         mpplot.tight_layout()
         mpplot.savefig(os.path.join(

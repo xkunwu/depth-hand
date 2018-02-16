@@ -25,6 +25,34 @@ def index2imagename(index):
     return 'image_D{:08d}.png'.format(index)
 
 
+def write_h5(writer, index, poses):
+    writer.create_dataset(
+        'index',
+        index.shape,
+        compression='lzf',
+        dtype=np.int32
+    )
+    writer.create_dataset(
+        'poses',
+        poses.shape,
+        compression='lzf',
+        dtype=float)
+    writer['index'][:] = index
+    writer['poses'][:] = poses
+
+
+def write_txt(writer, index, poses):
+    for ii, pp in zip(index, poses):
+        writer.write(
+            index2imagename(ii) +
+            '\t' + '\t'.join("%.4f" % x for x in pp) +
+            '\n')
+
+
+def h5_to_txt(reader, writer):
+    write_txt(writer, reader['index'][:, 0], reader['poses'])
+
+
 def parse_line_annot(line):
     """ parse raw annotation, and appendix for crop-resize """
     annot_list = re.split(r'\s+', line.strip())

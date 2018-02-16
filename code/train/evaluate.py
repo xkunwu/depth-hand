@@ -107,10 +107,10 @@ if __name__ == "__main__":
 
     from args_holder import args_holder
     # import tfplot
-    with_train = True
-    # with_train = False
-    # with_eval = True
-    with_eval = False
+    # with_train = True
+    with_train = False
+    with_eval = True
+    # with_eval = False
 
     # mpl = import_module('matplotlib')
     # mpl.use('Agg')

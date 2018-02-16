@@ -26,7 +26,9 @@ class dense_regre(base_regre):
             'batch_allot_hmap'
         )
         self.num_appen = 4
-        self.hmap_size = 32
+        self.crop_size = 64
+        self.hmap_size = 16
+        self.map_scale = 4
 
     def receive_data(self, thedata, args):
         """ Receive parameters specific to the data """
@@ -406,7 +408,6 @@ class dense_regre(base_regre):
                     sc = 'stage128_image'
                     net = slim.conv2d(input_tensor, 16, 3)
                     net = incept_resnet.conv_maxpool(net, scope=sc)
-                    print(net.shape)
                     self.end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points
@@ -415,7 +416,6 @@ class dense_regre(base_regre):
                         net, scope='stage64_residual')
                     net = incept_resnet.reduce_net(
                         net, scope='stage64_reduce')
-                    print(net.shape)
                     self.end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points
