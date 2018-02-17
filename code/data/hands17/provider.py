@@ -1,95 +1,121 @@
 import os
-import numpy as np
-from itertools import islice
 from . import ops as dataops
 from . import io as dataio
 from utils.iso_boxes import iso_cube
 from utils.regu_grid import latice_image
 
 
-def prow_pose_c(args, thedata, batchallot):
+def prow_tsdf3(args, thedata, batch_data):
+    bi, pcnt3 = \
+        args[0], args[1]
+    tsdf3 = dataops.trunc_belief(pcnt3)
+    batch_data[bi, ...] = tsdf3
+
+
+def prow_truncd(args, thedata, batch_data):
+    bi, pcnt3 = \
+        args[0], args[1]
+    truncd = dataops.prop_dist(pcnt3)
+    batch_data[bi, ...] = truncd
+
+
+def prow_pcnt3(args, thedata, batch_data):
+    bi, index, resce = \
+        args[0], args[1], args[2]
+    img_name = dataio.index2imagename(index)
+    img = dataio.read_image(os.path.join(
+        thedata.training_images, img_name))
+    cube = iso_cube()
+    cube.load(resce)
+    pcnt3 = dataops.to_pcnt3(img, cube, thedata)
+    batch_data[bi, ...] = pcnt3
+
+
+def prow_ortho3(args, thedata, batch_data):
+    bi, index, resce = \
+        args[0], args[1], args[2]
+    img_name = dataio.index2imagename(index)
+    img = dataio.read_image(os.path.join(
+        thedata.training_images, img_name))
+    cube = iso_cube()
+    cube.load(resce)
+    img_ortho3 = dataops.to_ortho3(img, cube, thedata)
+    batch_data[bi, ...] = img_ortho3
+
+
+def prow_pose_c(args, thedata, batch_data):
     bi, poses, resce, = \
-        args[0], args[2], args[3]
+        args[0], args[1], args[2]
     cube = iso_cube()
     cube.load(resce)
     pose_c = cube.transform_to_center(
         poses.reshape(-1, 3))
-    batchallot.entry['pose_c'][bi, ...] = pose_c.flatten()
+    batch_data[bi, ...] = pose_c.flatten()
 
 
-def prow_crop2(args, thedata, batchallot):
+def prow_crop2(args, thedata, batch_data):
     bi, index, resce = \
-        args[0], args[1], args[3]
+        args[0], args[1], args[2]
     img_name = dataio.index2imagename(index)
     img = dataio.read_image(os.path.join(
         thedata.training_images, img_name))
     cube = iso_cube()
     cube.load(resce)
     img_crop2 = dataops.to_crop2(img, cube, thedata)
-    batchallot.entry['crop2'][bi, ...] = img_crop2
+    batch_data[bi, ...] = img_crop2
 
 
-def prow_clean(args, thedata, batchallot):
+def prow_clean(args, thedata, batch_data):
     bi, index, resce = \
-        args[0], args[1], args[3]
+        args[0], args[1], args[2]
     img_name = dataio.index2imagename(index)
     img = dataio.read_image(os.path.join(
         thedata.training_images, img_name))
     cube = iso_cube()
     cube.load(resce)
     img_clean = dataops.to_clean(img, cube, thedata)
-    batchallot.entry['clean'][bi, ...] = img_clean
+    batch_data[bi, ...] = img_clean
 
 
 def test_puttensor(
-        num_line, index, poses, resce, put_worker, thedata, batchallot):
+        args, put_worker, thedata, batch_data):
+    from itertools import izip
     import copy
-    test_copy = copy.deepcopy(batchallot)
-    for bi, ii, pp, rr in zip(range(num_line), index, poses, resce):
+    test_copy = copy.deepcopy(batch_data)
+    for args in izip(*args):
         put_worker(
-            (bi, ii, pp, rr), thedata, batchallot)
+            args, thedata, batch_data)
     print('this is TEST only!!! DO NOT forget to write using mp version')
     return test_copy
 
 
-def puttensor_mt(
-    fanno, store_beg, store_end,
-        put_worker, thedata, batchallot):
-    num_line = store_end - store_beg
-    if 0 >= num_line:
-        return 0
-    index = fanno['index'][store_beg:store_end, 0]
-    poses = fanno['poses'][store_beg:store_end, :]
-    resce = fanno['resce'][store_beg:store_end, :]
-
+def puttensor_mt(args, put_worker, thedata, batch_data):
     # from timeit import default_timer as timer
     # from datetime import timedelta
     # time_s = timer()
     # test_copy = test_puttensor(
-    #     num_line, index, poses, resce, put_worker, thedata, batchallot)
+    #     args, put_worker, thedata, batch_data)
     # time_e = str(timedelta(seconds=timer() - time_s))
     # print('single tread time: {}'.format(time_e))
-    # return num_line
+    # return
 
     from functools import partial
     from multiprocessing.dummy import Pool as ThreadPool
     # time_s = timer()
     thread_pool = ThreadPool()
     thread_pool.map(
-        partial(put_worker, thedata=thedata, batchallot=batchallot),
-        zip(range(num_line), index, poses, resce))
+        partial(put_worker, thedata=thedata, batch_data=batch_data),
+        zip(*args))
     thread_pool.close()
     thread_pool.join()
     # time_e = str(timedelta(seconds=timer() - time_s))
     # print('multiprocessing time: {:.4f}'.format(time_e))
 
     # import numpy as np
-    # print(np.linalg.norm(batchallot.batch_index - test_copy.batch_index))
-    # print(np.linalg.norm(batchallot.batch_frame - test_copy.batch_frame))
-    # print(np.linalg.norm(batchallot.batch_poses - test_copy.batch_poses))
-    # print(np.linalg.norm(batchallot.batch_resce - test_copy.batch_resce))
-
-    return num_line
+    # print(np.linalg.norm(batch_data.batch_index - test_copy.batch_index))
+    # print(np.linalg.norm(batch_data.batch_frame - test_copy.batch_frame))
+    # print(np.linalg.norm(batch_data.batch_poses - test_copy.batch_poses))
+    # print(np.linalg.norm(batch_data.batch_resce - test_copy.batch_resce))
 
 
 # def write_region2(fanno, yanker, caminfo, batch_index, batch_resce, batch_poses):

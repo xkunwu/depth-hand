@@ -346,33 +346,26 @@ class voxel_detect(base_conv3):
         ax = mpplot.subplot(2, 4, 8)
         draw_vxlab(fig, ax, vxcnt_crop, vxhit_h5, voxize_hmap, roll=roll)
 
-        # if self.args.show_draw:
-        #     mlab.figure(size=(800, 800))
-        #     points3_trans = cube.transform_to_center(points3_sam)
-        #     mlab.points3d(
-        #         points3_trans[:, 0], points3_trans[:, 1], points3_trans[:, 2],
-        #         scale_factor=8,
-        #         color=Color('lightsteelblue').rgb)
-        #     mlab.outline()
-
         # if not self.args.show_draw:
         #     mlab.options.offscreen = True
-        # mlab.figure(size=(800, 800))
-        # # mlab.contour3d(frame_h5)
-        # mlab.pipeline.volume(mlab.pipeline.scalar_field(frame_h5))
-        # mlab.pipeline.image_plane_widget(
-        #     mlab.pipeline.scalar_field(frame_h5),
-        #     plane_orientation='z_axes',
-        #     slice_index=self.crop_size / 2)
-        # np.set_printoptions(precision=4)
-        # # print(frame_h5[12:20, 12:20, 16])
-        # mlab.outline()
+        # else:
+        #     mlab.figure(size=(800, 800))
+        #     # mlab.contour3d(frame_h5)
+        #     mlab.pipeline.volume(mlab.pipeline.scalar_field(frame_h5))
+        #     mlab.pipeline.image_plane_widget(
+        #         mlab.pipeline.scalar_field(frame_h5),
+        #         plane_orientation='z_axes',
+        #         slice_index=self.crop_size / 2)
+        #     np.set_printoptions(precision=4)
+        #     # print(frame_h5[12:20, 12:20, 16])
+        #     mlab.outline()
 
         mpplot.savefig(os.path.join(
             args.predict_dir,
             'draw_{}_{}.png'.format(self.name_desc, img_id)))
         if self.args.show_draw:
             mpplot.show()
+            mlab.close()
         print('[{}] drawing image #{:d} - done.'.format(
             self.name_desc, img_id))
 

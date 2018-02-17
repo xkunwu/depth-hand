@@ -119,7 +119,7 @@ class hands17holder:
             num_line = len(lines)
             h5file.create_dataset(
                 'index',
-                (num_line, 1),
+                (num_line,),
                 compression='lzf',
                 dtype=np.int32
             )
@@ -240,7 +240,7 @@ class hands17holder:
                 with h5py.File(test_file + '.h5', 'w') as writer:
                     dataio.write_h5(writer, index, poses)
                 with open(test_file, 'w') as writer:
-                    dataio.write_txt(writer, index[:, 0], poses)
+                    dataio.write_txt(writer, index, poses)
         # with h5py.File(test_file, 'r') as reader:
         #     with open(test_file + '_1.txt', 'w') as writer:
         #         dataio.h5_to_txt(reader, writer)
@@ -268,13 +268,17 @@ class hands17holder:
         self.training_annot_test = os.path.join(
             self.predict_dir, 'training_test')
         self.frame_bbox = os.path.join(self.data_dir, 'frame/BoundingBox.txt')
-        self.store_file = {
-            'index': self.training_annot_train,
-            'poses': self.training_annot_train,
-            'resce': self.training_annot_train
-        }
+        # self.store_file = {
+        #     'index': self.training_annot_train,
+        #     'poses': self.training_annot_train,
+        #     'resce': self.training_annot_train
+        # }
         self.store_prow = {
             'pose_c': datapro.prow_pose_c,
             'crop2': datapro.prow_crop2,
             'clean': datapro.prow_clean,
+            'ortho3': datapro.prow_ortho3,
+            'pcnt3': datapro.prow_pcnt3,
+            'truncd': datapro.prow_truncd,
+            'tsdf3': datapro.prow_tsdf3,
         }

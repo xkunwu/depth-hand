@@ -453,17 +453,23 @@ def prop_dist(pcnt):
     return tdf
 
 
-def fill_grid(img, pose_raw, step, caminfo):
+def to_pcnt3(img, cube, caminfo):
+    step = caminfo.crop_size
+    points3_pick = cube.pick(img_to_raw(img, caminfo))
+    grid = regu_grid()
+    grid.from_cube(cube, step)
+    pcnt3 = grid.fill(points3_pick)
+    return pcnt3
+
+
+def fill_grid(img, pose_raw, caminfo):
     cube = iso_cube(
         (np.max(pose_raw, axis=0) + np.min(pose_raw, axis=0)) / 2,
         caminfo.region_size
     )
-    points3_pick = cube.pick(img_to_raw(img, caminfo))
-    grid = regu_grid()
-    grid.from_cube(cube, step)
-    pcnt = grid.fill(points3_pick)
+    pcnt3 = to_pcnt3(img, cube, caminfo)
     resce = cube.dump()
-    return pcnt, resce
+    return pcnt3, resce
 
 
 def raw_to_vxoff(vxcnt, pose_raw, cube, step, caminfo):
@@ -596,11 +602,7 @@ def voxel_hit(img, pose_raw, step, caminfo):
     return pcnt, resce
 
 
-def proj_ortho3(img, pose_raw, caminfo):
-    cube = iso_cube(
-        (np.max(pose_raw, axis=0) + np.min(pose_raw, axis=0)) / 2,
-        caminfo.region_size
-    )
+def to_ortho3(img, cube, caminfo, sort=False):
     points3_pick = cube.pick(img_to_raw(img, caminfo))
     points3_norm = cube.transform_center_shrink(points3_pick)
     img_l = []
@@ -627,6 +629,15 @@ def proj_ortho3(img, pose_raw, caminfo):
     #     resce,
     #     cube.evecs.flatten()))
     img_ortho3 = np.stack(img_l, axis=2)
+    return img_ortho3
+
+
+def proj_ortho3(img, pose_raw, caminfo, sort=False):
+    cube = iso_cube(
+        (np.max(pose_raw, axis=0) + np.min(pose_raw, axis=0)) / 2,
+        caminfo.region_size
+    )
+    img_ortho3 = to_ortho3(img, cube, caminfo, sort=sort)
     resce = cube.dump()
     return img_ortho3, resce
 

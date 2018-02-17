@@ -162,8 +162,8 @@ class incept_resnet:
                 net, 5, stride=3, padding='VALID',
                 scope='avgpool8_5x5_3')
             print(net.shape)
-            net = slim.conv2d(net, 64, 1, scope='reduce8')
-            print(net.shape)
+            # net = slim.conv2d(net, 64, 1, scope='reduce8')
+            # print(net.shape)
             net = slim.conv2d(  # --> 1x1x?
                 net, 128, net.get_shape()[1:3],
                 padding='VALID', scope='fullconn8')

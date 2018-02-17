@@ -3,11 +3,9 @@ from importlib import import_module
 import numpy as np
 import tensorflow as tf
 import progressbar
-import h5py
 import matplotlib.pyplot as mpplot
 from cv2 import resize as cv2resize
 from utils.coder import file_pack
-from utils.iso_boxes import iso_rect
 from utils.iso_boxes import iso_cube
 
 
@@ -31,7 +29,7 @@ class base_regre(object):
         # self.num_appen = 7
         self.batch_allot = getattr(
             import_module('model.batch_allot'),
-            'batch_allot'
+            'batch_crop2'
         )
         self.batch_data = {}
         # receive arguments
@@ -166,7 +164,7 @@ class base_regre(object):
         # with h5py.File(self.predict_file + '.h5', 'w') as writer:
         #     self.data_module.io.write_h5(writer, index, poses)
         with open(self.predict_file, 'w') as writer:
-            self.data_module.io.write_txt(writer, index[:, 0], poses)
+            self.data_module.io.write_txt(writer, index, poses)
 
         fig = mpplot.figure(figsize=(2 * 5, 2 * 5))
         img_id = self.draw_prediction_poses(
@@ -215,7 +213,7 @@ class base_regre(object):
 
     def yanker(self, pose_local, resce, caminfo):
         resce3 = resce[0:4]
-        return self.data_module.ops.local_to_raw(pose_local, resce3)
+        return self.data_module.ops.pca_to_raw(pose_local, resce3)
 
     def prepare_data(self, thedata, args,
                      filepack, prepare_h5file):
@@ -224,8 +222,8 @@ class base_regre(object):
         batchallot = self.batch_allot(self, num_line)
         store_size = batchallot.store_size
         self.logger.info(
-            'preparing data [{}]: {:d} lines (producing {:.4f} MB for store size {:d}) ...'.format(
-                self.__class__.__name__, num_line,
+            '[{}] preparing data: {:d} lines (producing {:.4f} MB for store size {:d}) ...'.format(
+                self.name_desc, num_line,
                 float(batchallot.store_bytes) / (2 << 20),
                 store_size))
         for key in prepare_h5file:
@@ -242,11 +240,16 @@ class base_regre(object):
         li = 0
         while True:
             store_end = min(store_beg + store_size, num_line)
-            if store_beg >= num_line:
+            proc_size = store_end - store_beg
+            if 0 >= proc_size:
                 break
+            index = file_annot['index'][store_beg:store_end, 0]
+            poses = file_annot['poses'][store_beg:store_end, :]
+            resce = file_annot['resce'][store_beg:store_end, :]
+            args_zip = zip(range(proc_size), index, poses, resce)
             for key in prepare_h5file:
                 resline = self.data_module.provider.puttensor_mt(
-                    file_annot, store_beg, store_end,
+                    args_zip,
                     thedata.store_prow[key], thedata, batchallot
                 )
                 prepare_h5file[key][store_beg:store_end, ...] = \
@@ -256,21 +259,82 @@ class base_regre(object):
             timerbar.update(li)
         timerbar.finish()
 
+    def prepare_data_recur(self, target, filepack, thedata):
+        precon_list = self.store_precon[target]
+        if not precon_list:
+            return
+        for precon in precon_list:
+            self.prepare_data_recur(precon, filepack, thedata)
+        if os.path.exists(self.store_name[target]):
+            return
+        precon_h5 = {}
+        num_line = 0
+        for precon in precon_list:
+            precon_h5[precon] = filepack.push_h5(
+                self.store_name[precon])
+            num_line = precon_h5[precon][precon].shape[0]
+        batchallot = self.batch_allot(self, num_line)
+        store_size = batchallot.store_size
+        self.logger.info(
+            '[{}] preparing data ({}): {:d} lines with store size {:d} ...'.format(
+                self.name_desc, target, num_line, store_size))
+        target_h5, batch_data = batchallot.create_fn[target](
+            filepack, self.store_name[target], num_line
+        )
+        timerbar = progressbar.ProgressBar(
+            maxval=num_line,
+            widgets=[
+                progressbar.Percentage(),
+                ' ', progressbar.Bar('=', '[', ']'),
+                ' ', progressbar.ETA()]
+        ).start()
+        store_beg = 0
+        li = 0
+        while True:
+            store_end = min(store_beg + store_size, num_line)
+            proc_size = store_end - store_beg
+            if 0 >= proc_size:
+                break
+            args = [range(proc_size)]
+            for precon in precon_list:
+                args.append(precon_h5[precon][precon][
+                    store_beg:store_end, ...])
+            # args_zip = zip(args)
+            self.data_module.provider.puttensor_mt(
+                args,
+                thedata.store_prow[target], thedata, batch_data
+            )
+            target_h5[store_beg:store_end, ...] = batch_data
+            store_beg = store_end
+            li += proc_size
+            timerbar.update(li)
+        timerbar.finish()
+
     def check_dir(self, thedata, args):
-        prepare_h5file = {}
-        for name, filename in self.store_name.items():
-            if not os.path.exists(filename):
-                prepare_h5file[name] = None
-        if prepare_h5file:
-            from timeit import default_timer as timer
-            from datetime import timedelta
-            time_s = timer()
-            with file_pack() as filepack:
-                self.prepare_data(thedata, args, filepack, prepare_h5file)
-            time_e = str(timedelta(seconds=timer() - time_s))
-            self.logger.info('data prepared [{}], time: {}'.format(
-                self.__class__.__name__, time_e))
-        self.store_handle = {}
+        from timeit import default_timer as timer
+        from datetime import timedelta
+        time_s = timer()
+        with file_pack() as filepack:
+            for name in self.store_name:
+                self.prepare_data_recur(
+                    name, filepack, thedata)
+        time_e = str(timedelta(seconds=timer() - time_s))
+        self.logger.info('data prepared [{}], time: {}'.format(
+            self.__class__.__name__, time_e))
+        # prepare_h5file = {}  # missing data
+        # for name, filename in self.store_name.items():
+        #     if not os.path.exists(filename):
+        #         prepare_h5file[name] = None
+        # if prepare_h5file:
+        #     from timeit import default_timer as timer
+        #     from datetime import timedelta
+        #     time_s = timer()
+        #     with file_pack() as filepack:
+        #         self.prepare_data(thedata, args, filepack, prepare_h5file)
+        #     time_e = str(timedelta(seconds=timer() - time_s))
+        #     self.logger.info('data prepared [{}], time: {}'.format(
+        #         self.__class__.__name__, time_e))
+        self.store_handle = {}  # pointing to h5 db
         for name, filename in self.store_name.items():
             h5file = args.filepack.push_h5(filename)
             self.store_handle[name] = h5file[name]
@@ -287,10 +351,18 @@ class base_regre(object):
         self.train_file = args.data_inst.training_annot_train
         self.store_name = {
             'index': self.train_file,
+            'poses': self.train_file,
+            'resce': self.train_file,
+            'pose_c': os.path.join(self.prepare_dir, 'pose_c'),
             'crop2': os.path.join(
                 self.prepare_dir, 'crop2_{}'.format(self.crop_size)),
-            'pose_c': os.path.join(self.prepare_dir, 'pose_c'),
-            'resce': self.train_file
+        }
+        self.store_precon = {
+            'index': [],
+            'poses': [],
+            'resce': [],
+            'pose_c': ['poses', 'resce'],
+            'crop2': ['index', 'resce'],
         }
 
     def debug_compare(self, batch_pred, logger):
@@ -316,7 +388,7 @@ class base_regre(object):
         store_size = index_h5.shape[0]
         frame_id = np.random.choice(store_size)
         # frame_id = 0
-        img_id = index_h5[frame_id, 0]
+        img_id = index_h5[frame_id, ...]
         frame_h5 = self.store_handle['crop2'][frame_id, ...]
         poses_h5 = self.store_handle['pose_c'][frame_id, ...].reshape(-1, 3)
         resce_h5 = self.store_handle['resce'][frame_id, ...]

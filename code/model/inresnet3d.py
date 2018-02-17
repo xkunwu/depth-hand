@@ -97,13 +97,17 @@ class inresnet3d:
             net = slim.avg_pool3d(
                 net, 5, stride=3, padding='VALID',
                 scope='avgpool8_5x5_3')
-            net = slim.conv3d(net, 64, 1, scope='reduce8')
+            print(net.shape)
+            # net = slim.conv3d(net, 64, 1, scope='reduce8')
+            # print(net.shape)
             net = slim.conv3d(
-                net, 192, net.get_shape()[1:4],
+                net, 256, net.get_shape()[1:4],
                 padding='VALID', scope='fullconn8')
+            print(net.shape)
             net = slim.flatten(net)
             net = slim.dropout(
                 net, 0.5, scope='dropout8')
+            print(net.shape)
             net = slim.fully_connected(
                 net, out_dim,
                 activation_fn=None, normalizer_fn=None,
