@@ -29,6 +29,8 @@ class incept_resnet:
                 mixed, num_out, 1,
                 normalizer_fn=None, activation_fn=None,
                 scope='mixup')
+            if num != num_out:
+                net = slim.conv2d(net, num_out, 1, stride=1)
             net += mixup * scale
         if activation_fn is not None:
             net = activation_fn(net)
@@ -57,6 +59,8 @@ class incept_resnet:
                 mixed, num_out, 1,
                 normalizer_fn=None, activation_fn=None,
                 scope='mixup')
+            if num != num_out:
+                net = slim.conv2d(net, num_out, 1, stride=1)
             net += mixup
         if activation_fn is not None:
             net = activation_fn(net)
@@ -85,6 +89,8 @@ class incept_resnet:
                 mixed, num_out, 1,
                 normalizer_fn=None, activation_fn=None,
                 scope='mixup')
+            if num != num_out:
+                net = slim.conv2d(net, num_out, 1, stride=1)
             net += mixup * scale
         if activation_fn is not None:
             net = activation_fn(net)
@@ -115,6 +121,8 @@ class incept_resnet:
                 mixed, num_out, 1, stride=1,
                 normalizer_fn=None, activation_fn=None,
                 scope='mixup')
+            if num != num_out:
+                net = slim.conv2d(net, num_out, 1, stride=1)
             net += mixup * scale
         if activation_fn is not None:
             net = activation_fn(net)

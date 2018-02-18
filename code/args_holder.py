@@ -9,6 +9,7 @@ model_map = {
     'direc_tsdf': 'model.direc_tsdf',
     'trunc_dist': 'model.trunc_dist',
     'voxel_regre': 'model.voxel_regre',
+    'voxel_offset': 'model.voxel_offset',
     'voxel_detect': 'model.voxel_detect',
     'base_conv3': 'model.base_conv3',
     'base_conv3_inres': 'model.base_inres',

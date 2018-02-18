@@ -5,7 +5,7 @@ from psutil import virtual_memory
 class batch_crop2(object):
     def __init__(self, model_inst, store_size=-1):
         import multiprocessing
-        self.store_size = multiprocessing.cpu_count() * (2 << 10)
+        self.store_size = multiprocessing.cpu_count() * (2 << 4)
         if 0 < store_size:
             self.store_size = min(self.store_size, store_size)
         self.model_inst = model_inst
@@ -16,10 +16,10 @@ class batch_crop2(object):
         #         shape=(
         #             self.store_size,
         #             self.crop_size, self.crop_size),
-        #         dtype=float),
+        #         dtype=np.float32),
         #     'pose_c': np.empty(
         #         shape=(self.store_size, self.out_dim),
-        #         dtype=float),
+        #         dtype=np.float32),
         # }
         # self.store_bytes = 0
         # for _, v in self.entry.items():
@@ -39,12 +39,12 @@ class batch_crop2(object):
             chunks=(1,
                     crop_size, crop_size),
             compression='lzf',
-            dtype=float)
+            dtype=np.float32)
         batch_data = np.empty(
             shape=(
                 self.store_size,
                 crop_size, crop_size),
-            dtype=float)
+            dtype=np.float32)
         return h5file['crop2'], batch_data
 
     def create_pose_c(self, filepack, h5file_name, num_line):
@@ -54,10 +54,10 @@ class batch_crop2(object):
             'pose_c',
             (num_line, out_dim),
             compression='lzf',
-            dtype=float)
+            dtype=np.float32)
         batch_data = np.empty(
             shape=(self.store_size, out_dim),
-            dtype=float)
+            dtype=np.float32)
         return h5file['pose_c'], batch_data
 
 
@@ -76,12 +76,12 @@ class batch_clean(batch_crop2):
             chunks=(1,
                     crop_size, crop_size),
             compression='lzf',
-            dtype=float)
+            dtype=np.float32)
         batch_data = np.empty(
             shape=(
                 self.store_size,
                 crop_size, crop_size),
-            dtype=float)
+            dtype=np.float32)
         return h5file['clean'], batch_data
 
 
@@ -102,13 +102,13 @@ class batch_ortho3(batch_clean):
                     crop_size, crop_size,
                     3),
             compression='lzf',
-            dtype=float)
+            dtype=np.float32)
         batch_data = np.empty(
             shape=(
                 self.store_size,
                 crop_size, crop_size,
                 3),
-            dtype=float)
+            dtype=np.float32)
         return h5file['ortho3'], batch_data
 
 
@@ -127,12 +127,12 @@ class batch_conv3(batch_clean):
             chunks=(1,
                     crop_size, crop_size, crop_size),
             compression='lzf',
-            dtype=float)
+            dtype=np.float32)
         batch_data = np.empty(
             shape=(
                 self.store_size,
                 crop_size, crop_size, crop_size),
-            dtype=float)
+            dtype=np.float32)
         return h5file['pcnt3'], batch_data
 
 
@@ -151,12 +151,12 @@ class batch_truncd(batch_conv3):
             chunks=(1,
                     crop_size, crop_size, crop_size),
             compression='lzf',
-            dtype=float)
+            dtype=np.float32)
         batch_data = np.empty(
             shape=(
                 self.store_size,
                 crop_size, crop_size, crop_size),
-            dtype=float)
+            dtype=np.float32)
         return h5file['truncd'], batch_data
 
 
@@ -177,314 +177,130 @@ class batch_tsdf3(batch_conv3):
                     crop_size, crop_size, crop_size,
                     3),
             compression='lzf',
-            dtype=float)
+            dtype=np.float32)
         batch_data = np.empty(
             shape=(
                 self.store_size,
                 crop_size, crop_size, crop_size,
                 3),
-            dtype=float)
+            dtype=np.float32)
         return h5file['tsdf3'], batch_data
 
 
-class batch_allot_hmap(object):
-    def __init__(self, model_inst):
-        self.batch_size = model_inst.batch_size
-        self.crop_size = model_inst.crop_size
-        self.hmap_size = model_inst.hmap_size
-        self.out_dim = model_inst.out_dim
-        self.num_channel = model_inst.num_channel
-        self.num_appen = model_inst.num_appen
-        batch_data = {
-            'batch_index': np.empty(
-                shape=(self.batch_size, 1), dtype=np.int32),
-            'batch_frame': np.empty(
-                shape=(
-                    self.batch_size,
-                    self.crop_size, self.crop_size,
-                    self.num_channel),
-                # dtype=np.float32),
-                dtype=float),
-            'batch_poses': np.empty(
-                shape=(self.batch_size, self.out_dim * 3),
-                # dtype=np.float32),
-                dtype=float),
-            'batch_hmap2': np.empty(
-                shape=(
-                    self.batch_size,
-                    self.hmap_size, self.hmap_size,
-                    self.out_dim),
-                # dtype=np.float32)
-                dtype=float),
-            'batch_olmap': np.empty(
-                shape=(
-                    self.batch_size,
-                    self.hmap_size, self.hmap_size,
-                    self.out_dim),
-                # dtype=np.float32)
-                dtype=float),
-            'batch_uomap': np.empty(
-                shape=(
-                    self.batch_size,
-                    self.hmap_size, self.hmap_size,
-                    self.out_dim * 3),
-                # dtype=np.float32)
-                dtype=float),
-            'batch_resce': np.empty(
-                shape=(self.batch_size, self.num_appen),
-                # dtype=np.float32),
-                dtype=float),
-        }
-        self.batch_bytes = \
-            batch_data['batch_index'].nbytes + batch_data['batch_frame'].nbytes + \
-            batch_data['batch_poses'].nbytes + batch_data['batch_resce'].nbytes + \
-            batch_data['batch_hmap2'].nbytes + batch_data['batch_olmap'].nbytes + \
-            batch_data['batch_uomap'].nbytes
-        self.batch_beg = 0
+class batch_vxhit(batch_conv3):
+    def __init__(self, model_inst, store_size=-1):
+        super(batch_vxhit, self).__init__(model_inst, store_size)
+        self.create_fn['vxhit'] = self.create_vxhit
+        self.create_fn['pose_hit'] = self.create_pose_hit
+        self.create_fn['pose_lab'] = self.create_pose_lab
 
-    def allot(self, store_size=-1):
-        from psutil import virtual_memory
-        # use up to 1/4 total memory
-        store_cap_mult = (virtual_memory().total >> 2) // self.batch_bytes
-        # maximal entries in a processing cycle
-        store_cap = store_cap_mult * self.batch_size
-        if 0 > store_size:
-            self.store_size = store_cap
-        else:
-            self.store_size = min(store_cap, store_size)
-        self.store_bytes = self.store_size * self.batch_bytes / self.batch_size
-        self.store_beg = 0
-        self.batch_index = np.empty(
-            shape=(self.store_size, 1), dtype=np.int32)
-        self.batch_frame = np.empty(
+    def create_vxhit(self, filepack, h5file_name, num_line):
+        crop_size = self.model_inst.crop_size
+        h5file = filepack.write_h5(h5file_name)
+        h5file.create_dataset(
+            'vxhit',
+            (num_line,
+                crop_size, crop_size, crop_size),
+            chunks=(1,
+                    crop_size, crop_size, crop_size),
+            compression='lzf',
+            dtype=np.float32)
+        batch_data = np.empty(
             shape=(
                 self.store_size,
-                self.crop_size, self.crop_size,
-                self.num_channel),
-            # dtype=np.float32)
-            dtype=float)
-        self.batch_poses = np.empty(
-            shape=(self.store_size, self.out_dim * 3),
-            # dtype=np.float32)
-            dtype=float)
-        self.batch_hmap2 = np.empty(
-            shape=(self.store_size, self.hmap_size, self.hmap_size, self.out_dim),
-            # dtype=np.float32)
-            dtype=float)
-        self.batch_olmap = np.empty(
-            shape=(self.store_size, self.hmap_size, self.hmap_size, self.out_dim),
-            # dtype=np.float32)
-            dtype=float)
-        self.batch_uomap = np.empty(
-            shape=(self.store_size, self.hmap_size, self.hmap_size, self.out_dim * 3),
-            # dtype=np.float32)
-            dtype=float)
-        self.batch_resce = np.empty(
-            shape=(self.store_size, self.num_appen),
-            # dtype=np.float32)
-            dtype=float)
+                crop_size, crop_size, crop_size),
+            dtype=np.float32)
+        return h5file['vxhit'], batch_data
 
-
-class batch_allot_vxhit(object):
-    def __init__(self, model_inst):
-        self.batch_size = model_inst.batch_size
-        self.crop_size = model_inst.crop_size
-        self.hmap_size = model_inst.hmap_size
-        self.out_dim = model_inst.out_dim
-        self.num_channel = model_inst.num_channel
-        self.num_appen = model_inst.num_appen
-        batch_data = {
-            'batch_index': np.empty(
-                shape=(self.batch_size, 1), dtype=np.int32),
-            'batch_frame': np.empty(
-                shape=(
-                    self.batch_size,
-                    self.crop_size, self.crop_size, self.crop_size,
-                    self.num_channel),
-                # dtype=np.float32),
-                dtype=float),
-            'batch_poses': np.empty(
-                shape=(self.batch_size, self.out_dim * 3),
-                # dtype=np.float32),
-                dtype=float),
-            # 'batch_vxhit': np.empty(
-            #     shape=(
-            #         self.batch_size,
-            #         self.hmap_size, self.hmap_size, self.hmap_size,
-            #         self.out_dim),
-            #     # dtype=np.float32)
-            #     dtype=float),
-            'batch_vxhit': np.empty(
-                shape=(
-                    self.batch_size,
-                    self.out_dim),
-                # dtype=np.float32)
-                dtype=float),
-            'batch_resce': np.empty(
-                shape=(self.batch_size, self.num_appen),
-                # dtype=np.float32),
-                dtype=float),
-        }
-        self.batch_bytes = \
-            batch_data['batch_index'].nbytes + batch_data['batch_frame'].nbytes + \
-            batch_data['batch_poses'].nbytes + batch_data['batch_resce'].nbytes + \
-            batch_data['batch_vxhit'].nbytes
-        self.batch_beg = 0
-
-    def allot(self, store_size=-1):
-        from psutil import virtual_memory
-        store_cap_mult = (virtual_memory().total >> 2) // self.batch_bytes
-        store_cap = store_cap_mult * self.batch_size
-        if 0 > store_size:
-            self.store_size = store_cap
-        else:
-            self.store_size = min(store_cap, store_size)
-        self.store_bytes = self.store_size * self.batch_bytes / self.batch_size
-        self.store_beg = 0
-        self.batch_index = np.empty(
-            shape=(self.store_size, 1), dtype=np.int32)
-        self.batch_frame = np.empty(
+    def create_pose_hit(self, filepack, h5file_name, num_line):
+        hmap_size = self.model_inst.hmap_size
+        out_dim = self.model_inst.out_dim
+        h5file = filepack.write_h5(h5file_name)
+        h5file.create_dataset(
+            'pose_hit',
+            (num_line,
+                hmap_size, hmap_size, hmap_size,
+                out_dim),
+            chunks=(1,
+                    hmap_size, hmap_size, hmap_size,
+                    out_dim),
+            compression='lzf',
+            dtype=np.float32)
+        batch_data = np.empty(
             shape=(
                 self.store_size,
-                self.crop_size, self.crop_size, self.crop_size,
-                self.num_channel),
-            # dtype=np.float32)
-            dtype=float)
-        self.batch_poses = np.empty(
-            shape=(self.store_size, self.out_dim * 3),
-            # dtype=np.float32)
-            dtype=float)
-        # self.batch_vxhit = np.empty(
-        #     shape=(
-        #         self.store_size,
-        #         self.hmap_size, self.hmap_size, self.hmap_size,
-        #         self.out_dim),
-        #     # dtype=np.float32)
-        #     dtype=float)
-        self.batch_vxhit = np.empty(
+                hmap_size, hmap_size, hmap_size,
+                out_dim),
+            dtype=np.float32)
+        return h5file['pose_hit'], batch_data
+
+    def create_pose_lab(self, filepack, h5file_name, num_line):
+        out_dim = self.model_inst.out_dim
+        h5file = filepack.write_h5(h5file_name)
+        h5file.create_dataset(
+            'pose_lab',
+            (num_line, out_dim),
+            chunks=(1, out_dim),
+            compression='lzf',
+            dtype=np.float32)
+        batch_data = np.empty(
             shape=(
-                self.store_size,
-                self.out_dim),
-            # dtype=np.float32)
-            dtype=float)
-        self.batch_resce = np.empty(
-            shape=(self.store_size, self.num_appen),
-            # dtype=np.float32)
-            dtype=float)
+                self.store_size, out_dim),
+            dtype=np.float32)
+        return h5file['pose_lab'], batch_data
 
 
-class batch_allot_vxdir(object):
-    def __init__(self, model_inst):
-        self.batch_size = model_inst.batch_size
-        self.crop_size = model_inst.crop_size
-        self.hmap_size = model_inst.hmap_size
-        self.out_dim = model_inst.out_dim
-        self.num_channel = model_inst.num_channel
-        self.num_appen = model_inst.num_appen
-        batch_data = {
-            'batch_index': np.empty(
-                shape=(self.batch_size, 1), dtype=np.int32),
-            'batch_frame': np.empty(
-                shape=(
-                    self.batch_size,
-                    self.crop_size, self.crop_size, self.crop_size,
-                    self.num_channel),
-                # dtype=np.float32),
-                dtype=float),
-            'batch_poses': np.empty(
-                shape=(self.batch_size, self.out_dim * 3),
-                # dtype=np.float32),
-                dtype=float),
-            # 'batch_vxhit': np.empty(
-            #     shape=(
-            #         self.batch_size,
-            #         self.hmap_size, self.hmap_size, self.hmap_size,
-            #         self.out_dim),
-            #     # dtype=np.float32)
-            #     dtype=float),
-            'batch_vxhit': np.empty(
-                shape=(
-                    self.batch_size,
-                    self.out_dim),
-                # dtype=np.float32)
-                dtype=float),
-            'batch_olmap': np.empty(
-                shape=(
-                    self.batch_size,
-                    self.hmap_size, self.hmap_size, self.hmap_size,
-                    self.out_dim),
-                # dtype=np.float32)
-                dtype=float),
-            'batch_uomap': np.empty(
-                shape=(
-                    self.batch_size,
-                    self.hmap_size, self.hmap_size, self.hmap_size,
-                    self.out_dim * 3),
-                # dtype=np.float32)
-                dtype=float),
-            'batch_resce': np.empty(
-                shape=(self.batch_size, self.num_appen),
-                # dtype=np.float32),
-                dtype=float),
-        }
-        self.batch_bytes = \
-            batch_data['batch_index'].nbytes + batch_data['batch_frame'].nbytes + \
-            batch_data['batch_poses'].nbytes + batch_data['batch_resce'].nbytes + \
-            batch_data['batch_vxhit'].nbytes + batch_data['batch_olmap'].nbytes + \
-            batch_data['batch_uomap'].nbytes
-        self.batch_beg = 0
+class batch_vxoff(batch_vxhit):
+    def __init__(self, model_inst, store_size=-1):
+        super(batch_vxoff, self).__init__(model_inst, store_size)
+        self.create_fn['vxoff'] = self.create_vxoff
 
-    def allot(self, store_size=-1):
-        from psutil import virtual_memory
-        store_cap_mult = (virtual_memory().total >> 2) // self.batch_bytes
-        store_cap = store_cap_mult * self.batch_size
-        if 0 > store_size:
-            self.store_size = store_cap
-        else:
-            self.store_size = min(store_cap, store_size)
-        self.store_bytes = self.store_size * self.batch_bytes / self.batch_size
-        self.store_beg = 0
-        self.batch_index = np.empty(
-            shape=(self.store_size, 1), dtype=np.int32)
-        self.batch_frame = np.empty(
+    def create_vxoff(self, filepack, h5file_name, num_line):
+        hmap_size = self.model_inst.hmap_size
+        out_dim = self.model_inst.out_dim
+        h5file = filepack.write_h5(h5file_name)
+        h5file.create_dataset(
+            'vxoff',
+            (num_line,
+                hmap_size, hmap_size, hmap_size,
+                out_dim * 3),
+            chunks=(1,
+                    hmap_size, hmap_size, hmap_size,
+                    out_dim * 3),
+            compression='lzf',
+            dtype=np.float32)
+        batch_data = np.empty(
             shape=(
                 self.store_size,
-                self.crop_size, self.crop_size, self.crop_size,
-                self.num_channel),
-            # dtype=np.float32)
-            dtype=float)
-        self.batch_poses = np.empty(
-            shape=(self.store_size, self.out_dim * 3),
-            # dtype=np.float32)
-            dtype=float)
-        # self.batch_vxhit = np.empty(
-        #     shape=(
-        #         self.store_size,
-        #         self.hmap_size, self.hmap_size, self.hmap_size,
-        #         self.out_dim),
-        #     # dtype=np.float32)
-        #     dtype=float)
-        self.batch_vxhit = np.empty(
+                hmap_size, hmap_size, hmap_size,
+                out_dim * 3),
+            dtype=np.float32)
+        return h5file['vxoff'], batch_data
+
+
+class batch_vxudir(batch_vxhit):
+    def __init__(self, model_inst, store_size=-1):
+        super(batch_vxudir, self).__init__(model_inst, store_size)
+        self.create_fn['vxudir'] = self.create_vxudir
+
+    def create_vxudir(self, filepack, h5file_name, num_line):
+        hmap_size = self.model_inst.hmap_size
+        out_dim = self.model_inst.out_dim
+        h5file = filepack.write_h5(h5file_name)
+        h5file.create_dataset(
+            'vxudir',
+            (num_line,
+                hmap_size, hmap_size, hmap_size,
+                out_dim * 4),
+            chunks=(1,
+                    hmap_size, hmap_size, hmap_size,
+                    out_dim * 4),
+            compression='lzf',
+            dtype=np.float32)
+        batch_data = np.empty(
             shape=(
                 self.store_size,
-                self.out_dim),
-            # dtype=np.float32)
-            dtype=float)
-        self.batch_olmap = np.empty(
-            shape=(
-                self.store_size,
-                self.hmap_size, self.hmap_size, self.hmap_size,
-                self.out_dim),
-            # dtype=np.float32)
-            dtype=float)
-        self.batch_uomap = np.empty(
-            shape=(
-                self.store_size,
-                self.hmap_size, self.hmap_size, self.hmap_size,
-                self.out_dim * 3),
-            # dtype=np.float32)
-            dtype=float)
-        self.batch_resce = np.empty(
-            shape=(self.store_size, self.num_appen),
-            # dtype=np.float32)
-            dtype=float)
+                hmap_size, hmap_size, hmap_size,
+                out_dim * 4),
+            dtype=np.float32)
+        return h5file['vxudir'], batch_data

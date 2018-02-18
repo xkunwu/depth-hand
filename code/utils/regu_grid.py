@@ -160,7 +160,7 @@ class regu_grid:
         if cellen is None:
             cellen = self.cellen
         for c in coord:
-            rect = iso_rect(c * cellen, cellen)
+            rect = iso_rect(c * cellen - (cellen / 2), cellen)
             rect.draw(ax)
 
     def draw_map(self, ax, vxmap):

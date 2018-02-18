@@ -4,7 +4,6 @@ import numpy as np
 import tensorflow as tf
 import progressbar
 import matplotlib.pyplot as mpplot
-from cv2 import resize as cv2resize
 from utils.coder import file_pack
 from utils.iso_boxes import iso_cube
 
@@ -304,7 +303,8 @@ class base_regre(object):
                 args,
                 thedata.store_prow[target], thedata, batch_data
             )
-            target_h5[store_beg:store_end, ...] = batch_data
+            target_h5[store_beg:store_end, ...] = \
+                batch_data[0:proc_size, ...]
             store_beg = store_end
             li += proc_size
             timerbar.update(li)
@@ -407,15 +407,10 @@ class base_regre(object):
 
         ax = mpplot.subplot(1, 2, 2)
         mpplot.gca().set_title('test storage read')
-        # resize the cropped resion for eazier pose drawing in the commen frame
-        sizel = np.floor(resce3[0]).astype(int)
-        ax.imshow(
-            cv2resize(frame_h5, (sizel, sizel)),
-            cmap=mpplot.cm.bone_r)
-        pose_raw = args.data_ops.local_to_raw(poses_h5, resce3)
+        ax.imshow(frame_h5, cmap=mpplot.cm.bone_r)
         pose3d = cube.trans_scale_to(poses_h5)
         pose2d, _ = cube.project_ortho(pose3d, roll=0, sort=False)
-        pose2d *= sizel
+        pose2d *= self.crop_size
         args.data_draw.draw_pose2d(
             ax, thedata,
             pose2d,
@@ -608,14 +603,14 @@ class base_regre(object):
             tf.float32, shape=(batch_size, self.out_dim))
         return frames_tf, poses_tf
 
-    def get_loss(self, pred, anno, end_points):
+    def get_loss(self, pred, echt, end_points):
         """ simple sum-of-squares loss
             pred: BxJ
-            anno: BxJ
+            echt: BxJ
         """
-        # loss = tf.reduce_sum(tf.pow(tf.subtract(pred, anno), 2)) / 2
-        loss = tf.nn.l2_loss(pred - anno)  # already divided by 2
-        # loss = tf.reduce_mean(tf.squared_difference(pred, anno)) / 2
+        # loss = tf.reduce_sum(tf.pow(tf.subtract(pred, echt), 2)) / 2
+        loss = tf.nn.l2_loss(pred - echt)  # already divided by 2
+        # loss = tf.reduce_mean(tf.squared_difference(pred, echt)) / 2
         losses_reg = tf.add_n(tf.get_collection(
             tf.GraphKeys.REGULARIZATION_LOSSES))
         return loss + losses_reg

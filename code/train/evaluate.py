@@ -102,7 +102,7 @@ def test_dataops(args):
 
 
 if __name__ == "__main__":
-    # python -m train.evaluate --max_epoch=1 --batch_size=10 --bn_decay=0.94 --model_name=base_clean
+    # python -m train.evaluate --max_epoch=1 --batch_size=10 --bn_decay=0.94 --show_draw=True --model_name=base_clean
     # import pdb; pdb.set_trace()
 
     from args_holder import args_holder
@@ -112,31 +112,32 @@ if __name__ == "__main__":
     with_eval = True
     # with_eval = False
 
-    # mpl = import_module('matplotlib')
-    # mpl.use('Agg')
-    with args_holder() as argsholder:
-        argsholder.parse_args()
-        args = argsholder.args
-        argsholder.create_instance()
-        # import shutil
-        # shutil.rmtree(args.out_dir)
-        # os.makedirs(args.out_dir)
-
-        test_dataops(args)
-
-        run_one(args, with_train, with_eval)
-        argsholder.append_log()
-
-        # draw_compare(args)
-    sys.exit()
+    # # mpl = import_module('matplotlib')
+    # # mpl.use('Agg')
+    # with args_holder() as argsholder:
+    #     argsholder.parse_args()
+    #     args = argsholder.args
+    #     argsholder.create_instance()
+    #     # import shutil
+    #     # shutil.rmtree(args.out_dir)
+    #     # os.makedirs(args.out_dir)
+    #
+    #     test_dataops(args)
+    #
+    #     run_one(args, with_train, with_eval)
+    #     argsholder.append_log()
+    #
+    #     # draw_compare(args)
+    # sys.exit()
 
     mpl = import_module('matplotlib')
     mpl.use('Agg')
     methlist = [
         # # 'localizer2',
+        'voxel_offset',
         # 'voxel_regre',
         # 'voxel_detect',
-        'dense_regre',
+        # 'dense_regre',
         # 'direc_tsdf',
         # 'trunc_dist',
         # 'base_conv3',

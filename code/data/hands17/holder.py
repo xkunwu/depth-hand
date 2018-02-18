@@ -54,9 +54,10 @@ class hands17holder:
     #         color=colors[ii]
     #     )
     image_size = (480, 640)
-    region_size = 120  # empirical spacial cropping radius
+    region_size = 120.  # empirical spacial cropping radius
     crop_size = 128  # input image size to models (may changed)
-    anchor_num = 16  # for attention model
+    # hmap_size = 32  # for detection models
+    # anchor_num = 16  # for attention model
     crop_range = 480.  # +/- spacial capture range
     z_range = (100., 1060.)  # empirical valid depth range
     z_max = 9999.  # max distance set to 10m
@@ -275,10 +276,15 @@ class hands17holder:
         # }
         self.store_prow = {
             'pose_c': datapro.prow_pose_c,
+            'pose_hit': datapro.prow_pose_hit,
+            'pose_lab': datapro.prow_pose_lab,
             'crop2': datapro.prow_crop2,
             'clean': datapro.prow_clean,
             'ortho3': datapro.prow_ortho3,
             'pcnt3': datapro.prow_pcnt3,
             'truncd': datapro.prow_truncd,
             'tsdf3': datapro.prow_tsdf3,
+            'vxhit': datapro.prow_vxhit,
+            'vxoff': datapro.prow_vxoff,
+            'vxudir': datapro.prow_vxudir,
         }

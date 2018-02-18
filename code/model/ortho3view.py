@@ -58,10 +58,11 @@ class ortho3view(base_regre):
         super(ortho3view, self).receive_data(thedata, args)
         self.store_name = {
             'index': self.train_file,
+            'poses': self.train_file,
+            'resce': self.train_file,
+            'pose_c': os.path.join(self.prepare_dir, 'pose_c'),
             'ortho3': os.path.join(
                 self.prepare_dir, 'ortho3_{}'.format(self.crop_size)),
-            'pose_c': os.path.join(self.prepare_dir, 'pose_c'),
-            'resce': self.train_file
         }
         self.store_precon = {
             'index': [],

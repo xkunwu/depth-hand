@@ -4,6 +4,7 @@ import matplotlib.image as mpimg
 import matplotlib.collections as mcoll
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import tfplot
+from utils.coder import file_pack
 from utils.regu_grid import regu_grid
 
 
@@ -25,23 +26,40 @@ def draw_uomap3d(fig, ax, vxcnt_crop, uomap):
     crop_size = vxcnt_crop.shape[0]
     hmap_size = uomap.shape[0]
     map_scale = crop_size / hmap_size
-    # vxcnt_hmap = vxcnt_crop[::2, ::2, ::2]
-    # grid = regu_grid(step=32)
-    # coord = grid.slice_ortho(vxcnt_hmap)
-    # grid.draw_slice(ax, coord, 2.)
-    xx, yy, zz = np.meshgrid(
-        np.arange(0, crop_size, map_scale),
+    vxcnt_hmap = vxcnt_crop[::2, ::2, ::2]
+    grid = regu_grid(step=32)
+    coord = grid.slice_ortho(vxcnt_hmap)
+    grid.draw_slice(ax, coord, 2.)
+    xx, yy = np.meshgrid(
         np.arange(0, crop_size, map_scale),
         np.arange(0, crop_size, map_scale))
     ax.quiver(
-        xx, yy, zz,
-        uomap[..., 0], uomap[..., 1], uomap[..., 2],
-        color='r', length=0.9)
+        xx, yy,
+        np.squeeze(uomap[..., 0]),
+        -np.squeeze(uomap[..., 1]),
+        color='r', width=0.004, scale=20)
+    # xx, yy, zz = np.meshgrid(
+    #     np.arange(0, crop_size, map_scale),
+    #     np.arange(0, crop_size, map_scale),
+    #     np.arange(0, crop_size, map_scale))
+    # ax.quiver(
+    #     xx, yy, zz,
+    #     uomap[..., 0], uomap[..., 1], uomap[..., 2],
+    #     color='r', length=1.2, arrow_length_ratio=0.4)
     ax.set_xlim([0, crop_size])
     ax.set_ylim([0, crop_size])
-    ax.view_init(azim=180, elev=-90)
+    # ax.view_init(azim=180, elev=-90)
     ax.set_aspect('equal', adjustable='box')
     ax.invert_yaxis()
+
+
+def figure_uomap3d(vxcnt_crop, uomap):
+    fig, ax = tfplot.subplots(figsize=(4, 4))
+    draw_uomap3d(fig, ax, vxcnt_crop, uomap)
+    ax.axis('off')
+    return fig
+
+tfplot_uomap3d = tfplot.wrap(figure_uomap3d, batch=False)
 
 
 def draw_vxmap(

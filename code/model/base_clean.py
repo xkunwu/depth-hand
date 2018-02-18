@@ -4,6 +4,31 @@ import numpy as np
 from .base_regre import base_regre
 # from utils.coder import file_pack
 from utils.iso_boxes import iso_cube
+import tfplot
+
+
+# def draw_pose_pred(
+#     fig, ax, img_crop, pose_pred, resce,
+#         draw_fn, caminfo):
+#     cube = iso_cube()
+#     cube.load(resce)
+#     ax.imshow(img_crop, cmap='bone_r')
+#     pose3d = cube.trans_scale_to(pose_pred)
+#     pose2d, _ = cube.project_ortho(pose3d, roll=0, sort=False)
+#     pose2d *= caminfo.crop_size
+#     draw_fn(
+#         ax, caminfo,
+#         pose2d,
+#     )
+#
+#
+# def figure_pose_pred(img_crop, pose_pred, resce, draw_fn, caminfo):
+#     fig, ax = tfplot.subplots(figsize=(4, 4))
+#     draw_pose_pred(fig, ax, img_crop, pose_pred, resce, draw_fn, caminfo)
+#     ax.axis('off')
+#     return fig
+#
+# tfplot_pose_pred = tfplot.wrap(figure_pose_pred, batch=False)
 
 
 class base_clean(base_regre):
@@ -45,10 +70,11 @@ class base_clean(base_regre):
         super(base_clean, self).receive_data(thedata, args)
         self.store_name = {
             'index': self.train_file,
+            'poses': self.train_file,
+            'resce': self.train_file,
+            'pose_c': os.path.join(self.prepare_dir, 'pose_c'),
             'clean': os.path.join(
                 self.prepare_dir, 'clean_{}'.format(self.crop_size)),
-            'pose_c': os.path.join(self.prepare_dir, 'pose_c'),
-            'resce': self.train_file
         }
         self.store_precon = {
             'index': [],
@@ -93,28 +119,27 @@ class base_clean(base_regre):
         print(np.min(poses_h5, axis=0), np.max(poses_h5, axis=0))
         from colour import Color
         colors = [Color('orange').rgb, Color('red').rgb, Color('lime').rgb]
-        mpplot.subplots(nrows=1, ncols=2, figsize=(2 * 5, 1 * 5))
+        fig, _ = mpplot.subplots(nrows=1, ncols=2, figsize=(2 * 5, 1 * 5))
 
         ax = mpplot.subplot(1, 2, 2)
         mpplot.gca().set_title('test storage read')
         resce3 = resce_h5[0:4]
         cube = iso_cube()
         cube.load(resce3)
-        # need to maintain both image and poses at the same scale
-        sizel = np.floor(resce3[0]).astype(int)
-        ax.imshow(
-            cv2resize(frame_h5, (sizel, sizel)),
-            cmap=mpplot.cm.bone_r)
+        # draw_pose_pred(
+        #     fig, ax, frame_h5, poses_h5, resce_h5,
+        #     args.data_draw.draw_pose2d, thedata)
+        ax.imshow(frame_h5, cmap=mpplot.cm.bone_r)
         pose3d = cube.trans_scale_to(poses_h5)
         pose2d, _ = cube.project_ortho(pose3d, roll=0, sort=False)
-        pose2d *= sizel
+        pose2d *= self.crop_size
         args.data_draw.draw_pose2d(
             ax, thedata,
             pose2d,
         )
 
         ax = mpplot.subplot(1, 2, 1)
-        mpplot.gca().set_title('test output')
+        mpplot.gca().set_title('test image - {:d}'.format(img_id))
         img_name = args.data_io.index2imagename(img_id)
         img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
         ax.imshow(img, cmap=mpplot.cm.bone_r)

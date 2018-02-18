@@ -21,7 +21,7 @@ class voxel_regre(voxel_detect):
         super(voxel_regre, self).__init__(args)
         self.batch_allot = getattr(
             import_module('model.batch_allot'),
-            'batch_allot_vxdir'
+            'batch_vxdir'
         )
         self.crop_size = 32
         self.hmap_size = 16

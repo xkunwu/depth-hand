@@ -1,12 +1,15 @@
 import os
+import numpy as np
 import tensorflow as tf
+import progressbar
 from functools import reduce
-from train.train_abc import train_abc
-from utils.image_ops import tfplot_vxlab, tfplot_vxflt
+from utils.coder import file_pack
 from utils.tf_utils import unravel_index
+from train.train_abc import train_abc
+from utils.image_ops import tfplot_vxmap, tfplot_uomap3d
 
 
-class train_voxel_detect(train_abc):
+class train_voxel_offset(train_abc):
     def train(self):
         self.logger.info('######## Training ########')
         tf.reset_default_graph()
@@ -43,38 +46,27 @@ class train_voxel_detect(train_abc):
             hmap_size = self.args.model_inst.hmap_size
             num_j = self.args.model_inst.out_dim
             joint_id = num_j - 1
-            vxflt_pred = pred_op[0, :, joint_id]
-            vxlab_echt = poses_op[0, joint_id]
-            frame = frames_op[0, ...]
-            vxmap_echt_op = tf.expand_dims(tfplot_vxlab(
-                frame, vxlab_echt, hmap_size), axis=0)
-            tf.summary.image('vxmap_echt/', vxmap_echt_op, max_outputs=1)
-            vxmap_pred_op = tf.expand_dims(tfplot_vxflt(
-                frame, vxflt_pred, hmap_size), axis=0)
-            tf.summary.image('vxflt_pred/', vxmap_pred_op, max_outputs=1)
-
-            tf.summary.histogram(
-                'vxhit_value_pred', vxflt_pred)
-            vxidx_echt = unravel_index(
-                vxlab_echt, (hmap_size, hmap_size, hmap_size))
-            vxidx_pred = unravel_index(
-                tf.argmax(vxflt_pred, output_type=tf.int32),
-                (hmap_size, hmap_size, hmap_size))
-            tf.summary.scalar(
-                'vxhit_diff_echt',
-                tf.reduce_sum(tf.abs(vxidx_echt - vxidx_pred)))
-            joint_id = 0
-            vxflt_pred = vxflt_pred
-            tf.summary.histogram(
-                'vxhit_1_value_pred', vxflt_pred)
-            vxidx_echt = unravel_index(
-                vxlab_echt, (hmap_size, hmap_size, hmap_size))
-            vxidx_pred = unravel_index(
-                tf.argmax(vxflt_pred, output_type=tf.int32),
-                (hmap_size, hmap_size, hmap_size))
-            tf.summary.scalar(
-                'vxhit_1_diff_echt',
-                tf.reduce_sum(tf.abs(vxidx_echt - vxidx_pred)))
+            frame = frames_op[0, ..., 0]
+            vxdist_echt = poses_op[0, ..., joint_id]
+            vxdist_pred = pred_op[0, ..., joint_id]
+            uomap_echt = poses_op[
+                0, hmap_size / 2, ...,
+                num_j + 3 * joint_id:num_j + 3 * (joint_id + 1)]
+            uomap_pred = pred_op[
+                0, hmap_size / 2, ...,
+                num_j + 3 * joint_id:num_j + 3 * (joint_id + 1)]
+            vxdist_echt_op = tf.expand_dims(tfplot_vxmap(
+                frame, vxdist_echt, hmap_size, reduce_fn=np.max), axis=0)
+            tf.summary.image('vxdist_echt/', vxdist_echt_op, max_outputs=1)
+            vxdist_pred_op = tf.expand_dims(tfplot_vxmap(
+                frame, vxdist_pred, hmap_size, reduce_fn=np.max), axis=0)
+            tf.summary.image('vxdist_pred/', vxdist_pred_op, max_outputs=1)
+            vxunit_echt_op = tf.expand_dims(tfplot_uomap3d(
+                frame, uomap_echt), axis=0)
+            tf.summary.image('vxunit_echt/', vxunit_echt_op, max_outputs=1)
+            vxunit_pred_op = tf.expand_dims(tfplot_uomap3d(
+                frame, uomap_pred), axis=0)
+            tf.summary.image('vxunit_pred/', vxunit_pred_op, max_outputs=1)
 
             optimizer = tf.train.AdamOptimizer(learning_rate)
             # train_op = optimizer.minimize(

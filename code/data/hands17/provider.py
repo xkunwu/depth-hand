@@ -5,6 +5,58 @@ from utils.iso_boxes import iso_cube
 from utils.regu_grid import latice_image
 
 
+def prow_vxudir(args, thedata, batch_data):
+    bi, pcnt3, poses, resce, = \
+        args[0], args[1], args[2], args[3]
+    cube = iso_cube()
+    cube.load(resce)
+    vxudir = dataops.raw_to_vxudir(
+        pcnt3, poses.reshape(-1, 3), cube, thedata)
+    batch_data[bi, ...] = vxudir
+
+
+def prow_vxoff(args, thedata, batch_data):
+    bi, pcnt3, poses, resce, = \
+        args[0], args[1], args[2], args[3]
+    cube = iso_cube()
+    cube.load(resce)
+    vxoff = dataops.raw_to_vxoff(
+        pcnt3, poses.reshape(-1, 3), cube, thedata)
+    batch_data[bi, ...] = vxoff
+
+
+def prow_pose_lab(args, thedata, batch_data):
+    bi, poses, resce, = \
+        args[0], args[1], args[2]
+    cube = iso_cube()
+    cube.load(resce)
+    pose_lab = dataops.raw_to_vxlab(
+        poses.reshape(-1, 3), cube, thedata)
+    batch_data[bi, ...] = pose_lab
+
+
+def prow_pose_hit(args, thedata, batch_data):
+    bi, poses, resce, = \
+        args[0], args[1], args[2]
+    cube = iso_cube()
+    cube.load(resce)
+    pose_hit = dataops.raw_to_vxhit(
+        poses.reshape(-1, 3), cube, thedata)
+    batch_data[bi, ...] = pose_hit
+
+
+def prow_vxhit(args, thedata, batch_data):
+    bi, index, resce = \
+        args[0], args[1], args[2]
+    img_name = dataio.index2imagename(index)
+    img = dataio.read_image(os.path.join(
+        thedata.training_images, img_name))
+    cube = iso_cube()
+    cube.load(resce)
+    vxhit = dataops.to_vxhit(img, cube, thedata)
+    batch_data[bi, ...] = vxhit
+
+
 def prow_tsdf3(args, thedata, batch_data):
     bi, pcnt3 = \
         args[0], args[1]
@@ -106,8 +158,8 @@ def puttensor_mt(args, put_worker, thedata, batch_data):
     thread_pool.map(
         partial(put_worker, thedata=thedata, batch_data=batch_data),
         zip(*args))
-    thread_pool.close()
-    thread_pool.join()
+    thread_pool.close()  # that's it for this batch
+    thread_pool.join()  # serilization point
     # time_e = str(timedelta(seconds=timer() - time_s))
     # print('multiprocessing time: {:.4f}'.format(time_e))
 

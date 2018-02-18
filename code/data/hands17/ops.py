@@ -472,108 +472,225 @@ def fill_grid(img, pose_raw, caminfo):
     return pcnt3, resce
 
 
-def raw_to_vxoff(vxcnt, pose_raw, cube, step, caminfo):
+def to_vxhit(img, cube, caminfo):
+    step = caminfo.crop_size
+    points3_pick = cube.pick(img_to_raw(img, caminfo))
+    grid = regu_grid()
+    grid.from_cube(cube, step)
+    pcnt3 = grid.hit(points3_pick)
+    return pcnt3
+
+
+def voxel_hit(img, pose_raw, step, caminfo):
+    cube = iso_cube(
+        (np.max(pose_raw, axis=0) + np.min(pose_raw, axis=0)) / 2,
+        caminfo.region_size
+    )
+    pcnt3 = to_vxhit(img, cube, caminfo)
+    resce = cube.dump()
+    return pcnt3, resce
+
+
+def raw_to_vxoff_flat(vxcnt, pose_raw, cube, caminfo):
     """ offset map from voxel center to each joint
     """
+    step = caminfo.hmap_size
     grid = regu_grid()
     grid.from_cube(cube, step)
+    voxcens = grid.voxen(
+        np.mgrid[0:step, 0:step, 0:step].reshape(3, -1).T)
+    offset = pose_raw - voxcens[:, None]  # (S*S*S)xJx3
+    return offset
+    # return offset.reshape((step ** 3, -1))
+
+
+def _void_id(vxcnt, step):
+    scale = int(vxcnt.shape[0] / step)
     vol_shape = (step, step, step)
+    if 1 == scale:
+        vxcnt_hmap = vxcnt
+    else:
+        # # vxcnt_hmap = vxcnt[::scale, ::scale, ::scale]
+        # from itertools import product
+        # r = [0, 1]
+        # vxcnt_hmap = np.zeros(vol_shape)
+        # for i0 in np.array(list(product(r, r, r))):
+        #     vxcnt_hmap += vxcnt[i0[0]::2, i0[1]::2, i0[2]::2]
+        vxcnt_hmap = np.zeros(vol_shape)
+        for i0 in np.mgrid[0:scale, 0:scale, 0:scale].reshape(3, -1).T:
+            vxcnt_hmap += vxcnt[i0[0]::scale, i0[1]::scale, i0[2]::scale]
+        # print(np.sum(vxcnt_hmap) - np.sum(vxcnt))
+    void_id = (1e-2 > vxcnt_hmap.ravel())
+    return void_id
+
+
+def raw_to_vxoff(vxcnt, pose_raw, cube, caminfo):
+    """ offset map from voxel center to each joint
+    """
+    step = caminfo.hmap_size
+    offset = raw_to_vxoff_flat(vxcnt, pose_raw, cube, caminfo)
+    void_id = _void_id(vxcnt, step)
+    offset[void_id] = 0
+    return offset.reshape(step, step, step, -1)
+
+
+def raw_to_vxudir(vxcnt, pose_raw, cube, caminfo):
+    """ offset map from voxel center to each joint
+    """
     from numpy import linalg
-    omap_l = []
-    hmap_l = []
-    umap_l = []
+    step = caminfo.hmap_size
+    offset = raw_to_vxoff_flat(vxcnt, pose_raw, cube, caminfo)
+    offlen = linalg.norm(offset, axis=-1)  # offset norm
     theta = caminfo.region_size * 2  # maximal - cube size
-    # # vxcnt_hmap = vxcnt[::2, ::2, ::2]
-    # from itertools import product
-    # r = [0, 1]
-    # vxcnt_hmap = np.zeros(vol_shape)
-    # for i0 in np.array(list(product(r, r, r))):
-    #     vxcnt_hmap += vxcnt[i0[0]::2, i0[1]::2, i0[2]::2]
-    # # print(np.sum(vxcnt_hmap), np.sum(vxcnt))
-    vxcnt_hmap = vxcnt
-    for jj, joint in enumerate(pose_raw):
-        indices = np.argwhere(1e-2 < vxcnt_hmap)
-        voxcens = grid.voxen(indices)
-        offset = joint - voxcens
-        dist = linalg.norm(offset, axis=1)  # offset norm
-        valid_id = np.where(np.logical_and(
-            1e-1 < dist,  # remove sigular point
-            theta > dist  # limit support within theta
-        ))
-        offset = offset[valid_id]
-        dist = dist[valid_id]
-        unit_off = offset / np.tile(dist, [3, 1]).T  # unit offset
-        dist = (theta - dist) / theta  # inverse propotional
-        vid = indices[valid_id]
-        for dim in range(3):
-            om = np.zeros(vol_shape)
-            om[vid[:, 0], vid[:, 1], vid[:, 2]] = offset[:, dim]
-            omap_l.append(om)
-            um = np.zeros(vol_shape)
-            um[vid[:, 0], vid[:, 1], vid[:, 2]] = unit_off[:, dim]
-            umap_l.append(um)
-        hm = np.zeros(vol_shape)
-        hm[vid[:, 0], vid[:, 1], vid[:, 2]] = dist
-        hmap_l.append(hm)
-    offset_map = np.stack(omap_l, axis=3)
-    olmap = np.stack(hmap_l, axis=3)
-    uomap = np.stack(umap_l, axis=3)
-    return offset_map, olmap, uomap
+    invalid_id = np.logical_or(
+        1e-2 > offlen,  # remove sigular point
+        theta < offlen,  # limit support within theta
+    )
+    offset[invalid_id, ...] = 0
+    offlen[invalid_id] = theta
+    unit_off = offset / offlen[:, :, None]
+    void_id = _void_id(vxcnt, step)
+    unit_off[void_id, ...] = 0
+    offlen[void_id] = theta
+    offlen = (theta - offlen) / theta  # inverse propotional
+    return np.concatenate(
+        (offlen.reshape(step, step, step, -1),
+            unit_off.reshape(step, step, step, -1)),
+        axis=-1)
 
 
-def vxoff_to_raw(
-    vxhit, olmap, uomap, vxcnt,
-        cube, step, caminfo, nn=5):
+def vxudir_to_raw(vxhit, vxudir, cube, caminfo, nn=5):
     """ recover 3d from weight avarage """
     from sklearn.preprocessing import normalize
+    step = caminfo.hmap_size
+    theta = caminfo.region_size * 2
     grid = regu_grid()
     grid.from_cube(cube, step)
-    vol_shape = (step, step, step)
-    num_joint = olmap.shape[-1]
-    theta = caminfo.region_size * 2
-    pose_out = np.empty([num_joint, 3])
-    for joint in range(num_joint):
-        # restore from 3d
-        hm = vxhit[..., joint]
-        # hm = softmax(vxhit[..., joint].flatten()).flatten()
-        # hm[np.where(1e-2 > vxcnt_hmap)] = 0  # mask out void is wrong - joint not on the surface
-        hm[np.where(0 > hm)] = 0  # not training goal
-        top_id = hm.argpartition(-nn, axis=None)[-nn:]  # top elements
-        x3, y3, z3 = np.unravel_index(top_id, vol_shape)
-        conf3 = hm[x3, y3, z3]
-        # conf3 = hm[top_id]
-        print(conf3)
-        dist = olmap[x3, y3, z3, joint]
-        dist = theta - dist * theta  # inverse propotional
-        uom = uomap[..., 3 * joint:3 * (joint + 1)]
-        unit_off = uom[x3, y3, z3, :]
-        unit_off = normalize(unit_off, norm='l2')
-        offset = unit_off * np.tile(dist, [3, 1]).T
-        p0 = grid.voxen(np.vstack([x3, y3, z3]).astype(float).T)
-        pred3 = p0 + offset
+    num_joint = caminfo.join_num
+    offlen = vxudir[..., :num_joint].reshape(-1, num_joint).T
+    top_id = np.argpartition(offlen, -nn, axis=1)[:, -nn:]  # top elements
+    conf3 = np.take(offlen, top_id)
+    voxcens = grid.voxen(
+        np.mgrid[0:step, 0:step, 0:step].reshape(3, -1).T)
+    pose_out = np.empty((num_joint, 3))
+    for jj in range(num_joint):
+        unit_off = vxudir[..., num_joint + 3 * jj:num_joint + 3 * (jj + 1)].reshape(-1, 3)
+        unit_off = normalize(unit_off[top_id[jj], :])
+        d = theta - offlen[jj, top_id[jj]] * theta
+        p0 = voxcens[top_id[jj], :]
+        pred3 = p0 + unit_off * d[:, None]
+        c = conf3[jj]
         pred32 = np.sum(
-            pred3 * np.tile(conf3, [3, 1]).T, axis=0
-        ) / np.sum(conf3)
-        pose_out[joint, :] = pred32
+            pred3 * c[:, None], axis=0
+        ) / np.sum(c)
+        pose_out[jj, :] = pred32
+
+    # print(conf3.shape)
+    # unit = vxudir[..., num_joint:].reshape(num_joint, -1, 3)
+    # print(np.take(unit, top_id).shape)
+    # ux = np.take(unit[..., 0], top_id)
+    # uy = np.take(unit[..., 1], top_id)
+    # uz = np.take(unit[..., 2], top_id)
+    # unit = normalize(
+    #     np.stack((ux, uy, uz), axis=2),
+    #     axis=2)
+    # print(unit.shape)
+    # ux = np.take(voxcens[..., 0], top_id)
+    # uy = np.take(voxcens[..., 1], top_id)
+    # uz = np.take(voxcens[..., 2], top_id)
+    # pose_pred = voxcens + offset
+    # vol_shape = (step, step, step)
+    # pose_out = np.empty([num_joint, 3])
+    # for joint in range(num_joint):
+    #     # restore from 3d
+    #     hm = vxhit[..., joint]
+    #     # hm = softmax(vxhit[..., joint].flatten()).flatten()
+    #     # hm[np.where(1e-2 > vxcnt_hmap)] = 0  # mask out void is wrong - joint not on the surface
+    #     hm[np.where(0 > hm)] = 0  # not training goal
+    #     top_id = hm.argpartition(-nn, axis=None)[-nn:]  # top elements
+    #     x3, y3, z3 = np.unravel_index(top_id, vol_shape)
+    #     conf3 = hm[x3, y3, z3]
+    #     # conf3 = hm[top_id]
+    #     print(conf3)
+    #     dist = olmap[x3, y3, z3, joint]
+    #     dist = theta - dist * theta  # inverse propotional
+    #     uom = uomap[..., 3 * joint:3 * (joint + 1)]
+    #     unit_off = uom[x3, y3, z3, :]
+    #     unit_off = normalize(unit_off, norm='l2')
+    #     offset = unit_off * np.tile(dist, [3, 1]).T
+    #     p0 = grid.voxen(np.vstack([x3, y3, z3]).astype(float).T)
+    #     pred3 = p0 + offset
+    #     pred32 = np.sum(
+    #         pred3 * np.tile(conf3, [3, 1]).T, axis=0
+    #     ) / np.sum(conf3)
+        pose_out[jj, :] = pred32
     return pose_out
 
 
-def raw_to_vxlab(pose_raw, cube, step, caminfo):
-    """ 01-voxel heatmap, also labels """
+# def vxoff_to_raw(
+#     vxhit, olmap, uomap, vxcnt,
+#         cube, step, caminfo, nn=5):
+#     """ recover 3d from weight avarage """
+#     from sklearn.preprocessing import normalize
+#     grid = regu_grid()
+#     grid.from_cube(cube, step)
+#     vol_shape = (step, step, step)
+#     num_joint = olmap.shape[-1]
+#     theta = caminfo.region_size * 2
+#     pose_out = np.empty([num_joint, 3])
+#     for joint in range(num_joint):
+#         # restore from 3d
+#         hm = vxhit[..., joint]
+#         # hm = softmax(vxhit[..., joint].flatten()).flatten()
+#         # hm[np.where(1e-2 > vxcnt_hmap)] = 0  # mask out void is wrong - joint not on the surface
+#         hm[np.where(0 > hm)] = 0  # not training goal
+#         top_id = hm.argpartition(-nn, axis=None)[-nn:]  # top elements
+#         x3, y3, z3 = np.unravel_index(top_id, vol_shape)
+#         conf3 = hm[x3, y3, z3]
+#         # conf3 = hm[top_id]
+#         print(conf3)
+#         dist = olmap[x3, y3, z3, joint]
+#         dist = theta - dist * theta  # inverse propotional
+#         uom = uomap[..., 3 * joint:3 * (joint + 1)]
+#         unit_off = uom[x3, y3, z3, :]
+#         unit_off = normalize(unit_off, norm='l2')
+#         offset = unit_off * np.tile(dist, [3, 1]).T
+#         p0 = grid.voxen(np.vstack([x3, y3, z3]).astype(float).T)
+#         pred3 = p0 + offset
+#         pred32 = np.sum(
+#             pred3 * np.tile(conf3, [3, 1]).T, axis=0
+#         ) / np.sum(conf3)
+#         pose_out[joint, :] = pred32
+#     return pose_out
+
+
+def raw_to_vxhit(pose_raw, cube, caminfo):
+    """ 01-voxel heatmap """
+    step = caminfo.hmap_size
     grid = regu_grid()
     grid.from_cube(cube, step)
     indices = grid.putit(pose_raw)
-    # vol_l = []
-    # for index in indices:
-    #     vol = np.zeros((step, step, step))
-    #     vol[index[0], index[1], index[2]] = 1.
-    # return np.stack(vol_l, axis=3)
+    vol_l = []
+    for index in indices:
+        vol = np.zeros((step, step, step))
+        vol[index[0], index[1], index[2]] = 1.
+        vol_l.append(vol)
+    return np.stack(vol_l, axis=3)
+
+
+def raw_to_vxlab(pose_raw, cube, caminfo):
+    """ 01-voxel heatmap converted to labels """
+    step = caminfo.hmap_size
+    grid = regu_grid()
+    grid.from_cube(cube, step)
+    indices = grid.putit(pose_raw)
     return np.ravel_multi_index(
         indices.T, (step, step, step))
 
 
-def vxlab_to_raw(vxlab, cube, step, caminfo):
+def vxlab_to_raw(vxlab, cube, caminfo):
     """ vxlab: sequential number """
+    step = caminfo.hmap_size
     grid = regu_grid()
     grid.from_cube(cube, step)
     num_joint = vxlab.shape[-1]
@@ -587,19 +704,6 @@ def vxlab_to_raw(vxlab, cube, step, caminfo):
             int(vh), vol_shape))
         pose_out[joint, :] = grid.voxen(index)
     return pose_out
-
-
-def voxel_hit(img, pose_raw, step, caminfo):
-    cube = iso_cube(
-        (np.max(pose_raw, axis=0) + np.min(pose_raw, axis=0)) / 2,
-        caminfo.region_size
-    )
-    points3_pick = cube.pick(img_to_raw(img, caminfo))
-    grid = regu_grid()
-    grid.from_cube(cube, step)
-    pcnt = grid.hit(points3_pick)
-    resce = cube.dump()
-    return pcnt, resce
 
 
 def to_ortho3(img, cube, caminfo, sort=False):
