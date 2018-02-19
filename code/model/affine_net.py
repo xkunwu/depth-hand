@@ -9,7 +9,7 @@ class affine_net:
     #         input_tensor, out_dim, is_training, end_point_list,
     #         scope=None, final_endpoint='stage_out'):
     #     """ input_tensor: BxHxWxC
-    #         out_dim: BxJ, where J is flattened 3D locations
+    #         out_dim: Bx(Jx3), where J is number of joints
     #     """
     #     end_points = {}
     #

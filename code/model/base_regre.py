@@ -110,7 +110,7 @@ class base_regre(object):
         for ei, resce, poses in zip(range(num_elem), batch_resce, batch_poses):
             pose_local = poses.reshape(-1, 3)
             pose_raw = self.yanker(pose_local, resce, self.caminfo)
-            poses_out[ei] = pose_raw.reshape(1, -1)
+            poses_out[ei] = pose_raw.flatten()
         self.eval_pred.append(poses_out)
 
     def draw_image_pose(self, ax, line, image_dir, caminfo):
@@ -298,7 +298,6 @@ class base_regre(object):
             for precon in precon_list:
                 args.append(precon_h5[precon][precon][
                     store_beg:store_end, ...])
-            # args_zip = zip(args)
             self.data_module.provider.puttensor_mt(
                 args,
                 thedata.store_prow[target], thedata, batch_data
@@ -344,7 +343,8 @@ class base_regre(object):
         """ Receive parameters specific to the data """
         self.logger = args.logger
         self.data_module = args.data_module
-        self.out_dim = thedata.join_num * 3
+        self.join_num = thedata.join_num
+        self.out_dim = self.join_num * 3
         self.image_dir = thedata.training_images
         self.caminfo = thedata
         self.region_size = thedata.region_size
@@ -435,7 +435,6 @@ class base_regre(object):
         # img_name, frame, poses, resce = self.provider_worker(
         #     annot_line, self.image_dir, thedata)
         # frame = np.squeeze(frame, axis=-1)
-        # poses = poses.reshape(-1, 3)
         # if (
         #         (1e-4 < np.linalg.norm(frame_h5 - frame)) or
         #         (1e-4 < np.linalg.norm(poses_h5 - poses))
@@ -454,10 +453,11 @@ class base_regre(object):
             self.name_desc, img_id))
 
     def get_model(
-            self, input_tensor, is_training, bn_decay,
+            self, input_tensor, is_training,
+            bn_decay, regu_scale,
             scope=None, final_endpoint='stage_out'):
         """ input_tensor: BxHxWxC
-            out_dim: BxJ, where J is flattened 3D locations
+            out_dim: Bx(Jx3), where J is number of joints
         """
         end_points = {}
         self.end_point_list = []
@@ -504,7 +504,7 @@ class base_regre(object):
         # self.end_point_list.append('dropout1')
         # end_points['dropout1'] = net
         # net = tf_util.fully_connected(
-        #     net, self.out_dim, scope='fullconn3', activation_fn=None)
+        #     net, out_dim, scope='fullconn3', activation_fn=None)
         # self.end_point_list.append('fullconn3')
         # end_points['fullconn3'] = net
 
@@ -516,7 +516,6 @@ class base_regre(object):
         # ~/anaconda2/lib/python2.7/site-packages/tensorflow/contrib/layers/
         with tf.variable_scope(
                 scope, self.name_desc, [input_tensor]):
-            weight_decay = 0.00004
             bn_epsilon = 0.001
             with \
                 slim.arg_scope(
@@ -533,8 +532,8 @@ class base_regre(object):
                     is_training=is_training), \
                 slim.arg_scope(
                     [slim.fully_connected],
-                    weights_regularizer=slim.l2_regularizer(weight_decay),
-                    biases_regularizer=slim.l2_regularizer(weight_decay),
+                    weights_regularizer=slim.l2_regularizer(regu_scale),
+                    biases_regularizer=slim.l2_regularizer(regu_scale),
                     activation_fn=tf.nn.relu,
                     normalizer_fn=slim.batch_norm), \
                 slim.arg_scope(
@@ -543,15 +542,15 @@ class base_regre(object):
                 slim.arg_scope(
                     [slim.conv2d_transpose],
                     stride=2, padding='SAME',
-                    weights_regularizer=slim.l2_regularizer(weight_decay),
-                    biases_regularizer=slim.l2_regularizer(weight_decay),
+                    weights_regularizer=slim.l2_regularizer(regu_scale),
+                    biases_regularizer=slim.l2_regularizer(regu_scale),
                     activation_fn=tf.nn.relu,
                     normalizer_fn=slim.batch_norm), \
                 slim.arg_scope(
                     [slim.conv2d],
                     stride=1, padding='SAME',
-                    weights_regularizer=slim.l2_regularizer(weight_decay),
-                    biases_regularizer=slim.l2_regularizer(weight_decay),
+                    weights_regularizer=slim.l2_regularizer(regu_scale),
+                    biases_regularizer=slim.l2_regularizer(regu_scale),
                     activation_fn=tf.nn.relu,
                     normalizer_fn=slim.batch_norm):
                 with tf.variable_scope('stage128'):
@@ -618,7 +617,7 @@ class base_regre(object):
     # @staticmethod
     # def base_arg_scope(is_training,
     #                    bn_decay=0.9997, bn_epsilon=0.001,
-    #                    weight_decay=0.00004, activation_fn=tf.nn.relu):
+    #                    regu_scale=0.00004, activation_fn=tf.nn.relu):
     #     from tensorflow.contrib import slim
     #     with slim.arg_scope(
     #             [slim.batch_norm],
@@ -634,8 +633,8 @@ class base_regre(object):
     #                         is_training=is_training):
     #                         with slim.arg_scope(
     #                                 [slim.fully_connected],
-    #                                 weights_regularizer=slim.l2_regularizer(weight_decay),
-    #                                 biases_regularizer=slim.l2_regularizer(weight_decay),
+    #                                 weights_regularizer=slim.l2_regularizer(regu_scale),
+    #                                 biases_regularizer=slim.l2_regularizer(regu_scale),
     #                                 activation_fn=tf.nn.relu,
     #                                 normalizer_fn=slim.batch_norm):
     #                             with slim.arg_scope(
@@ -644,8 +643,8 @@ class base_regre(object):
     #                                 with slim.arg_scope(
     #                                         [slim.conv2d],
     #                                         stride=1, padding='SAME',
-    #                                         weights_regularizer=slim.l2_regularizer(weight_decay),
-    #                                         biases_regularizer=slim.l2_regularizer(weight_decay),
+    #                                         weights_regularizer=slim.l2_regularizer(regu_scale),
+    #                                         biases_regularizer=slim.l2_regularizer(regu_scale),
     #                                         activation_fn=tf.nn.relu,
     #                                         normalizer_fn=slim.batch_norm) as scope:
     #                                     return scope

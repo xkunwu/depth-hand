@@ -33,7 +33,6 @@ class dense_regre(base_regre):
     def receive_data(self, thedata, args):
         """ Receive parameters specific to the data """
         super(dense_regre, self).receive_data(thedata, args)
-        self.out_dim = thedata.join_num
 
     def provider_worker(self, line, image_dir, caminfo):
         img_name, pose_raw = self.data_module.io.parse_line_annot(line)
@@ -96,7 +95,7 @@ class dense_regre(base_regre):
     def write_pred(self, fanno, caminfo,
                    batch_index, batch_resce,
                    batch_frame, batch_poses):
-        num_j = self.out_dim
+        num_j = self.join_num
         for ii in range(batch_index.shape[0]):
             img_name = self.data_module.io.index2imagename(batch_index[ii, 0])
             resce = batch_resce[ii, :]
@@ -166,7 +165,7 @@ class dense_regre(base_regre):
         ).start()
         crop_size = self.crop_size
         hmap_size = self.hmap_size
-        out_dim = self.out_dim
+        out_dim = self.join_num
         num_channel = self.num_channel
         num_appen = self.num_appen
         with h5py.File(os.path.join(self.prepare_dir, name_appen), 'w') as h5file:
@@ -174,7 +173,7 @@ class dense_regre(base_regre):
                 'index',
                 (num_line, 1),
                 compression='lzf',
-                dtype=np.int32
+                dtype='i4'
             )
             h5file.create_dataset(
                 'frame',
@@ -185,38 +184,38 @@ class dense_regre(base_regre):
                         crop_size, crop_size,
                         num_channel),
                 compression='lzf',
-                # dtype=np.float32)
-                dtype=float)
+                # dtype='f4')
+                dtype='f4')
             h5file.create_dataset(
                 'poses',
                 (num_line, out_dim * 3),
                 compression='lzf',
-                # dtype=np.float32)
-                dtype=float)
+                # dtype='f4')
+                dtype='f4')
             h5file.create_dataset(
                 'hmap2',
                 (num_line, hmap_size, hmap_size, out_dim),
                 compression='lzf',
-                # dtype=np.float32)
-                dtype=float)
+                # dtype='f4')
+                dtype='f4')
             h5file.create_dataset(
                 'olmap',
                 (num_line, hmap_size, hmap_size, out_dim),
                 compression='lzf',
-                # dtype=np.float32)
-                dtype=float)
+                # dtype='f4')
+                dtype='f4')
             h5file.create_dataset(
                 'uomap',
                 (num_line, hmap_size, hmap_size, out_dim * 3),
                 compression='lzf',
-                # dtype=np.float32)
-                dtype=float)
+                # dtype='f4')
+                dtype='f4')
             h5file.create_dataset(
                 'resce',
                 (num_line, num_appen),
                 compression='lzf',
-                # dtype=np.float32)
-                dtype=float)
+                # dtype='f4')
+                dtype='f4')
             bi = 0
             store_beg = 0
             while True:
@@ -271,7 +270,7 @@ class dense_regre(base_regre):
         from colour import Color
         colors = [Color('orange').rgb, Color('red').rgb, Color('lime').rgb]
         fig, _ = mpplot.subplots(nrows=2, ncols=3, figsize=(3 * 5, 2 * 5))
-        joint_id = self.out_dim - 1
+        joint_id = self.join_num - 1
         hmap2 = hmap2_h5[..., joint_id]
         olmap = olmap_h5[..., joint_id]
         uomap = uomap_h5[..., 3 * joint_id:3 * (joint_id + 1)]
@@ -344,7 +343,8 @@ class dense_regre(base_regre):
             self.name_desc, img_id))
 
     def get_model(
-            self, input_tensor, is_training, bn_decay,
+            self, input_tensor, is_training,
+            bn_decay, regu_scale,
             hg_repeat=1, scope=None):
         """ input_tensor: BxHxWxC
             out_dim: BxHxWx(J*5), where J is number of joints
@@ -352,7 +352,7 @@ class dense_regre(base_regre):
         end_points = {}
         self.end_point_list = []
         final_endpoint = 'hourglass_{}'.format(hg_repeat - 1)
-        num_joint = self.out_dim
+        num_joint = self.join_num
         # num_out_map = num_joint * 5  # hmap2, olmap, uomap
         num_feature = 128
         num_vol = self.hmap_size * self.hmap_size * self.hmap_size
@@ -366,7 +366,6 @@ class dense_regre(base_regre):
         # ~/anaconda2/lib/python2.7/site-packages/tensorflow/contrib/layers/
         with tf.variable_scope(
                 scope, self.name_desc, [input_tensor]):
-            weight_decay = 0.00004
             bn_epsilon = 0.001
             with \
                 slim.arg_scope(
@@ -383,8 +382,8 @@ class dense_regre(base_regre):
                     is_training=is_training), \
                 slim.arg_scope(
                     [slim.fully_connected],
-                    weights_regularizer=slim.l2_regularizer(weight_decay),
-                    biases_regularizer=slim.l2_regularizer(weight_decay),
+                    weights_regularizer=slim.l2_regularizer(regu_scale),
+                    biases_regularizer=slim.l2_regularizer(regu_scale),
                     activation_fn=tf.nn.relu,
                     normalizer_fn=slim.batch_norm), \
                 slim.arg_scope(
@@ -393,15 +392,15 @@ class dense_regre(base_regre):
                 slim.arg_scope(
                     [slim.conv2d_transpose],
                     stride=2, padding='SAME',
-                    weights_regularizer=slim.l2_regularizer(weight_decay),
-                    biases_regularizer=slim.l2_regularizer(weight_decay),
+                    weights_regularizer=slim.l2_regularizer(regu_scale),
+                    biases_regularizer=slim.l2_regularizer(regu_scale),
                     activation_fn=tf.nn.relu,
                     normalizer_fn=slim.batch_norm), \
                 slim.arg_scope(
                     [slim.conv2d],
                     stride=1, padding='SAME',
-                    weights_regularizer=slim.l2_regularizer(weight_decay),
-                    biases_regularizer=slim.l2_regularizer(weight_decay),
+                    weights_regularizer=slim.l2_regularizer(regu_scale),
+                    biases_regularizer=slim.l2_regularizer(regu_scale),
                     activation_fn=tf.nn.relu,
                     normalizer_fn=slim.batch_norm):
                 with tf.variable_scope('stage128'):
@@ -473,22 +472,22 @@ class dense_regre(base_regre):
         #     tf.float32, shape=(
         #         batch_size,
         #         self.hmap_size, self.hmap_size,
-        #         self.out_dim))
+        #         self.join_num))
         # olmap_tf = tf.placeholder(
         #     tf.float32, shape=(
         #         batch_size,
         #         self.hmap_size, self.hmap_size,
-        #         self.out_dim))
+        #         self.join_num))
         # uomap_tf = tf.placeholder(
         #     tf.float32, shape=(
         #         batch_size,
         #         self.hmap_size, self.hmap_size,
-        #         self.out_dim * 3))
+        #         self.join_num * 3))
         poses_tf = tf.placeholder(
             tf.float32, shape=(
                 batch_size,
                 self.hmap_size, self.hmap_size,
-                self.out_dim * 5))
+                self.join_num * 5))
         return frames_tf, poses_tf
 
     def get_loss(self, pred, echt, end_points):
@@ -496,7 +495,7 @@ class dense_regre(base_regre):
             pred: BxHxWx(J*5)
             echt: BxHxWx(J*5)
         """
-        # num_joint = self.out_dim
+        # num_joint = self.join_num
         loss = 0
         for name, net in end_points.items():
             if not name.startswith('hourglass_'):

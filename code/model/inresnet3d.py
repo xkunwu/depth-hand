@@ -122,7 +122,7 @@ class inresnet3d:
             block_rep=[4, 4, 4], block_scale=[1.0, 1.0, 1.0],
             scope=None, final_endpoint='stage_out'):
         """ input_tensor: BxHxWxC
-            out_dim: BxJ, where J is flattened 3D locations
+            out_dim: Bx(Jx3), where J is number of joints
         """
         end_points = {}
         print(bn_decay)
@@ -133,7 +133,7 @@ class inresnet3d:
 
         with tf.variable_scope(
                 scope, 'inresnet3d', [input_tensor]):
-            weight_decay = 0.00004
+            regu_scale = 0.00004
             bn_epsilon = 0.001
             with \
                 slim.arg_scope(
@@ -150,8 +150,8 @@ class inresnet3d:
                     is_training=is_training), \
                 slim.arg_scope(
                     [slim.fully_connected],
-                    weights_regularizer=slim.l2_regularizer(weight_decay),
-                    biases_regularizer=slim.l2_regularizer(weight_decay),
+                    weights_regularizer=slim.l2_regularizer(regu_scale),
+                    biases_regularizer=slim.l2_regularizer(regu_scale),
                     activation_fn=tf.nn.relu,
                     normalizer_fn=slim.batch_norm), \
                 slim.arg_scope(
@@ -160,15 +160,15 @@ class inresnet3d:
                 slim.arg_scope(
                     [slim.conv3d_transpose],
                     stride=2, padding='SAME',
-                    weights_regularizer=slim.l2_regularizer(weight_decay),
-                    biases_regularizer=slim.l2_regularizer(weight_decay),
+                    weights_regularizer=slim.l2_regularizer(regu_scale),
+                    biases_regularizer=slim.l2_regularizer(regu_scale),
                     activation_fn=tf.nn.relu,
                     normalizer_fn=slim.batch_norm), \
                 slim.arg_scope(
                     [slim.conv3d],
                     stride=1, padding='SAME',
-                    weights_regularizer=slim.l2_regularizer(weight_decay),
-                    biases_regularizer=slim.l2_regularizer(weight_decay),
+                    weights_regularizer=slim.l2_regularizer(regu_scale),
+                    biases_regularizer=slim.l2_regularizer(regu_scale),
                     activation_fn=tf.nn.relu,
                     normalizer_fn=slim.batch_norm):
                 with tf.variable_scope('stage64'):

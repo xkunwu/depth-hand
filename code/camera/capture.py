@@ -132,10 +132,11 @@ class capture:
     def capture_detect(self, serv, dev):
         tf.reset_default_graph()
         with tf.device('/gpu:' + str(self.args.gpu_id)):
-            frames_tf, _ = self.args.model_inst.placeholder_inputs(1)
+            frames_op, _ = self.args.model_inst.placeholder_inputs(1)
             is_training_tf = tf.placeholder(tf.bool, shape=())
             pred, end_points = self.args.model_inst.get_model(
-                frames_tf, is_training_tf, self.args.bn_decay)
+                frames_op, is_training_tf,
+                self.args.bn_decay, self.args.regu_scale)
             saver = tf.train.Saver()
         config = tf.ConfigProto()
         config.gpu_options.allow_growth = True

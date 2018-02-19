@@ -164,7 +164,7 @@ class voxel_regre(voxel_detect):
                 'index',
                 (num_line, 1),
                 compression='lzf',
-                dtype=np.int32
+                dtype='i4'
             )
             h5file.create_dataset(
                 'frame',
@@ -175,38 +175,38 @@ class voxel_regre(voxel_detect):
                         crop_size, crop_size, crop_size,
                         num_channel),
                 compression='lzf',
-                # dtype=np.float32)
-                dtype=float)
+                # dtype='f4')
+                dtype='f4')
             h5file.create_dataset(
                 'poses',
                 (num_line, out_dim * 3),
                 compression='lzf',
-                # dtype=np.float32)
-                dtype=float)
+                # dtype='f4')
+                dtype='f4')
             h5file.create_dataset(
                 'vxhit',
                 (num_line, out_dim),
                 compression='lzf',
-                # dtype=np.float32)
-                dtype=float)
+                # dtype='f4')
+                dtype='f4')
             h5file.create_dataset(
                 'olmap',
                 (num_line, hmap_size, hmap_size, hmap_size, out_dim),
                 compression='lzf',
-                # dtype=np.float32)
-                dtype=float)
+                # dtype='f4')
+                dtype='f4')
             h5file.create_dataset(
                 'uomap',
                 (num_line, hmap_size, hmap_size, hmap_size, out_dim * 3),
                 compression='lzf',
-                # dtype=np.float32)
-                dtype=float)
+                # dtype='f4')
+                dtype='f4')
             h5file.create_dataset(
                 'resce',
                 (num_line, num_appen),
                 compression='lzf',
-                # dtype=np.float32)
-                dtype=float)
+                # dtype='f4')
+                dtype='f4')
             bi = 0
             store_beg = 0
             while True:
@@ -375,7 +375,8 @@ class voxel_regre(voxel_detect):
             self.name_desc, img_id))
 
     def get_model(
-            self, input_tensor, is_training, bn_decay,
+            self, input_tensor, is_training,
+            bn_decay, regu_scale,
             hg_repeat=1, scope=None):
         """ input_tensor: BxHxWxDxC
             out_dim: BxHxWxDx(J*5), where J is number of joints
@@ -397,7 +398,6 @@ class voxel_regre(voxel_detect):
         # ~/anaconda2/lib/python2.7/site-packages/tensorflow/contrib/layers/
         with tf.variable_scope(
                 scope, self.name_desc, [input_tensor]):
-            weight_decay = 0.00004
             bn_epsilon = 0.001
             with \
                 slim.arg_scope(
@@ -414,8 +414,8 @@ class voxel_regre(voxel_detect):
                     is_training=is_training), \
                 slim.arg_scope(
                     [slim.fully_connected],
-                    weights_regularizer=slim.l2_regularizer(weight_decay),
-                    biases_regularizer=slim.l2_regularizer(weight_decay),
+                    weights_regularizer=slim.l2_regularizer(regu_scale),
+                    biases_regularizer=slim.l2_regularizer(regu_scale),
                     activation_fn=tf.nn.relu,
                     normalizer_fn=slim.batch_norm), \
                 slim.arg_scope(
@@ -424,15 +424,15 @@ class voxel_regre(voxel_detect):
                 slim.arg_scope(
                     [slim.conv3d_transpose],
                     stride=2, padding='SAME',
-                    weights_regularizer=slim.l2_regularizer(weight_decay),
-                    biases_regularizer=slim.l2_regularizer(weight_decay),
+                    weights_regularizer=slim.l2_regularizer(regu_scale),
+                    biases_regularizer=slim.l2_regularizer(regu_scale),
                     activation_fn=tf.nn.relu,
                     normalizer_fn=slim.batch_norm), \
                 slim.arg_scope(
                     [slim.conv3d],
                     stride=1, padding='SAME',
-                    weights_regularizer=slim.l2_regularizer(weight_decay),
-                    biases_regularizer=slim.l2_regularizer(weight_decay),
+                    weights_regularizer=slim.l2_regularizer(regu_scale),
+                    biases_regularizer=slim.l2_regularizer(regu_scale),
                     activation_fn=tf.nn.relu,
                     normalizer_fn=slim.batch_norm):
                 with tf.variable_scope('stage64'):

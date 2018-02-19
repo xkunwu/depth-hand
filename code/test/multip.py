@@ -22,7 +22,7 @@ with h5py.File('multip', 'w') as h5file:
         'index',
         (num_line, 1),
         compression='lzf',
-        dtype=np.int32
+        dtype='i4'
     )
 
     thread_pool = ThreadPool()

@@ -42,7 +42,7 @@ class hourglass:
 
         with tf.variable_scope(
                 scope, 'hourglass_net', [input_tensor]):
-            weight_decay = 0.00004
+            regu_scale = 0.00004
             bn_epsilon = 0.001
             with \
                 slim.arg_scope(
@@ -59,8 +59,8 @@ class hourglass:
                     is_training=is_training), \
                 slim.arg_scope(
                     [slim.fully_connected],
-                    weights_regularizer=slim.l2_regularizer(weight_decay),
-                    biases_regularizer=slim.l2_regularizer(weight_decay),
+                    weights_regularizer=slim.l2_regularizer(regu_scale),
+                    biases_regularizer=slim.l2_regularizer(regu_scale),
                     activation_fn=tf.nn.relu,
                     normalizer_fn=slim.batch_norm), \
                 slim.arg_scope(
@@ -69,15 +69,15 @@ class hourglass:
                 slim.arg_scope(
                     [slim.conv2d_transpose],
                     stride=2, padding='SAME',
-                    weights_regularizer=slim.l2_regularizer(weight_decay),
-                    biases_regularizer=slim.l2_regularizer(weight_decay),
+                    weights_regularizer=slim.l2_regularizer(regu_scale),
+                    biases_regularizer=slim.l2_regularizer(regu_scale),
                     activation_fn=tf.nn.relu,
                     normalizer_fn=slim.batch_norm), \
                 slim.arg_scope(
                     [slim.conv2d],
                     stride=1, padding='SAME',
-                    weights_regularizer=slim.l2_regularizer(weight_decay),
-                    biases_regularizer=slim.l2_regularizer(weight_decay),
+                    weights_regularizer=slim.l2_regularizer(regu_scale),
+                    biases_regularizer=slim.l2_regularizer(regu_scale),
                     activation_fn=tf.nn.relu,
                     normalizer_fn=slim.batch_norm):
                 with tf.variable_scope('stage128'):

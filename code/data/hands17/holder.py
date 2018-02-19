@@ -121,19 +121,22 @@ class hands17holder:
             h5file.create_dataset(
                 'index',
                 (num_line,),
+                maxshape=(num_line,),
                 compression='lzf',
-                dtype=np.int32
+                dtype='i4'
             )
             h5file.create_dataset(
                 'poses',
                 (num_line, self.join_num * 3),
+                maxshape=(num_line, self.join_num * 3),
                 compression='lzf',
-                dtype=float)
+                dtype='f4')
             h5file.create_dataset(
                 'resce',
                 (num_line, 4),
+                maxshape=(num_line, 4),
                 compression='lzf',
-                dtype=float)
+                dtype='f4')
             timerbar = progressbar.ProgressBar(
                 maxval=num_line,
                 widgets=[
@@ -166,6 +169,75 @@ class hands17holder:
                 if 0 == (li % 10e2):
                     timerbar.update(li)
             timerbar.finish()
+            h5file['index'].resize((self.num_training,))
+            h5file['poses'].resize((self.num_training, self.join_num * 3))
+            h5file['resce'].resize((self.num_training, 4))
+        return pose_limit
+
+    def remove_out_frame_annot_mt(self):
+        from itertools import islice
+        from utils.coder import file_pack
+        from model.batch_allot import batch_index
+        self.num_training = int(0)
+        pose_limit = np.array([
+            [np.inf, np.inf, np.inf],
+            [-np.inf, -np.inf, -np.inf],
+        ])
+        with file_pack() as filepack:
+            reader = filepack.push_file(self.training_annot_origin)
+            num_line = int(sum(1 for line in reader))
+            reader.seek(0)
+            batchallot = batch_index(self, num_line)
+            store_size = batchallot.store_size
+            h5file, batch_data = batchallot.create_index(
+                filepack, self.training_annot_cleaned, num_line)
+            timerbar = progressbar.ProgressBar(
+                maxval=num_line,
+                widgets=[
+                    progressbar.Percentage(),
+                    ' ', progressbar.Bar('=', '[', ']'),
+                    ' ', progressbar.ETA()]
+            ).start()
+            write_beg = 0
+            li = 0
+            while True:
+                next_n_lines = list(islice(reader, store_size))
+                if not next_n_lines:
+                    break
+                proc_size = len(next_n_lines)
+                args = [range(proc_size), next_n_lines]
+                batch_data['valid'] = np.full(
+                    (store_size,), False)
+                datapro.puttensor_mt(
+                    args,
+                    datapro.prow_index, self, batch_data
+                )
+                valid = batch_data['valid']
+                valid_num = np.sum(valid)
+                write_end = write_beg + valid_num
+                if write_beg == write_end:
+                    break
+                h5file['index'][write_beg:write_end, ...] = \
+                    batch_data['index'][valid, ...]
+                poses = batch_data['poses'][valid, ...]
+                h5file['poses'][write_beg:write_end, ...] = \
+                    poses
+                h5file['resce'][write_beg:write_end, ...] = \
+                    batch_data['resce'][valid, ...]
+                poses = poses.reshape(-1, 3)
+                pose_limit[0, :] = np.minimum(
+                    pose_limit[0, :],
+                    np.min(poses, axis=0))
+                pose_limit[1, :] = np.maximum(
+                    pose_limit[1, :],
+                    np.max(poses, axis=0))
+                write_beg = write_end
+                self.num_training += valid_num
+                li += proc_size
+                if 0 == (li % 10e2):
+                    timerbar.update(li)
+            timerbar.finish()
+            batchallot.resize(h5file, self.num_training)
         return pose_limit
 
     # def shuffle_split(self):
@@ -200,7 +272,8 @@ class hands17holder:
             from datetime import timedelta
             time_s = timer()
             self.logger.info('cleaning data ...')
-            pose_limit = self.remove_out_frame_annot()
+            # pose_limit = self.remove_out_frame_annot()
+            pose_limit = self.remove_out_frame_annot_mt()
             time_e = str(timedelta(seconds=timer() - time_s))
             self.logger.info('{:d} images after cleaning, time: {}'.format(
                 self.num_training, time_e))

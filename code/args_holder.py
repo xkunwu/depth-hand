@@ -103,6 +103,9 @@ class args_holder:
             '--bn_decay', type=float, default=0.9997,
             help='decay rate during batch normalization [default: 0.9997]')
         self.parser.add_argument(
+            '--regu_scale', type=float, default=0.0004,
+            help='regularization scale [default: 0.0004]')
+        self.parser.add_argument(
             '--learning_rate', type=float, default=0.01,
             help='Initial learning rate [default: 0.001]')
         self.parser.add_argument(

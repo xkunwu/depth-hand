@@ -280,7 +280,8 @@ class voxel_detect(base_conv3):
             self.name_desc, img_id))
 
     def get_model(
-            self, input_tensor, is_training, bn_decay,
+            self, input_tensor, is_training,
+            bn_decay, regu_scale,
             hg_repeat=1, scope=None):
         """ input_tensor: BxHxWxDxC
             out_dim: BxHxWxDxJ, where J is number of joints
@@ -301,7 +302,6 @@ class voxel_detect(base_conv3):
         # ~/anaconda2/lib/python2.7/site-packages/tensorflow/contrib/layers/
         with tf.variable_scope(
                 scope, self.name_desc, [input_tensor]):
-            weight_decay = 0.00004
             bn_epsilon = 0.001
             with \
                 slim.arg_scope(
@@ -318,8 +318,8 @@ class voxel_detect(base_conv3):
                     is_training=is_training), \
                 slim.arg_scope(
                     [slim.fully_connected],
-                    weights_regularizer=slim.l2_regularizer(weight_decay),
-                    biases_regularizer=slim.l2_regularizer(weight_decay),
+                    weights_regularizer=slim.l2_regularizer(regu_scale),
+                    biases_regularizer=slim.l2_regularizer(regu_scale),
                     activation_fn=tf.nn.relu,
                     normalizer_fn=slim.batch_norm), \
                 slim.arg_scope(
@@ -328,15 +328,15 @@ class voxel_detect(base_conv3):
                 slim.arg_scope(
                     [slim.conv3d_transpose],
                     stride=2, padding='SAME',
-                    weights_regularizer=slim.l2_regularizer(weight_decay),
-                    biases_regularizer=slim.l2_regularizer(weight_decay),
+                    weights_regularizer=slim.l2_regularizer(regu_scale),
+                    biases_regularizer=slim.l2_regularizer(regu_scale),
                     activation_fn=tf.nn.relu,
                     normalizer_fn=slim.batch_norm), \
                 slim.arg_scope(
                     [slim.conv3d],
                     stride=1, padding='SAME',
-                    weights_regularizer=slim.l2_regularizer(weight_decay),
-                    biases_regularizer=slim.l2_regularizer(weight_decay),
+                    weights_regularizer=slim.l2_regularizer(regu_scale),
+                    biases_regularizer=slim.l2_regularizer(regu_scale),
                     activation_fn=tf.nn.relu,
                     normalizer_fn=slim.batch_norm):
                 with tf.variable_scope('stage64'):

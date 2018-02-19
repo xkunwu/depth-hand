@@ -1,4 +1,5 @@
 import os
+import numpy as np
 from . import ops as dataops
 from . import io as dataio
 from utils.iso_boxes import iso_cube
@@ -127,6 +128,24 @@ def prow_clean(args, thedata, batch_data):
     cube.load(resce)
     img_clean = dataops.to_clean(img, cube, thedata)
     batch_data[bi, ...] = img_clean
+
+
+def prow_index(args, thedata, batch_data):
+    bi, line = \
+        args[0], args[1]
+    img_name, pose_raw = dataio.parse_line_annot(line)
+    pose2d = dataops.raw_to_2d(pose_raw, thedata)
+    if (0 > np.min(pose2d)) or (0 > np.min(thedata.image_size - pose2d)):
+        return
+    index = dataio.imagename2index(img_name)
+    cube = iso_cube(
+        (np.max(pose_raw, axis=0) + np.min(pose_raw, axis=0)) / 2,
+        thedata.region_size
+    )
+    batch_data['valid'][bi] = True
+    batch_data['index'][bi, ...] = index
+    batch_data['poses'][bi, ...] = pose_raw
+    batch_data['resce'][bi, ...] = cube.dump()
 
 
 def test_puttensor(

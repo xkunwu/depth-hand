@@ -23,7 +23,8 @@ class train_voxel_regre(train_abc):
             global_step = tf.train.create_global_step()
 
             pred_op, end_points = self.args.model_inst.get_model(
-                frames_op, is_training_tf, self.args.bn_decay)
+                frames_op, is_training_tf,
+                self.args.bn_decay, self.args.regu_scale)
             shapestr = 'input: {}'.format(frames_op.shape)
             for ends in self.args.model_inst.end_point_list:
                 net = end_points[ends]
@@ -229,7 +230,8 @@ class train_voxel_regre(train_abc):
                 tf.bool, shape=(), name='is_training')
 
             pred_op, end_points = self.args.model_inst.get_model(
-                frames_op, is_training_tf, self.args.bn_decay)
+                frames_op, is_training_tf,
+                self.args.bn_decay, self.args.regu_scale)
             loss_op = self.args.model_inst.get_loss(
                 pred_op, poses_op, vxmap_op, end_points)
 

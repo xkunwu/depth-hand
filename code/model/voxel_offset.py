@@ -169,6 +169,8 @@ class voxel_offset(voxel_detect):
         err_re = np.sum(np.abs(pose_out - pose_raw))
         if 1e-2 < err_re:
             print('ERROR: reprojection error: {}'.format(err_re))
+        else:
+            print('reprojection looks good: {}'.format(err_re))
         grid = regu_grid()
         grid.from_cube(cube, voxize_crop)
 
@@ -201,18 +203,27 @@ class voxel_offset(voxel_detect):
         if not self.args.show_draw:
             mlab.options.offscreen = True
         else:
+            from utils.image_ops import transparent_cmap
             # should reverser y-axis
             mlab.figure(
                 bgcolor=(1, 1, 1), fgcolor=(0., 0., 0.),
                 size=(800, 800))
             xx, yy, zz = np.where(1e-2 < frame_h5)
+            vv = frame_h5[xx, yy, zz]
+            vc = transparent_cmap(mpplot.cm.jet)(vv)
             yy = 63 - yy
-            mlab.points3d(
+            nodes = mlab.points3d(
                 xx, yy, zz,
                 mode="cube", opacity=0.5,
-                color=Color('khaki').rgb,
+                # color=Color('khaki').rgb,
+                # colormap='hot',
                 scale_factor=0.9)
+            nodes.glyph.scale_mode = 'scale_by_vector'
+            nodes.mlab_source.dataset.point_data.scalars = vc
             xx, yy, zz = np.mgrid[
+                # (scale / 2):(voxize_crop + (scale / 2)):scale,
+                # (scale / 2):(voxize_crop + (scale / 2)):scale,
+                # (scale / 2):(voxize_crop + (scale / 2)):scale]
                 0:voxize_crop:scale,
                 0:voxize_crop:scale,
                 0:voxize_crop:scale]
@@ -243,7 +254,8 @@ class voxel_offset(voxel_detect):
             self.name_desc, img_id))
 
     def get_model(
-            self, input_tensor, is_training, bn_decay,
+            self, input_tensor, is_training,
+            bn_decay, regu_scale,
             hg_repeat=2, scope=None):
         """ input_tensor: BxHxWxDxC
             out_dim: BxHxWxDx(J*4), where J is number of joints
@@ -263,7 +275,6 @@ class voxel_offset(voxel_detect):
         # ~/anaconda2/lib/python2.7/site-packages/tensorflow/contrib/layers/
         with tf.variable_scope(
                 scope, self.name_desc, [input_tensor]):
-            weight_decay = 0.00004
             bn_epsilon = 0.001
             with \
                 slim.arg_scope(
@@ -280,8 +291,8 @@ class voxel_offset(voxel_detect):
                     is_training=is_training), \
                 slim.arg_scope(
                     [slim.fully_connected],
-                    weights_regularizer=slim.l2_regularizer(weight_decay),
-                    biases_regularizer=slim.l2_regularizer(weight_decay),
+                    weights_regularizer=slim.l2_regularizer(regu_scale),
+                    biases_regularizer=slim.l2_regularizer(regu_scale),
                     activation_fn=tf.nn.relu,
                     normalizer_fn=slim.batch_norm), \
                 slim.arg_scope(
@@ -290,15 +301,15 @@ class voxel_offset(voxel_detect):
                 slim.arg_scope(
                     [slim.conv3d_transpose],
                     stride=2, padding='SAME',
-                    weights_regularizer=slim.l2_regularizer(weight_decay),
-                    biases_regularizer=slim.l2_regularizer(weight_decay),
+                    weights_regularizer=slim.l2_regularizer(regu_scale),
+                    biases_regularizer=slim.l2_regularizer(regu_scale),
                     activation_fn=tf.nn.relu,
                     normalizer_fn=slim.batch_norm), \
                 slim.arg_scope(
                     [slim.conv3d],
                     stride=1, padding='SAME',
-                    weights_regularizer=slim.l2_regularizer(weight_decay),
-                    biases_regularizer=slim.l2_regularizer(weight_decay),
+                    weights_regularizer=slim.l2_regularizer(regu_scale),
+                    biases_regularizer=slim.l2_regularizer(regu_scale),
                     activation_fn=tf.nn.relu,
                     normalizer_fn=slim.batch_norm):
                 with tf.variable_scope('stage64'):
@@ -310,9 +321,9 @@ class voxel_offset(voxel_detect):
                     #     return net, end_points
                     sc = 'stage32'
                     net = slim.conv3d(input_tensor, 16, 3)
-                    net = inresnet3d.conv_maxpool(net, scope=sc)
                     # net = inresnet3d.resnet_k(
-                    #     net, scope='stage32_residual')
+                    #     net, scope='stage32_res')
+                    net = inresnet3d.conv_maxpool(net, scope=sc)
                     net = slim.conv3d(
                         net, num_feature, 1, scope='stage32_out')
                     self.end_point_list.append(sc)
@@ -321,10 +332,10 @@ class voxel_offset(voxel_detect):
                 for hg in range(hg_repeat):
                     sc = 'hourglass_{}'.format(hg)
                     with tf.variable_scope(sc):
-                        branch0 = inresnet3d.hourglass3d(
-                            net, 2, scope=sc + '_hg')
+                        # branch0 = inresnet3d.hourglass3d(
+                        #     net, 2, scope=sc + '_hg')
                         branch0 = inresnet3d.resnet_k(
-                            branch0, scope='_res')
+                            net, scope='_res')
                         branch_olm = slim.conv3d(
                             branch0, num_joint, 1,
                             # normalizer_fn=None, activation_fn=tf.nn.relu)

@@ -1,8 +1,10 @@
 - [] SPT
 - [] iterative refine
-- [] inres net
-- [] producing small results
+- [x] inres net
+- [x] producing small results
     - due to using different batch size while evaluating, which is necessary for streaming
 - [] 2d localizer
-- [] ref. object detector
-- [] detection based approach
+- [] ref. object detector application
+- [x] detection based approach
+- [] data clean parallelization
+    - or preprocess earlier!

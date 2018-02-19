@@ -15,15 +15,16 @@ class base_regre_hg(base_regre):
             'test_{}'.format(self.__class__.__base__.__name__))
 
     def get_model(
-            self, input_tensor, is_training, bn_decay,
+            self, input_tensor, is_training,
+            bn_decay, regu_scale,
             scope=None, final_endpoint='stage_out'):
         """ input_tensor: BxHxWxC
-            out_dim: BxJ, where J is flattened 3D locations
+            out_dim: Bx(Jx3), where J is number of joints
         """
         self.end_point_list = []
         return hourglass.get_net(
-            input_tensor, self.out_dim,
-            is_training, bn_decay, self.end_point_list
+            input_tensor, self.out_dim, is_training,
+            bn_decay, regu_scale, self.end_point_list
         )
 
 
@@ -38,13 +39,14 @@ class base_clean_hg(base_clean):
             'test_{}'.format(self.__class__.__base__.__name__))
 
     def get_model(
-            self, input_tensor, is_training, bn_decay,
+            self, input_tensor, is_training,
+            bn_decay, regu_scale,
             scope=None, final_endpoint='stage_out'):
         """ input_tensor: BxHxWxC
-            out_dim: BxJ, where J is flattened 3D locations
+            out_dim: Bx(Jx3), where J is number of joints
         """
         self.end_point_list = []
         return hourglass.get_net(
-            input_tensor, self.out_dim,
-            is_training, bn_decay, self.end_point_list
+            input_tensor, self.out_dim, is_training,
+            bn_decay, regu_scale, self.end_point_list
         )

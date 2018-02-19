@@ -30,13 +30,13 @@ def write_h5(writer, index, poses):
         'index',
         index.shape,
         compression='lzf',
-        dtype=np.int32
+        dtype='i4'
     )
     writer.create_dataset(
         'poses',
         poses.shape,
         compression='lzf',
-        dtype=float)
+        dtype='f4')
     writer['index'][:] = index
     writer['poses'][:] = poses
 
