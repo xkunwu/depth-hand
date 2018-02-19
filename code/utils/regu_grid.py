@@ -89,14 +89,22 @@ class regu_grid:
 
     def putit(self, points3):
         index = np.floor((points3 - self.cll) / self.cellen).astype(int)
-        return np.clip(index, 0, self.step - 1)
+        return index
+        # return np.clip(index, 0, self.step - 1)
 
     def fill(self, points3):
-        pcnt = np.zeros(shape=(self.step, self.step, self.step))
+        step = self.step
+        pcnt = np.zeros((step ** 3))
         indices = self.putit(points3)
-        for index in indices:
-            pcnt[index[0], index[1], index[2]] += 1.
+        seqid = np.ravel_multi_index(indices.T, (step, step, step))
+        unid, counts = np.unique(seqid, return_counts=True)
+        pcnt[unid] = counts.astype(float)
         pcnt /= np.max(pcnt)  # normalized density
+        pcnt = pcnt.reshape((step, step, step))
+        # pcnt = np.zeros(shape=(step, step, step))
+        # for index in indices:
+        #     pcnt[index[0], index[1], index[2]] += 1.
+        # pcnt /= np.max(pcnt)  # normalized density
         # self.pcnt = pcnt
         return pcnt
 

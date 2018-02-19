@@ -123,15 +123,14 @@ class iso_cube:
         return np.ceil(2 * self.sidelen).astype(int) + 1
 
     def pick(self, points3):
-        """ in the local oriented unit coordinates.
-            orientation is important here.
-        """
-        points3_trans = (points3 - self.cen) / self.sidelen
-        cmin = - np.ones(3)
-        cmax = np.ones(3)
+        # points3_trans = (points3 - self.cen) / self.sidelen
+        # cmin = - np.ones(3)
+        # cmax = np.ones(3)
+        cmin = self.cen - self.sidelen * 0.999999
+        cmax = self.cen + self.sidelen * 0.999999
         conds = np.logical_and(
-            np.all(cmin < points3_trans, axis=1),
-            np.all(cmax > points3_trans, axis=1)
+            np.all(cmin < points3, axis=1),
+            np.all(cmax > points3, axis=1)
         )
         return points3[conds, :]
 
