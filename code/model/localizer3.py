@@ -423,6 +423,6 @@ class localizer3(base_conv3):
         """
         scale = self.crop_range / self.region_size
         loss = tf.nn.l2_loss((pred - echt) * scale)
-        losses_reg = tf.add_n(tf.get_collection(
+        loss_reg = tf.add_n(tf.get_collection(
             tf.GraphKeys.REGULARIZATION_LOSSES))
-        return loss + losses_reg
+        return loss + loss_reg

@@ -83,6 +83,7 @@ class batch_crop2(object):
         self.create_fn = {
             'crop2': self.create_crop2,
             'pose_c': self.create_pose_c,
+            'pose_c1': self.create_pose_c1,
         }
 
     def create_crop2(self, filepack, h5file_name, num_line):
@@ -115,6 +116,19 @@ class batch_crop2(object):
             shape=(self.store_size, out_dim),
             dtype='f4')
         return h5file['pose_c'], batch_data
+
+    def create_pose_c1(self, filepack, h5file_name, num_line):
+        out_dim = self.model_inst.join_num * 3
+        h5file = filepack.write_h5(h5file_name)
+        h5file.create_dataset(
+            'pose_c1',
+            (num_line, out_dim),
+            compression='lzf',
+            dtype='f4')
+        batch_data = np.empty(
+            shape=(self.store_size, out_dim),
+            dtype='f4')
+        return h5file['pose_c1'], batch_data
 
 
 class batch_clean(batch_crop2):

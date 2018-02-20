@@ -57,8 +57,8 @@ class voxel_detect(base_conv3):
     def receive_data(self, thedata, args):
         """ Receive parameters specific to the data """
         super(voxel_detect, self).receive_data(thedata, args)
-        self.out_dim = thedata.join_num
         thedata.hmap_size = self.hmap_size
+        self.out_dim = (self.hmap_size ** 3) * self.join_num
         self.store_name = {
             'index': self.train_file,
             'poses': self.train_file,
@@ -105,7 +105,7 @@ class voxel_detect(base_conv3):
         batch_resce = self.batch_data['batch_resce']
         batch_poses = np.argmax(pred_val, axis=1)  # convert to label
         num_elem = batch_index.shape[0]
-        poses_out = np.empty((num_elem, self.out_dim * 3))
+        poses_out = np.empty((num_elem, self.join_num * 3))
         for ei, resce, pose_lab in zip(range(num_elem), batch_resce, batch_poses):
             pose_raw = self.yanker(pose_lab, resce, self.caminfo)
             poses_out[ei] = pose_raw.reshape(1, -1)
@@ -289,7 +289,7 @@ class voxel_detect(base_conv3):
         end_points = {}
         self.end_point_list = []
         final_endpoint = 'hourglass_{}'.format(hg_repeat - 1)
-        num_joint = self.out_dim
+        num_joint = self.join_num
         num_feature = 32
         num_vol = self.hmap_size * self.hmap_size * self.hmap_size
 
@@ -387,7 +387,7 @@ class voxel_detect(base_conv3):
             tf.int32, shape=(
                 batch_size,
                 # self.hmap_size, self.hmap_size, self.hmap_size,
-                self.out_dim))
+                self.join_num))
         return frames_tf, poses_tf
 
     def get_loss(self, pred, echt, end_points):
@@ -409,6 +409,6 @@ class voxel_detect(base_conv3):
         #     if not name.startswith('hourglass_'):
         #         continue
         #     loss += tf.nn.l2_loss(net - echt)  # already divided by 2
-        losses_reg = tf.add_n(tf.get_collection(
+        loss_reg = tf.add_n(tf.get_collection(
             tf.GraphKeys.REGULARIZATION_LOSSES))
-        return loss + losses_reg
+        return loss + loss_reg

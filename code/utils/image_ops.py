@@ -15,6 +15,47 @@ def depth_cmap(cmap):
     return mycmap
 
 
+def draw_udir(vxdist, vxunit, voxize_crop, scale):
+    from mayavi import mlab
+    from colour import Color
+    # should reverser y-axis
+    mlab.figure(
+        bgcolor=(1, 1, 1), fgcolor=(0., 0., 0.),
+        size=(800, 800))
+    xx, yy, zz = np.where(1e-2 < vxdist)
+    vv = vxdist[np.where(1e-2 < vxdist)]
+    xx *= scale
+    yy *= scale
+    zz *= scale
+    vc = transparent_cmap(mpplot.cm.jet)(vv)
+    yy = voxize_crop - 1 - yy
+    nodes = mlab.points3d(
+        xx, yy, zz,
+        mode="cube", opacity=0.5,
+        # color=Color('khaki').rgb,
+        # colormap='hot',
+        scale_factor=0.9)
+    nodes.glyph.scale_mode = 'scale_by_vector'
+    nodes.mlab_source.dataset.point_data.scalars = vc
+    xx, yy, zz = np.mgrid[
+        # (scale / 2):(voxize_crop + (scale / 2)):scale,
+        # (scale / 2):(voxize_crop + (scale / 2)):scale,
+        # (scale / 2):(voxize_crop + (scale / 2)):scale]
+        0:voxize_crop:scale,
+        0:voxize_crop:scale,
+        0:voxize_crop:scale]
+    yy = voxize_crop - 1 - yy
+    mlab.quiver3d(
+        xx, yy, zz,
+        vxunit[..., 0], -vxunit[..., 1], vxunit[..., 2],
+        mode="arrow",
+        color=Color('red').rgb,
+        line_width=8, scale_factor=2)
+    mlab.gcf().scene.parallel_projection = True
+    mlab.view(0, 0)
+    mlab.gcf().scene.camera.zoom(1.5)
+
+
 def transparent_cmap(cmap, tmax=0.99, N=255):
     mycmap = cmap
     mycmap._init()

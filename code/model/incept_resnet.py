@@ -189,14 +189,14 @@ class incept_resnet:
 
     @staticmethod
     def get_net(
-            input_tensor, out_dim, is_training, bn_decay, end_point_list,
+            input_tensor, out_dim, is_training,
+            bn_decay, regu_scale, end_point_list,
             block_rep=[4, 4, 4], block_scale=[1.0, 1.0, 1.0],
             scope=None, final_endpoint='stage_out'):
         """ input_tensor: BxHxWxC
             out_dim: Bx(Jx3), where J is number of joints
         """
         end_points = {}
-        print(bn_decay)
 
         def add_and_check_final(name, net):
             end_points[name] = net
@@ -204,7 +204,6 @@ class incept_resnet:
 
         with tf.variable_scope(
                 scope, 'incept_resnet', [input_tensor]):
-            regu_scale = 0.00004
             bn_epsilon = 0.001
             with \
                 slim.arg_scope(

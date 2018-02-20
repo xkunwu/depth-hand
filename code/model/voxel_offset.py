@@ -2,7 +2,6 @@ import os
 from importlib import import_module
 import numpy as np
 import tensorflow as tf
-import h5py
 from .voxel_detect import voxel_detect
 from utils.iso_boxes import iso_cube
 from utils.regu_grid import regu_grid
@@ -52,6 +51,7 @@ class voxel_offset(voxel_detect):
     def receive_data(self, thedata, args):
         """ Receive parameters specific to the data """
         super(voxel_offset, self).receive_data(thedata, args)
+        self.out_dim = (self.hmap_size ** 3) * self.join_num * 4
         self.store_name = {
             'index': self.train_file,
             'poses': self.train_file,
@@ -72,7 +72,7 @@ class voxel_offset(voxel_detect):
             'vxudir': ['pcnt3', 'poses', 'resce'],
         }
 
-    def yanker(self, resce, vxhit, vxudir, caminfo):
+    def yanker_hmap(self, resce, vxhit, vxudir, caminfo):
         cube = iso_cube()
         cube.load(resce)
         return self.data_module.ops.vxudir_to_raw(
@@ -83,34 +83,15 @@ class voxel_offset(voxel_detect):
         batch_resce = self.batch_data['batch_resce']
         batch_frame = self.batch_data['batch_frame']
         num_elem = batch_index.shape[0]
-        poses_out = np.empty((num_elem, self.out_dim * 3))
+        poses_out = np.empty((num_elem, self.join_num * 3))
         for ei in range(num_elem):
-            pose_raw = self.yanker(
+            pose_raw = self.yanker_hmap(
                 batch_resce[ei, ...],
                 batch_frame[ei, ...],
                 pred_val[ei, ...],
                 self.caminfo)
             poses_out[ei] = pose_raw.reshape(1, -1)
         self.eval_pred.append(poses_out)
-
-    # def write_pred(self, fanno, caminfo,
-    #                batch_index, batch_resce,
-    #                batch_frame, batch_poses):
-    #     num_j = self.out_dim
-    #     for ii in range(batch_index.shape[0]):
-    #         img_name = self.data_module.io.index2imagename(batch_index[ii, 0])
-    #         resce = batch_resce[ii, :]
-    #         frame = np.squeeze(batch_frame[ii, ...])
-    #         vxhit = batch_poses[ii, ..., 0 * num_j:1 * num_j]
-    #         olmap = batch_poses[ii, ..., 1 * num_j:2 * num_j]
-    #         uomap = batch_poses[ii, ..., 2 * num_j:]
-    #         pose_raw = self.yanker_hmap(
-    #             resce, vxhit, olmap, uomap, frame,
-    #             self.hmap_size, caminfo)
-    #         fanno.write(
-    #             img_name +
-    #             '\t' + '\t'.join("%.4f" % x for x in pose_raw.flatten()) +
-    #             '\n')
 
     def draw_random(self, thedata, args):
         import matplotlib.pyplot as mpplot
@@ -141,17 +122,17 @@ class voxel_offset(voxel_detect):
         img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
         from colour import Color
         colors = [Color('orange').rgb, Color('red').rgb, Color('lime').rgb]
-        fig, _ = mpplot.subplots(nrows=2, ncols=2, figsize=(2 * 5, 2 * 5))
+        fig, _ = mpplot.subplots(nrows=2, ncols=3, figsize=(3 * 5, 2 * 5))
         vxcnt_crop = frame_h5
         voxize_crop = self.crop_size
         voxize_hmap = self.hmap_size
         scale = self.map_scale
-        num_joint = self.out_dim
+        num_joint = self.join_num
         joint_id = num_joint - 1
         vxdist = vxudir_h5[..., joint_id]
         vxunit = vxudir_h5[..., num_joint + 3 * joint_id:num_joint + 3 * (joint_id + 1)]
 
-        ax = mpplot.subplot(2, 2, 1)
+        ax = mpplot.subplot(2, 3, 1)
         ax.imshow(img, cmap=mpplot.cm.bone_r)
         pose_raw = poses_h5
         args.data_draw.draw_pose2d(
@@ -164,7 +145,7 @@ class voxel_offset(voxel_detect):
         for ii, rect in enumerate(rects):
             rect.draw(ax, colors[ii])
 
-        pose_out = self.yanker(
+        pose_out = self.yanker_hmap(
             resce_h5, vxcnt_crop, vxudir_h5, self.caminfo)
         err_re = np.sum(np.abs(pose_out - pose_raw))
         if 1e-2 < err_re:
@@ -189,59 +170,72 @@ class voxel_offset(voxel_detect):
             ax.set_aspect('equal', adjustable='box')
             ax.invert_yaxis()
 
-        ax = mpplot.subplot(2, 2, 2)
+        ax = mpplot.subplot(2, 3, 2)
         draw_voxel_pose(ax, pose_raw, roll=0)
 
         from utils.image_ops import draw_vxmap, draw_uomap3d
-        ax = mpplot.subplot(2, 2, 3)
-        draw_vxmap(fig, ax, vxcnt_crop, vxdist, voxize_hmap, reduce_fn=np.max, roll=0)
-
-        # ax = mpplot.subplot(2, 2, 4, projection='3d')
-        ax = mpplot.subplot(2, 2, 4)
+        # ax = mpplot.subplot(2, 3, 4, projection='3d')
+        ax = mpplot.subplot(2, 3, 3)
         draw_uomap3d(fig, ax, vxcnt_crop, vxunit[voxize_hmap / 2, ...])
+
+        ax = mpplot.subplot(2, 3, 4)
+        draw_vxmap(fig, ax, vxcnt_crop, vxdist, voxize_hmap, reduce_fn=np.max, roll=0)
+        ax = mpplot.subplot(2, 3, 5)
+        draw_vxmap(fig, ax, vxcnt_crop, vxdist, voxize_hmap, reduce_fn=np.max, roll=1)
+        ax = mpplot.subplot(2, 3, 6)
+        draw_vxmap(fig, ax, vxcnt_crop, vxdist, voxize_hmap, reduce_fn=np.max, roll=2)
 
         if not self.args.show_draw:
             mlab.options.offscreen = True
         else:
-            from utils.image_ops import transparent_cmap
-            # should reverser y-axis
-            mlab.figure(
-                bgcolor=(1, 1, 1), fgcolor=(0., 0., 0.),
-                size=(800, 800))
-            xx, yy, zz = np.where(1e-2 < frame_h5)
-            vv = frame_h5[xx, yy, zz]
-            vc = transparent_cmap(mpplot.cm.jet)(vv)
-            yy = 63 - yy
-            nodes = mlab.points3d(
-                xx, yy, zz,
-                mode="cube", opacity=0.5,
-                # color=Color('khaki').rgb,
-                # colormap='hot',
-                scale_factor=0.9)
-            nodes.glyph.scale_mode = 'scale_by_vector'
-            nodes.mlab_source.dataset.point_data.scalars = vc
-            xx, yy, zz = np.mgrid[
-                # (scale / 2):(voxize_crop + (scale / 2)):scale,
-                # (scale / 2):(voxize_crop + (scale / 2)):scale,
-                # (scale / 2):(voxize_crop + (scale / 2)):scale]
-                0:voxize_crop:scale,
-                0:voxize_crop:scale,
-                0:voxize_crop:scale]
-            yy = 63 - yy
-            mlab.quiver3d(
-                xx, yy, zz,
-                vxunit[..., 0], -vxunit[..., 1], vxunit[..., 2],
-                mode="arrow",
-                color=Color('red').rgb,
-                line_width=8, scale_factor=2)
-            mlab.gcf().scene.parallel_projection = True
-            mlab.view(0, 0)
-            mlab.gcf().scene.camera.zoom(1.5)
-            # mlab.outline()
+            from utils.image_ops import draw_udir
+            # # should reverser y-axis
+            # mlab.figure(
+            #     bgcolor=(1, 1, 1), fgcolor=(0., 0., 0.),
+            #     size=(800, 800))
+            # xx, yy, zz = np.where(1e-2 < vxdist)
+            # vv = vxdist[np.where(1e-2 < vxdist)]
+            # xx *= scale
+            # yy *= scale
+            # zz *= scale
+            # vc = transparent_cmap(mpplot.cm.jet)(vv)
+            # yy = voxize_crop - 1 - yy
+            # nodes = mlab.points3d(
+            #     xx, yy, zz,
+            #     mode="cube", opacity=0.5,
+            #     # color=Color('khaki').rgb,
+            #     # colormap='hot',
+            #     scale_factor=0.9)
+            # nodes.glyph.scale_mode = 'scale_by_vector'
+            # nodes.mlab_source.dataset.point_data.scalars = vc
+            # xx, yy, zz = np.mgrid[
+            #     # (scale / 2):(voxize_crop + (scale / 2)):scale,
+            #     # (scale / 2):(voxize_crop + (scale / 2)):scale,
+            #     # (scale / 2):(voxize_crop + (scale / 2)):scale]
+            #     0:voxize_crop:scale,
+            #     0:voxize_crop:scale,
+            #     0:voxize_crop:scale]
+            # yy = voxize_crop - 1 - yy
+            # mlab.quiver3d(
+            #     xx, yy, zz,
+            #     vxunit[..., 0], -vxunit[..., 1], vxunit[..., 2],
+            #     mode="arrow",
+            #     color=Color('red').rgb,
+            #     line_width=8, scale_factor=2)
+            # mlab.gcf().scene.parallel_projection = True
+            # mlab.view(0, 0)
+            # mlab.gcf().scene.camera.zoom(1.5)
+            # # mlab.outline()
+            draw_udir(vxdist, vxunit, voxize_crop, scale)
             mlab.draw()
             mlab.savefig(os.path.join(
                 args.predict_dir,
                 'draw3d_{}_{}.png'.format(self.name_desc, img_id)))
+            joint_id = 0
+            vxdist = vxudir_h5[..., joint_id]
+            vxunit = vxudir_h5[..., num_joint + 3 * joint_id:num_joint + 3 * (joint_id + 1)]
+            draw_udir(vxdist, vxunit, voxize_crop, scale)
+            mlab.draw()
 
         mpplot.savefig(os.path.join(
             args.predict_dir,
@@ -263,7 +257,7 @@ class voxel_offset(voxel_detect):
         end_points = {}
         self.end_point_list = []
         final_endpoint = 'hourglass_{}'.format(hg_repeat - 1)
-        num_joint = self.out_dim
+        num_joint = self.join_num
         num_feature = 96
 
         def add_and_check_final(name, net):
@@ -349,6 +343,12 @@ class voxel_offset(voxel_detect):
                             axis=-1)
                         self.end_point_list.append(sc)
                         if add_and_check_final(sc, net_maps):
+                            # flat_soft = tf.reshape(branch_hit, [-1, num_vol, num_joint])
+                            # flat_soft = tf.nn.softmax(flat_soft, dim=1)
+                            # branch_hit = tf.reshape(flat_soft, [-1, vol_shape, num_joint])
+                            # net_maps = tf.concat(
+                            #     [branch_hit, branch_olm, branch_uom],
+                            #     axis=-1)
                             return net_maps, end_points
                         branch1 = slim.conv3d(
                             net_maps, num_feature, 1)
@@ -365,7 +365,7 @@ class voxel_offset(voxel_detect):
             tf.float32, shape=(
                 batch_size,
                 self.hmap_size, self.hmap_size, self.hmap_size,
-                self.out_dim * 4))
+                self.join_num * 4))
         return frames_tf, poses_tf
 
     @staticmethod
@@ -381,19 +381,19 @@ class voxel_offset(voxel_detect):
             pred: BxHxWxDxJ
             echt: BxJ
         """
-        num_j = self.out_dim
-        loss = 0
+        num_j = self.join_num
+        loss_udir = 0
         for name, net in end_points.items():
             if not name.startswith('hourglass_'):
                 continue
-            loss += tf.nn.l2_loss(net - echt)
+            loss_udir += tf.nn.l2_loss(net - echt)
             vxunit_pred = tf.reshape(
                 net[..., num_j:],
                 (-1, 3))
             loss_unit = tf.reduce_sum(vxunit_pred ** 2, axis=-1)
             loss_unit = tf.reduce_sum(
                 self.smooth_l1(tf.abs(1 - loss_unit)))
-            loss += loss_unit
-        losses_reg = tf.add_n(tf.get_collection(
+            loss_udir += loss_unit
+        loss_reg = tf.add_n(tf.get_collection(
             tf.GraphKeys.REGULARIZATION_LOSSES))
-        return loss + losses_reg
+        return loss_udir + loss_reg

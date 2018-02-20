@@ -114,7 +114,7 @@ class capture:
         return depth
 
     def detect_region(self, depth, sess, ops):
-        depth_rescale = self.args.data_ops.resize_localizer(
+        depth_rescale = self.args.data_ops.resize_normalize(
             depth, self.args.data_inst)
         feed_dict = {
             ops['batch_frame']: self.args.model_inst.convert_input(

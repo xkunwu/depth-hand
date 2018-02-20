@@ -77,6 +77,7 @@ class inresnet3d:
             num_out = num
         num2 = (num_out >> 1)
         num4 = (num2 >> 1)
+        # num8 = (num4 >> 1)
         sc_current = 'reduce_net_{}'.format(num2)
         with tf.variable_scope(scope, sc_current, [net], reuse=reuse):
             with tf.variable_scope('branch0'):
@@ -96,16 +97,23 @@ class inresnet3d:
                  scope=None, reuse=None):
         """ supposed to work best with 8x8 input """
         with tf.variable_scope(scope, 'pullout8', [net], reuse=reuse):
-            net = slim.avg_pool3d(
-                net, 5, stride=3, padding='VALID',
-                scope='avgpool8_5x5_3')
+            net = inresnet3d.conv_maxpool(net, scope='conv_pool_8')
+            print(net.shape)
+            shape4 = net.get_shape()
+            fc_num = shape4[4] * 8
+            net = slim.conv3d(
+                net, fc_num, shape4[1:4],
+                padding='VALID', scope='fullconn4')
+            # net = slim.avg_pool3d(
+            #     net, 5, stride=3, padding='VALID',
+            #     scope='avgpool8_5x5_3')
             print(net.shape)
             # net = slim.conv3d(net, 64, 1, scope='reduce8')
             # print(net.shape)
-            net = slim.conv3d(
-                net, 256, net.get_shape()[1:4],
-                padding='VALID', scope='fullconn8')
-            print(net.shape)
+            # net = slim.conv3d(
+            #     net, 256, net.get_shape()[1:4],
+            #     padding='VALID', scope='fullconn8')
+            # print(net.shape)
             net = slim.flatten(net)
             net = slim.dropout(
                 net, 0.5, scope='dropout8')
@@ -118,14 +126,14 @@ class inresnet3d:
 
     @staticmethod
     def get_net(
-            input_tensor, out_dim, is_training, bn_decay, end_point_list,
+            input_tensor, out_dim, is_training,
+            bn_decay, regu_scale, end_point_list,
             block_rep=[4, 4, 4], block_scale=[1.0, 1.0, 1.0],
             scope=None, final_endpoint='stage_out'):
         """ input_tensor: BxHxWxC
             out_dim: Bx(Jx3), where J is number of joints
         """
         end_points = {}
-        print(bn_decay)
 
         def add_and_check_final(name, net):
             end_points[name] = net
@@ -133,7 +141,6 @@ class inresnet3d:
 
         with tf.variable_scope(
                 scope, 'inresnet3d', [input_tensor]):
-            regu_scale = 0.00004
             bn_epsilon = 0.001
             with \
                 slim.arg_scope(

@@ -92,7 +92,7 @@ def draw_pose2d(ax, thedata, pose2d, show_margin=True):
     #         #          (int(p2[0]), int(p2[1])),
     #         #          thedata.join_color[fii + 1], 1)
 
-    return fig2data(mpplot.gcf(), show_margin)
+    # return fig2data(mpplot.gcf(), show_margin)
 
 
 def draw_pose_raw(ax, thedata, img, pose_raw, show_margin=False):

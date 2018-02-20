@@ -30,8 +30,9 @@ class hourglass:
 
     @staticmethod
     def get_net(
-            input_tensor, out_dim, is_training, bn_decay, end_point_list,
-            hg_repeat=8, scope=None, final_endpoint='stage_out'):
+            input_tensor, out_dim, is_training,
+            bn_decay, regu_scale, end_point_list,
+            hg_repeat=4, scope=None, final_endpoint='stage_out'):
         """ input_tensor: BxHxWxC
         """
         end_points = {}
@@ -42,7 +43,6 @@ class hourglass:
 
         with tf.variable_scope(
                 scope, 'hourglass_net', [input_tensor]):
-            regu_scale = 0.00004
             bn_epsilon = 0.001
             with \
                 slim.arg_scope(

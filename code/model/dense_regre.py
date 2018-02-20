@@ -450,11 +450,11 @@ class dense_regre(base_regre):
                             axis=-1)
                         self.end_point_list.append(sc)
                         if add_and_check_final(sc, net_maps):
-                            # branch_hm2 = tf.reshape(tf.nn.softmax(
-                            #     tf.reshape(branch_hm2, [-1, num_vol, num_joint]),
-                            #     dim=1), [-1, vol_shape, num_joint])
+                            # flat_soft = tf.reshape(branch_hit, [-1, num_vol, num_joint])
+                            # flat_soft = tf.nn.softmax(flat_soft, dim=1)
+                            # branch_hit = tf.reshape(flat_soft, [-1, vol_shape, num_joint])
                             # net_maps = tf.concat(
-                            #     [branch_hm2, branch_olm, branch_uom],
+                            #     [branch_hit, branch_olm, branch_uom],
                             #     axis=-1)
                             return net_maps, end_points
                         branch1 = slim.conv2d(
@@ -506,6 +506,6 @@ class dense_regre(base_regre):
             #         logits=pred[:, :num_joint])
             # )
             loss += tf.nn.l2_loss(net - echt)  # already divided by 2
-        losses_reg = tf.add_n(tf.get_collection(
+        loss_reg = tf.add_n(tf.get_collection(
             tf.GraphKeys.REGULARIZATION_LOSSES))
-        return loss + losses_reg
+        return loss + loss_reg

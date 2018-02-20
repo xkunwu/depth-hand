@@ -6,7 +6,7 @@ from functools import reduce
 from utils.coder import file_pack
 from utils.tf_utils import unravel_index
 from train.train_abc import train_abc
-from utils.image_ops import tfplot_vxlab, tfplot_vxflt, tfplot_vxmap
+from utils.image_ops import tfplot_vxmap, tfplot_uomap3d
 
 
 class train_voxel_regre(train_abc):
@@ -15,7 +15,7 @@ class train_voxel_regre(train_abc):
         tf.reset_default_graph()
         with tf.Graph().as_default(), \
                 tf.device('/gpu:' + str(self.args.gpu_id)):
-            frames_op, poses_op, vxmap_op = \
+            frames_op, poses_op, vxudir_op = \
                 self.args.model_inst.placeholder_inputs()
             is_training_tf = tf.placeholder(
                 tf.bool, shape=(), name='is_training')
@@ -36,7 +36,7 @@ class train_voxel_regre(train_abc):
             self.args.logger.info(
                 'network structure:\n{}'.format(shapestr))
             loss_op = self.args.model_inst.get_loss(
-                pred_op, poses_op, vxmap_op, end_points)
+                pred_op, poses_op, vxudir_op, end_points)
             # regre_error = tf.sqrt(loss_op * 2)
             regre_error = loss_op
             tf.summary.scalar('regression_error', regre_error)
@@ -48,38 +48,42 @@ class train_voxel_regre(train_abc):
             num_j = self.args.model_inst.out_dim
             joint_id = num_j - 1
             frame = frames_op[0, ..., 0]
-            vxlab_echt = poses_op[0, joint_id]
-            vxmap_pred = pred_op[0, ..., joint_id]
-            olmap_echt = vxmap_op[0, ..., joint_id]
-            olmap_pred = pred_op[0, ..., num_j + joint_id]
-            # uomap_echt = vxmap_op[
-            #     0, ...,
+            vxdist_echt = vxudir_op[0, ..., joint_id]
+            vxdist_echt_op = tf.expand_dims(tfplot_vxmap(
+                frame, vxdist_echt, hmap_size, reduce_fn=np.max), axis=0)
+            tf.summary.image('vxdist_echt/', vxdist_echt_op, max_outputs=1)
+            netid = 0
+            for ends in self.args.model_inst.end_point_list:
+                if not ends.startswith('hourglass_'):
+                    continue
+                net = end_points[ends]
+                vxdist_pred = net[0, ..., joint_id]
+                vxdist_pred_op = tf.expand_dims(tfplot_vxmap(
+                    frame, vxdist_pred, hmap_size, reduce_fn=np.max), axis=0)
+                tf.summary.image(
+                    'vxdist_pred_{:d}/'.format(netid),
+                    vxdist_pred_op, max_outputs=1)
+                netid += 1
+            # vxunit_echt = vxudir_op[
+            #     0, hmap_size / 2, ...,
             #     num_j + 3 * joint_id:num_j + 3 * (joint_id + 1)]
-            # uomap_pred = pred_op[
-            #     0, ...,
-            #     2 * num_j + 3 * joint_id:2 * num_j + 3 * (joint_id + 1)]
-            vxmap_echt_op = tf.expand_dims(tfplot_vxlab(
-                frame, vxlab_echt, hmap_size), axis=0)
-            tf.summary.image('vxmap_echt/', vxmap_echt_op, max_outputs=1)
-            vxmap_pred_op = tf.expand_dims(tfplot_vxmap(
-                frame, vxmap_pred, hmap_size, reduce_fn=np.max), axis=0)
-            tf.summary.image('vxmap_pred/', vxmap_pred_op, max_outputs=1)
-            olmap_echt_op = tf.expand_dims(tfplot_vxmap(
-                frame, olmap_echt, hmap_size, reduce_fn=np.max), axis=0)
-            tf.summary.image('olmap_echt/', olmap_echt_op, max_outputs=1)
-            olmap_pred_op = tf.expand_dims(tfplot_vxmap(
-                frame, olmap_pred, hmap_size, reduce_fn=np.max), axis=0)
-            tf.summary.image('olmap_pred/', olmap_pred_op, max_outputs=1)
-
-            tf.summary.histogram('vxhit_value_pred', vxmap_pred)
-            vxidx_echt = unravel_index(
-                vxlab_echt, (hmap_size, hmap_size, hmap_size))
-            vxidx_pred = unravel_index(
-                tf.argmax(tf.layers.flatten(vxmap_pred), output_type=tf.int32),
-                (hmap_size, hmap_size, hmap_size))
-            tf.summary.scalar(
-                'vxhit_diff_echt',
-                tf.reduce_sum(tf.abs(vxidx_echt - vxidx_pred)))
+            # vxunit_echt_op = tf.expand_dims(tfplot_uomap3d(
+            #     frame, vxunit_echt), axis=0)
+            # tf.summary.image('vxunit_echt/', vxunit_echt_op, max_outputs=1)
+            # netid = 0
+            # for ends in self.args.model_inst.end_point_list:
+            #     if not ends.startswith('hourglass_'):
+            #         continue
+            #     net = end_points[ends]
+            #     vxunit_pred = net[
+            #         0, hmap_size / 2, ...,
+            #         num_j + 3 * joint_id:num_j + 3 * (joint_id + 1)]
+            #     vxunit_pred_op = tf.expand_dims(tfplot_uomap3d(
+            #         frame, vxunit_pred), axis=0)
+            #     tf.summary.image(
+            #         'vxunit_pred_{:d}/'.format(netid),
+            #         vxunit_pred_op, max_outputs=1)
+            #     netid += 1
 
             optimizer = tf.train.AdamOptimizer(learning_rate)
             # train_op = optimizer.minimize(
@@ -126,7 +130,7 @@ class train_voxel_regre(train_abc):
                 ops = {
                     'batch_frame': frames_op,
                     'batch_poses': poses_op,
-                    'batch_vxmap': vxmap_op,
+                    'batch_vxudir': vxudir_op,
                     'is_training': is_training_tf,
                     'summary_op': summary_op,
                     'step': global_step,
@@ -149,7 +153,7 @@ class train_voxel_regre(train_abc):
             feed_dict = {
                 ops['batch_frame']: batch_data['batch_frame'],
                 ops['batch_poses']: batch_data['batch_poses'],
-                ops['batch_vxmap']: batch_data['batch_vxmap'],
+                ops['batch_vxudir']: batch_data['batch_vxudir'],
                 ops['is_training']: True
             }
             summary, step, _, loss_val, pred_val = sess.run(
@@ -191,7 +195,7 @@ class train_voxel_regre(train_abc):
             feed_dict = {
                 ops['batch_frame']: batch_data['batch_frame'],
                 ops['batch_poses']: batch_data['batch_poses'],
-                ops['batch_vxmap']: batch_data['batch_vxmap'],
+                ops['batch_vxudir']: batch_data['batch_vxudir'],
                 ops['is_training']: False
             }
             summary, step, loss_val, pred_val = sess.run(
@@ -224,7 +228,7 @@ class train_voxel_regre(train_abc):
         with tf.Graph().as_default(), \
                 tf.device('/gpu:' + str(self.args.gpu_id)):
             # sequential evaluate, suited for streaming
-            frames_op, poses_op, vxmap_op = \
+            frames_op, poses_op, vxudir_op = \
                 self.args.model_inst.placeholder_inputs(1)
             is_training_tf = tf.placeholder(
                 tf.bool, shape=(), name='is_training')
@@ -233,7 +237,7 @@ class train_voxel_regre(train_abc):
                 frames_op, is_training_tf,
                 self.args.bn_decay, self.args.regu_scale)
             loss_op = self.args.model_inst.get_loss(
-                pred_op, poses_op, vxmap_op, end_points)
+                pred_op, poses_op, vxudir_op, end_points)
 
             saver = tf.train.Saver()
 
@@ -251,20 +255,18 @@ class train_voxel_regre(train_abc):
                 ops = {
                     'batch_frame': frames_op,
                     'batch_poses': poses_op,
-                    'batch_vxmap': vxmap_op,
+                    'batch_vxudir': vxudir_op,
                     'is_training': is_training_tf,
                     'loss_op': loss_op,
                     'pred_op': pred_op
                 }
 
-                with file_pack() as filepack:
-                    writer = self.args.model_inst.start_evaluate(
-                        filepack)
-                    self.eval_one_epoch_write(sess, ops, writer)
+                self.args.model_inst.start_evaluate()
+                self.eval_one_epoch_write(sess, ops)
                 self.args.model_inst.end_evaluate(
                     self.args.data_inst, self.args)
 
-    def eval_one_epoch_write(self, sess, ops, writer):
+    def eval_one_epoch_write(self, sess, ops):
         batch_count = 0
         loss_sum = 0
         num_stores = self.args.model_inst.store_size
@@ -282,15 +284,13 @@ class train_voxel_regre(train_abc):
             feed_dict = {
                 ops['batch_frame']: batch_data['batch_frame'],
                 ops['batch_poses']: batch_data['batch_poses'],
-                ops['batch_vxmap']: batch_data['batch_vxmap'],
+                ops['batch_vxudir']: batch_data['batch_vxudir'],
                 ops['is_training']: False
             }
             loss_val, pred_val = sess.run(
                 [ops['loss_op'], ops['pred_op']],
                 feed_dict=feed_dict)
-            self.args.model_inst.evaluate_batch(
-                writer, pred_val
-            )
+            self.args.model_inst.evaluate_batch(pred_val)
             loss_sum += loss_val
             timerbar.update(batch_count)
             batch_count += 1

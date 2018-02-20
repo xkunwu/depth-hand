@@ -349,6 +349,7 @@ class hands17holder:
         # }
         self.store_prow = {
             'pose_c': datapro.prow_pose_c,
+            'pose_c1': datapro.prow_pose_c1,
             'pose_hit': datapro.prow_pose_hit,
             'pose_lab': datapro.prow_pose_lab,
             'crop2': datapro.prow_crop2,

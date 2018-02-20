@@ -211,8 +211,7 @@ class base_regre(object):
             mpplot.close(fig)
 
     def yanker(self, pose_local, resce, caminfo):
-        resce3 = resce[0:4]
-        return self.data_module.ops.pca_to_raw(pose_local, resce3)
+        return self.data_module.ops.pca_to_raw(pose_local, resce)
 
     def prepare_data(self, thedata, args,
                      filepack, prepare_h5file):
@@ -504,7 +503,7 @@ class base_regre(object):
         # self.end_point_list.append('dropout1')
         # end_points['dropout1'] = net
         # net = tf_util.fully_connected(
-        #     net, out_dim, scope='fullconn3', activation_fn=None)
+        #     net, self.out_dim, scope='fullconn3', activation_fn=None)
         # self.end_point_list.append('fullconn3')
         # end_points['fullconn3'] = net
 
@@ -610,9 +609,9 @@ class base_regre(object):
         # loss = tf.reduce_sum(tf.pow(tf.subtract(pred, echt), 2)) / 2
         loss = tf.nn.l2_loss(pred - echt)  # already divided by 2
         # loss = tf.reduce_mean(tf.squared_difference(pred, echt)) / 2
-        losses_reg = tf.add_n(tf.get_collection(
+        loss_reg = tf.add_n(tf.get_collection(
             tf.GraphKeys.REGULARIZATION_LOSSES))
-        return loss + losses_reg
+        return loss + loss_reg
 
     # @staticmethod
     # def base_arg_scope(is_training,

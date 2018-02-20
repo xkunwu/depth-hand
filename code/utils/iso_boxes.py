@@ -228,21 +228,13 @@ class iso_cube:
         # coord *= 0.999999  # simple hack to remove boundary
         xx = np.floor(coord[:, 0] * sizel).astype(int)
         yy = np.floor(coord[:, 1] * sizel).astype(int)
-        # yy = np.floor((1 - coord[:, 1]) * sizel).astype(int)
-        for x, y, z in zip(xx, yy, depth):
-            if x == sizel or y == sizel:
-                continue
-            if 1e-4 > img[x, y]:  # only write the nearest (sorted depth)
-                img[x, y] = z  # image coordinates: reverse x, y
+        img[xx, yy] = depth
         # # painter - slow but consistent
-        # depth_sort = np.argsort(depth)
-        # for sid in depth_sort:
-        #     x = xx[sid]
-        #     y = yy[sid]
+        # for x, y, z in zip(xx, yy, depth):
         #     if x == sizel or y == sizel:
         #         continue
-        #     if 1e-4 > img[y, x]:
-        #         img[y, x] = depth[sid]  # image coordinates: reverse x, y
+        #     if 1e-4 > img[x, y]:  # only write the nearest (sorted depth)
+        #         img[x, y] = z  # image coordinates: reverse x, y
         return img
 
     def image_to_unit(self, image):

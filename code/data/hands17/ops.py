@@ -288,7 +288,7 @@ def normalize_depth(img, caminfo):
     )
 
 
-def resize_localizer(img, caminfo):
+def resize_normalize(img, caminfo):
     """ rescale to fixed cropping size """
     img_rescale = cv2resize(
         img, (caminfo.crop_size, caminfo.crop_size))
@@ -414,6 +414,7 @@ def generate_anchors_2d(img, pose_raw, anchor_num, caminfo):
 
 
 def direc_belief(pcnt):
+    """ not optimized! """
     size = pcnt.shape[0]
     phi = np.ones_like(pcnt)
     z0front = np.ones((size, size)) * size
@@ -497,8 +498,11 @@ def raw_to_vxoff_flat(vxcnt, pose_raw, cube, caminfo):
     step = caminfo.hmap_size
     grid = regu_grid()
     grid.from_cube(cube, step)
+    # pose_raw = grid.voxen(np.array([[0, 0, 0], [1, 1, 1]]))
+    # print(pose_raw)
     voxcens = grid.voxen(
         np.mgrid[0:step, 0:step, 0:step].reshape(3, -1).T)
+    # print(voxcens)
     offset = pose_raw - voxcens[:, None]  # (S*S*S)xJx3
     return offset
     # return offset.reshape((step ** 3, -1))
@@ -540,15 +544,22 @@ def raw_to_vxudir(vxcnt, pose_raw, cube, caminfo):
     from numpy import linalg
     step = caminfo.hmap_size
     offset = raw_to_vxoff_flat(vxcnt, pose_raw, cube, caminfo)
+    # print(offset)
     offlen = linalg.norm(offset, axis=-1)  # offset norm
+    # print(offlen)
     theta = caminfo.region_size * 2  # maximal - cube size
-    invalid_id = np.logical_or(
-        1e-2 > offlen,  # remove sigular point
-        theta < offlen,  # limit support within theta
-    )
-    offset[invalid_id, ...] = 0
-    offlen[invalid_id] = theta
+    offlen = np.clip(offlen, 1e-2, theta)  # 1mm minimum
+    # invalid_id = np.logical_or(
+    #     1e-2 > offlen,  # remove sigular point
+    #     theta < offlen,  # limit support within theta
+    # )
+    # print(invalid_id)
+    # offset[invalid_id, ...] = 0
+    # print(offset)
+    # offlen[invalid_id] = theta
+    # print(offlen)
     unit_off = offset / offlen[:, :, None]
+    # print(unit_off)
     void_id = _void_id(vxcnt, step)
     unit_off[void_id, ...] = 0
     offlen[void_id] = theta
@@ -826,7 +837,7 @@ def to_crop2(img, cube, caminfo):
         cll_i[0]:cll_i[0] + sizel,
         cll_i[1]:cll_i[1] + sizel,
     ]
-    img_crop2 = resize_localizer(img_crop, caminfo)
+    img_crop2 = resize_normalize(img_crop, caminfo)
     return img_crop2
 
 

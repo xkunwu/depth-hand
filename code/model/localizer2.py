@@ -16,7 +16,7 @@ from utils.iso_boxes import iso_cube
 # def prow_localizer2(line, image_dir, caminfo):
 #     img_name, pose_raw = dataio.parse_line_annot(line)
 #     img = dataio.read_image(os.path.join(image_dir, img_name))
-#     img_rescale = dataops.resize_localizer(img, caminfo)
+#     img_rescale = dataops.resize_normalize(img, caminfo)
 #     anchors, resce = dataops.generate_anchors_2d(
 #         img, pose_raw, caminfo.anchor_num, caminfo)
 #     index = dataio.imagename2index(img_name)
@@ -563,6 +563,6 @@ class localizer2(base_regre):
         loss = loss_cls + self.loss_lambda * loss_reg
         # loss = loss_cls
         # loss = loss_reg
-        losses_reg = tf.add_n(tf.get_collection(
+        loss_reg = tf.add_n(tf.get_collection(
             tf.GraphKeys.REGULARIZATION_LOSSES))
-        return loss + losses_reg
+        return loss + loss_reg

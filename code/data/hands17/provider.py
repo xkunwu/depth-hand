@@ -96,6 +96,16 @@ def prow_ortho3(args, thedata, batch_data):
     batch_data[bi, ...] = img_ortho3
 
 
+def prow_pose_c1(args, thedata, batch_data):
+    bi, poses, resce, = \
+        args[0], args[1], args[2]
+    cube = iso_cube()
+    cube.load(resce)
+    pose_c1 = cube.transform_center_shrink(
+        poses.reshape(-1, 3))
+    batch_data[bi, ...] = pose_c1.flatten()
+
+
 def prow_pose_c(args, thedata, batch_data):
     bi, poses, resce, = \
         args[0], args[1], args[2]
