@@ -6,6 +6,26 @@ from utils.iso_boxes import iso_cube
 from utils.regu_grid import latice_image
 
 
+def prow_udir2(args, thedata, batch_data):
+    bi, clean, poses, resce, = \
+        args[0], args[1], args[2], args[3]
+    cube = iso_cube()
+    cube.load(resce)
+    udir2 = dataops.raw_to_udir2(
+        clean, poses.reshape(-1, 3), cube, thedata)
+    batch_data[bi, ...] = udir2
+
+
+def prow_hmap2(args, thedata, batch_data):
+    bi, poses, resce, = \
+        args[0], args[1], args[2]
+    cube = iso_cube()
+    cube.load(resce)
+    hmap2 = dataops.raw_to_heatmap2(
+        poses.reshape(-1, 3), cube, thedata)
+    batch_data[bi, ...] = hmap2
+
+
 def prow_vxudir(args, thedata, batch_data):
     bi, pcnt3, poses, resce, = \
         args[0], args[1], args[2], args[3]

@@ -19,8 +19,8 @@ class voxel_regre(voxel_offset):
 
     def __init__(self, args):
         super(voxel_regre, self).__init__(args)
-        self.crop_size = 64
-        self.hmap_size = 32
+        self.crop_size = 32
+        self.hmap_size = 16
         self.map_scale = self.crop_size / self.hmap_size
 
     def fetch_batch(self, fetch_size=None):

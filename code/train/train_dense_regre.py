@@ -41,7 +41,7 @@ class train_dense_regre(train_abc):
             learning_rate = self.get_learning_rate(global_step)
             tf.summary.scalar('learning_rate', learning_rate)
 
-            num_j = self.args.model_inst.out_dim
+            num_j = self.args.model_inst.join_num
             joint_id = num_j - 1
             frame = frames_op[0, ..., 0]
             hmap2_echt = poses_op[0, ..., joint_id]
@@ -73,7 +73,7 @@ class train_dense_regre(train_abc):
                 frame, uomap_pred), axis=0)
             tf.summary.image('uomap_pred/', uomap_pred_op, max_outputs=1)
 
-            num_j = self.args.model_inst.out_dim
+            num_j = self.args.model_inst.join_num
             tf.summary.histogram(
                 'hmap2_value_echt', poses_op[..., :num_j])
             tf.summary.histogram(

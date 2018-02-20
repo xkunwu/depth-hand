@@ -327,23 +327,23 @@ class batch_vxoff(batch_vxhit):
 
     def create_vxoff(self, filepack, h5file_name, num_line):
         hmap_size = self.model_inst.hmap_size
-        out_dim = self.model_inst.join_num
+        out_dim = self.model_inst.join_num * 3
         h5file = filepack.write_h5(h5file_name)
         h5file.create_dataset(
             'vxoff',
             (num_line,
                 hmap_size, hmap_size, hmap_size,
-                out_dim * 3),
+                out_dim),
             chunks=(1,
                     hmap_size, hmap_size, hmap_size,
-                    out_dim * 3),
+                    out_dim),
             compression='lzf',
             dtype='f4')
         batch_data = np.empty(
             shape=(
                 self.store_size,
                 hmap_size, hmap_size, hmap_size,
-                out_dim * 3),
+                out_dim),
             dtype='f4')
         return h5file['vxoff'], batch_data
 
@@ -355,22 +355,78 @@ class batch_vxudir(batch_vxhit):
 
     def create_vxudir(self, filepack, h5file_name, num_line):
         hmap_size = self.model_inst.hmap_size
-        out_dim = self.model_inst.join_num
+        out_dim = self.model_inst.join_num * 4
         h5file = filepack.write_h5(h5file_name)
         h5file.create_dataset(
             'vxudir',
             (num_line,
                 hmap_size, hmap_size, hmap_size,
-                out_dim * 4),
+                out_dim),
             chunks=(1,
                     hmap_size, hmap_size, hmap_size,
-                    out_dim * 4),
+                    out_dim),
             compression='lzf',
             dtype='f4')
         batch_data = np.empty(
             shape=(
                 self.store_size,
                 hmap_size, hmap_size, hmap_size,
-                out_dim * 4),
+                out_dim),
             dtype='f4')
         return h5file['vxudir'], batch_data
+
+
+class batch_hmap2(batch_clean):
+    def __init__(self, model_inst, store_size=-1):
+        super(batch_hmap2, self).__init__(model_inst, store_size)
+        self.create_fn['hmap2'] = self.create_hmap2
+
+    def create_hmap2(self, filepack, h5file_name, num_line):
+        hmap_size = self.model_inst.hmap_size
+        out_dim = self.model_inst.join_num
+        h5file = filepack.write_h5(h5file_name)
+        h5file.create_dataset(
+            'hmap2',
+            (num_line,
+                hmap_size, hmap_size,
+                out_dim),
+            chunks=(1,
+                    hmap_size, hmap_size,
+                    out_dim),
+            compression='lzf',
+            dtype='f4')
+        batch_data = np.empty(
+            shape=(
+                self.store_size,
+                hmap_size, hmap_size,
+                out_dim),
+            dtype='f4')
+        return h5file['hmap2'], batch_data
+
+
+class batch_udir2(batch_hmap2):
+    def __init__(self, model_inst, store_size=-1):
+        super(batch_udir2, self).__init__(model_inst, store_size)
+        self.create_fn['udir2'] = self.create_udir2
+
+    def create_udir2(self, filepack, h5file_name, num_line):
+        hmap_size = self.model_inst.hmap_size
+        out_dim = self.model_inst.join_num * 4
+        h5file = filepack.write_h5(h5file_name)
+        h5file.create_dataset(
+            'udir2',
+            (num_line,
+                hmap_size, hmap_size,
+                out_dim),
+            chunks=(1,
+                    hmap_size, hmap_size,
+                    out_dim),
+            compression='lzf',
+            dtype='f4')
+        batch_data = np.empty(
+            shape=(
+                self.store_size,
+                hmap_size, hmap_size,
+                out_dim),
+            dtype='f4')
+        return h5file['udir2'], batch_data

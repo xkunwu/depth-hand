@@ -27,16 +27,17 @@ def draw_udir(vxdist, vxunit, voxize_crop, scale):
     xx *= scale
     yy *= scale
     zz *= scale
-    vc = transparent_cmap(mpplot.cm.jet)(vv)
+    # vc = transparent_cmap(mpplot.cm.jet)(vv)
     yy = voxize_crop - 1 - yy
     nodes = mlab.points3d(
-        xx, yy, zz,
+        xx, yy, zz, vv,
         mode="cube", opacity=0.5,
         # color=Color('khaki').rgb,
-        # colormap='hot',
+        colormap='hot',
         scale_factor=0.9)
+    nodes.module_manager.scalar_lut_manager.reverse_lut = True
     nodes.glyph.scale_mode = 'scale_by_vector'
-    nodes.mlab_source.dataset.point_data.scalars = vc
+    # nodes.mlab_source.dataset.point_data.scalars = vv
     xx, yy, zz = np.mgrid[
         # (scale / 2):(voxize_crop + (scale / 2)):scale,
         # (scale / 2):(voxize_crop + (scale / 2)):scale,

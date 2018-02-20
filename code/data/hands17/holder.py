@@ -309,8 +309,8 @@ class hands17holder:
         if not os.path.exists(test_file):
             # shutil.copy2(self.training_annot_test, self.predict_dir)
             with h5py.File(self.training_annot_cleaned, 'r') as h5file:
-                index = h5file['index'][self.train_test_split:]
-                poses = h5file['poses'][self.train_test_split:]
+                index = h5file['index'][self.train_test_split:, ...]
+                poses = h5file['poses'][self.train_test_split:, ...]
                 with h5py.File(test_file + '.h5', 'w') as writer:
                     dataio.write_h5(writer, index, poses)
                 with open(test_file, 'w') as writer:
@@ -361,4 +361,6 @@ class hands17holder:
             'vxhit': datapro.prow_vxhit,
             'vxoff': datapro.prow_vxoff,
             'vxudir': datapro.prow_vxudir,
+            'hmap2': datapro.prow_hmap2,
+            'udir2': datapro.prow_udir2,
         }

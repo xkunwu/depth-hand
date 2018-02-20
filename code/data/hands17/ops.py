@@ -96,8 +96,9 @@ def raw_to_2d(points3, caminfo, resce=np.array([1, 0, 0])):
     return pose2d
 
 
-def raw_to_heatmap2(pose_raw, cube, hmap_size, caminfo):
+def raw_to_heatmap2(pose_raw, cube, caminfo):
     """ 2d heatmap for each joint """
+    hmap_size = caminfo.hmap_size
     # return np.zeros((hmap_size, hmap_size, 21))
     coord, depth = cube.raw_to_unit(pose_raw)
     img_l = []
@@ -114,13 +115,43 @@ def raw_to_heatmap2(pose_raw, cube, hmap_size, caminfo):
     return np.stack(img_l, axis=2)
 
 
-def raw_to_offset(image_crop, pose_raw, cube, hmap_size, caminfo):
+def raw_to_udir2(image_crop, pose_raw, cube, caminfo):
+    from numpy import linalg
+    step = caminfo.hmap_size
+    scale = int(image_crop.shape[0] / step)
+    # return np.zeros((hmap_size, hmap_size, 21)), np.zeros((hmap_size, hmap_size, 21)), np.zeros((hmap_size, hmap_size, 63))
+    image_hmap = image_crop[::scale, ::scale]  # downsampling
+    coord, depth = cube.image_to_unit(image_hmap)
+    depth_raw = cube.unit_to_raw(coord, depth)
+    offset = pose_raw[:, None] - depth_raw  # JxPx3
+    offlen = linalg.norm(offset, axis=-1)  # offset norm
+    theta = caminfo.region_size * 2  # maximal - cube size
+    offlen = np.clip(offlen, 1e-2, theta)  # 0.01mm minimum
+    unit_off = offset / offlen[:, :, None]
+    offlen = (theta - offlen) / theta  # inverse propotional
+    num_j = caminfo.join_num
+    olmap = np.zeros((step, step, num_j))
+    uomap = np.zeros((step, step, num_j, 3))
+    xx = np.floor(coord[:, 0] * step).astype(int)
+    yy = np.floor(coord[:, 1] * step).astype(int)
+    for jj in range(num_j):
+        olmap[xx, yy, jj] = offlen[jj, :]
+        for dd in range(3):
+            uomap[xx, yy, jj, dd] = unit_off[jj, :, dd]
+    return np.concatenate(
+        (olmap, uomap.reshape((step, step, 3 * num_j))),
+        axis=-1)
+
+
+def raw_to_offset(image_crop, pose_raw, cube, caminfo):
     """ offset map from depth to each joint
         Args:
             img: should be size of 128
     """
+    hmap_size = caminfo.hmap_size
+    scale = int(image_crop.shape[0] / hmap_size)
     # return np.zeros((hmap_size, hmap_size, 21)), np.zeros((hmap_size, hmap_size, 21)), np.zeros((hmap_size, hmap_size, 63))
-    image_hmap = image_crop[::4, ::4]  # downsampling to 32x32
+    image_hmap = image_crop[::scale, ::scale]  # downsampling
     coord, depth = cube.image_to_unit(image_hmap)
     depth_raw = cube.unit_to_raw(coord, depth)
     # points3_pick = cube.pick(img_to_raw(image_crop, caminfo))
@@ -195,9 +226,10 @@ def raw_to_offset(image_crop, pose_raw, cube, hmap_size, caminfo):
 
 def offset_to_raw(
     hmap2, olmap, uomap, image_crop,
-        cube, hmap_size, caminfo, nn=5):
+        cube, caminfo, nn=5):
     """ recover 3d from weight avarage """
     from sklearn.preprocessing import normalize
+    hmap_size = caminfo.hmap_size
     num_joint = olmap.shape[2]
     theta = caminfo.region_size * 2
     pose_out = np.empty([num_joint, 3])
@@ -548,7 +580,7 @@ def raw_to_vxudir(vxcnt, pose_raw, cube, caminfo):
     offlen = linalg.norm(offset, axis=-1)  # offset norm
     # print(offlen)
     theta = caminfo.region_size * 2  # maximal - cube size
-    offlen = np.clip(offlen, 1e-2, theta)  # 1mm minimum
+    offlen = np.clip(offlen, 1e-2, theta)  # 0.01mm minimum
     # invalid_id = np.logical_or(
     #     1e-2 > offlen,  # remove sigular point
     #     theta < offlen,  # limit support within theta

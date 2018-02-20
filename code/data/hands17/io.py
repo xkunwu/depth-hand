@@ -45,7 +45,7 @@ def write_txt(writer, index, poses):
     for ii, pp in zip(index, poses):
         writer.write(
             index2imagename(ii) +
-            '\t' + '\t'.join("%.4f" % x for x in pp) +
+            '\t' + '\t'.join("%.4f" % x for x in pp.flatten()) +
             '\n')
 
 

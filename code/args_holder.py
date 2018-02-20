@@ -146,7 +146,7 @@ class args_holder:
         fileHandler = logging.FileHandler(
             os.path.join(
                 self.args.log_dir_t, 'univue.log'),
-            mode='w'  # write seperately for multi-processing
+            mode='a'  # write seperately for multi-processing
         )
         fileHandler.setFormatter(self.logFormatter)
         logger.addHandler(fileHandler)
@@ -192,7 +192,7 @@ class args_holder:
     @staticmethod
     def write_args(args):
         import inspect
-        with open(os.path.join(args.log_dir_t, 'args.txt'), 'w') as writer:
+        with open(os.path.join(args.log_dir_t, 'args.txt'), 'a') as writer:
             writer.write('###################################\n')
             for arg in vars(args):
                 att = getattr(args, arg)
