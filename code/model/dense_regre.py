@@ -442,7 +442,7 @@ class dense_regre(base_regre):
             echt: BxHxWx(J*5)
         """
         # num_joint = self.join_num
-        loss = 0
+        loss_l2 = 0
         for name, net in end_points.items():
             if not name.startswith('hourglass_'):
                 continue
@@ -451,7 +451,7 @@ class dense_regre(base_regre):
             #         targets=echt[:, :num_joint],
             #         logits=pred[:, :num_joint])
             # )
-            loss += tf.nn.l2_loss(net - echt)  # already divided by 2
+            loss_l2 += tf.nn.l2_loss(net - echt)  # already divided by 2
         loss_reg = tf.add_n(tf.get_collection(
             tf.GraphKeys.REGULARIZATION_LOSSES))
-        return loss + loss_reg
+        return loss_l2, loss_reg

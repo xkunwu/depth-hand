@@ -211,6 +211,6 @@ class trunc_dist(base_conv3):
             'draw_{}_{}.png'.format(self.name_desc, img_id)))
         if self.args.show_draw:
             mpplot.show()
-            mlab.close()
+            mlab.close(all=True)
         print('[{}] drawing image #{:d} - done.'.format(
             self.name_desc, img_id))

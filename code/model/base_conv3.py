@@ -213,7 +213,7 @@ class base_conv3(base_regre):
             'draw_{}_{}.png'.format(self.name_desc, img_id)))
         if self.args.show_draw:
             mpplot.show()
-            mlab.close()
+            mlab.close(all=True)
         print('[{}] drawing image #{:d} - done.'.format(
             self.name_desc, img_id))
 
@@ -281,7 +281,7 @@ class base_conv3(base_regre):
                 #         return net, end_points
                 with tf.variable_scope('stage32'):
                     sc = 'stage32'
-                    net = slim.conv3d(input_tensor, 16, 3)
+                    net = slim.conv3d(input_tensor, 32, 3)
                     net = inresnet3d.conv_maxpool(net, scope=sc)
                     self.end_point_list.append(sc)
                     if add_and_check_final(sc, net):

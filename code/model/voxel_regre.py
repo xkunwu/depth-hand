@@ -96,7 +96,7 @@ class voxel_regre(voxel_offset):
     def get_model(
             self, input_tensor, is_training,
             bn_decay, regu_scale,
-            hg_repeat=1, scope=None):
+            hg_repeat=2, scope=None):
         """ input_tensor: BxHxWxDxC
             out_dim: BxHxWxDx(J*5), where J is number of joints
         """
@@ -104,7 +104,7 @@ class voxel_regre(voxel_offset):
         self.end_point_list = []
         final_endpoint = 'stage_out'
         num_joint = self.join_num
-        num_feature = 96
+        num_feature = 128
 
         def add_and_check_final(name, net):
             end_points[name] = net
@@ -160,7 +160,7 @@ class voxel_regre(voxel_offset):
                     # if add_and_check_final(sc, net):
                     #     return net, end_points
                     sc = 'stage32'
-                    net = slim.conv3d(input_tensor, 24, 3)
+                    net = slim.conv3d(input_tensor, 16, 3)
                     # net = inresnet3d.resnet_k(
                     #     net, scope='stage32_residual')
                     net = inresnet3d.conv_maxpool(net, scope=sc)
@@ -172,10 +172,10 @@ class voxel_regre(voxel_offset):
                 for hg in range(hg_repeat):
                     sc = 'hourglass_{}'.format(hg)
                     with tf.variable_scope(sc):
-                        branch0 = inresnet3d.hourglass3d(
-                            net, 2, scope=sc + '_hg')
+                        # branch0 = inresnet3d.hourglass3d(
+                        #     net, 2, scope=sc + '_hg')
                         branch0 = inresnet3d.resnet_k(
-                            branch0, scope='_res')
+                            net, scope='_res')
                         branch_olm = slim.conv3d(
                             branch0, num_joint, 1,
                             # normalizer_fn=None, activation_fn=tf.nn.relu)
@@ -242,17 +242,21 @@ class voxel_regre(voxel_offset):
         loss = tf.nn.l2_loss(pred - echt)
         num_j = self.join_num
         loss_udir = 0
+        loss_unit = 0
         for name, net in end_points.items():
             if not name.startswith('hourglass_'):
                 continue
-            loss_udir += tf.nn.l2_loss(net - vxudir)
+            # loss_udir += tf.nn.l2_loss(net - vxudir)
+            loss_udir += tf.reduce_sum(
+                self.smooth_l1(tf.abs(net - vxudir)))
             vxunit_pred = tf.reshape(
                 net[..., num_j:],
                 (-1, 3))
-            loss_unit = tf.reduce_sum(vxunit_pred ** 2, axis=-1)
-            loss_unit = tf.reduce_sum(
-                self.smooth_l1(tf.abs(1 - loss_unit)))
-            loss_udir += loss_unit
+            loss_unit += tf.reduce_sum(
+                self.smooth_l1(tf.abs(
+                    1 - tf.reduce_sum(vxunit_pred ** 2, axis=-1))))
+            # loss_udir += loss_unit
         loss_reg = tf.add_n(tf.get_collection(
             tf.GraphKeys.REGULARIZATION_LOSSES))
-        return loss + loss_udir + loss_reg
+        # return loss + 1e-6 * loss_udir + loss_reg
+        return loss, loss_udir, loss_unit, loss_reg

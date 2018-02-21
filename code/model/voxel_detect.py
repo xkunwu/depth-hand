@@ -395,7 +395,7 @@ class voxel_detect(base_conv3):
             pred: BxHxWxDxJ
             echt: BxJ
         """
-        loss = 0
+        loss_ce = 0
         for name, net in end_points.items():
             if not name.startswith('hourglass_'):
                 continue
@@ -404,11 +404,11 @@ class voxel_detect(base_conv3):
             losses_vxhit = [
                 tf.nn.sparse_softmax_cross_entropy_with_logits(
                     labels=e, logits=p) for e, p in zip(echt_l, pred_l)]
-            loss += tf.reduce_sum(tf.add_n(losses_vxhit))
+            loss_ce += tf.reduce_sum(tf.add_n(losses_vxhit))
         # for name, net in end_points.items():
         #     if not name.startswith('hourglass_'):
         #         continue
-        #     loss += tf.nn.l2_loss(net - echt)  # already divided by 2
+        #     loss_ce += tf.nn.l2_loss(net - echt)  # already divided by 2
         loss_reg = tf.add_n(tf.get_collection(
             tf.GraphKeys.REGULARIZATION_LOSSES))
-        return loss + loss_reg
+        return loss_ce, loss_reg

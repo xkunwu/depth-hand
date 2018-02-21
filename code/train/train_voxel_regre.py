@@ -35,11 +35,16 @@ class train_voxel_regre(train_abc):
                 )
             self.args.logger.info(
                 'network structure:\n{}'.format(shapestr))
-            loss_op = self.args.model_inst.get_loss(
+            # loss_op = self.args.model_inst.get_loss(
+            #     pred_op, poses_op, vxudir_op, end_points)
+            loss_l2, loss_udir, loss_unit, loss_reg = self.args.model_inst.get_loss(
                 pred_op, poses_op, vxudir_op, end_points)
-            # regre_error = tf.sqrt(loss_op * 2)
-            regre_error = loss_op
-            tf.summary.scalar('regression_error', regre_error)
+            loss_op = 1e-4 * loss_l2 + 1e-7 * loss_udir + 1e-7 * loss_unit + 1e-1 * loss_reg
+            tf.summary.scalar('loss', loss_op)
+            tf.summary.scalar('loss_l2', loss_l2)
+            tf.summary.scalar('loss_udir', loss_udir)
+            tf.summary.scalar('loss_unit', loss_unit)
+            tf.summary.scalar('loss_reg', loss_reg)
 
             learning_rate = self.get_learning_rate(global_step)
             tf.summary.scalar('learning_rate', learning_rate)
@@ -236,8 +241,11 @@ class train_voxel_regre(train_abc):
             pred_op, end_points = self.args.model_inst.get_model(
                 frames_op, is_training_tf,
                 self.args.bn_decay, self.args.regu_scale)
-            loss_op = self.args.model_inst.get_loss(
+            # loss_op = self.args.model_inst.get_loss(
+            #     pred_op, poses_op, vxudir_op, end_points)
+            loss, loss_udir, loss_unit, loss_reg = self.args.model_inst.get_loss(
                 pred_op, poses_op, vxudir_op, end_points)
+            loss_op = loss + 1e-6 * loss_udir + loss_reg
 
             saver = tf.train.Saver()
 

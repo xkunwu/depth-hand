@@ -115,11 +115,15 @@ class train_abc():
                         ends, self.transform_image_summary(net))
             self.args.logger.info(
                 'network structure:\n{}'.format(shapestr))
-            loss_op = self.args.model_inst.get_loss(
+            # loss_op = self.args.model_inst.get_loss(
+            #     pred_op, poses_op, end_points)
+            loss_l2, loss_reg = self.args.model_inst.get_loss(
                 pred_op, poses_op, end_points)
-            # regre_error = tf.sqrt(loss_op * 2)
-            regre_error = loss_op
-            tf.summary.scalar('regression_error', regre_error)
+            loss_op = 1e-4 * loss_l2 + 1e-1 * loss_reg
+            test_op = 1e-4 * loss_l2
+            tf.summary.scalar('loss', loss_op)
+            tf.summary.scalar('loss_l2', loss_l2)
+            tf.summary.scalar('loss_reg', loss_reg)
 
             learning_rate = self.get_learning_rate(global_step)
             tf.summary.scalar('learning_rate', learning_rate)
@@ -189,6 +193,7 @@ class train_abc():
                     'step': global_step,
                     'train_op': train_op,
                     'loss_op': loss_op,
+                    'test_op': test_op,
                     'pred_op': pred_op
                 }
                 self._train_iter(
@@ -253,7 +258,7 @@ class train_abc():
             }
             summary, step, loss_val, pred_val = sess.run(
                 [ops['summary_op'], ops['step'],
-                    ops['loss_op'], ops['pred_op']],
+                    ops['test_op'], ops['pred_op']],
                 feed_dict=feed_dict)
             loss_sum += loss_val / self.args.batch_size
             if batch_count % 10 == 0:
@@ -289,8 +294,12 @@ class train_abc():
             pred_op, end_points = self.args.model_inst.get_model(
                 frames_op, is_training_tf,
                 self.args.bn_decay, self.args.regu_scale)
-            loss_op = self.args.model_inst.get_loss(
+            # loss_op = self.args.model_inst.get_loss(
+            #     pred_op, poses_op, end_points)
+            loss_l2, loss_reg = self.args.model_inst.get_loss(
                 pred_op, poses_op, end_points)
+            loss_op = 1e-4 * loss_l2 + 1e-1 * loss_reg
+            test_op = 1e-4 * loss_l2
 
             saver = tf.train.Saver()
 
@@ -310,6 +319,7 @@ class train_abc():
                     'batch_poses': poses_op,
                     'is_training': is_training_tf,
                     'loss_op': loss_op,
+                    'test_op': test_op,
                     'pred_op': pred_op
                 }
 
@@ -340,7 +350,7 @@ class train_abc():
                 ops['is_training']: False
             }
             loss_val, pred_val = sess.run(
-                [ops['loss_op'], ops['pred_op']],
+                [ops['test_op'], ops['pred_op']],
                 feed_dict=feed_dict)
             self.args.model_inst.evaluate_batch(pred_val)
             loss_sum += loss_val

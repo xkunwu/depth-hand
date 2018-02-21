@@ -606,12 +606,12 @@ class base_regre(object):
             pred: BxJ
             echt: BxJ
         """
-        # loss = tf.reduce_sum(tf.pow(tf.subtract(pred, echt), 2)) / 2
-        loss = tf.nn.l2_loss(pred - echt)  # already divided by 2
-        # loss = tf.reduce_mean(tf.squared_difference(pred, echt)) / 2
+        # loss_l2 = tf.reduce_sum(tf.pow(tf.subtract(pred, echt), 2)) / 2
+        loss_l2 = tf.nn.l2_loss(pred - echt)  # already divided by 2
+        # loss_l2 = tf.reduce_mean(tf.squared_difference(pred, echt)) / 2
         loss_reg = tf.add_n(tf.get_collection(
             tf.GraphKeys.REGULARIZATION_LOSSES))
-        return loss + loss_reg
+        return loss_l2, loss_reg
 
     # @staticmethod
     # def base_arg_scope(is_training,
