@@ -526,21 +526,29 @@ def trunc_belief(pcnt):
 def prop_edt2(image_crop, pose_raw, cube, caminfo, roll=0):
     from scipy.ndimage.morphology import distance_transform_edt
     hmap_size = caminfo.hmap_size
+    istep = 1. / hmap_size
     scale = int(image_crop.shape[0] / hmap_size)
     if 1 == scale:
         image_hmap = image_crop
     else:
-        image_hmap = cv2resize(image_crop, (hmap_size, hmap_size))
+        image_hmap = image_crop[::scale, ::scale]  # downsampling
     mask = (1e-4 > image_hmap)
-    masked_edt = np.ma.masked_array(
-        distance_transform_edt(image_hmap),
-        mask)
+    masked_edt = np.ma.masked_array(image_hmap, mask)
+    edt_out = distance_transform_edt(mask) * istep
+    edt = image_hmap - edt_out
     pose3d = cube.transform_center_shrink(pose_raw)
     pose2d, _ = cube.project_ortho(pose3d, roll=roll, sort=False)
     pose2d = np.floor(pose2d * hmap_size).astype(int)
     edt_l = []
     for pose in pose2d:
-        phi = masked_edt.copy()
+        val = edt[pose[0], pose[1]]
+        if 0 > val:
+            phi = np.ma.masked_array(
+                # distance_transform_edt(0 < edt - val) + istep,
+                edt - val + istep,
+                (val > edt))
+        else:
+            phi = masked_edt.copy()
         phi[pose[0], pose[1]] = 0.
         df = skfmm.distance(phi, dx=1e-1)
         df_max = np.max(df)

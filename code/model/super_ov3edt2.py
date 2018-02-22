@@ -93,7 +93,7 @@ class super_ov3edt2(super_edt2):
         index_h5 = self.store_handle['index']
         store_size = index_h5.shape[0]
         frame_id = np.random.choice(store_size)
-        frame_id = 886  # frame_id = img_id - 1
+        # frame_id = 886  # frame_id = img_id - 1
         # frame_id = 125  # frame_id = img_id - 1
         img_id = index_h5[frame_id, ...]
         frame_h5 = self.store_handle['ortho3'][frame_id, ...]
