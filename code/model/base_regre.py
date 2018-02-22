@@ -175,11 +175,14 @@ class base_regre(object):
         fname = 'detection_{}_{:d}.png'.format(self.name_desc, img_id)
         mpplot.savefig(os.path.join(self.predict_dir, fname))
         mpplot.close(fig)
-        error_maxj = self.data_module.eval.evaluate_poses(
+        error_maxj, err_mean = self.data_module.eval.evaluate_poses(
             self.caminfo, self.name_desc,
             self.predict_dir, self.predict_file)
         self.logger.info('maximal per-joint mean error: {}'.format(
             error_maxj
+        ))
+        self.logger.info('mean error: {}'.format(
+            err_mean
         ))
 
     def detect_write_images(self):
@@ -386,7 +389,7 @@ class base_regre(object):
         index_h5 = self.store_handle['index']
         store_size = index_h5.shape[0]
         frame_id = np.random.choice(store_size)
-        # frame_id = 0
+        # frame_id = 0  # frame_id = img_id - 1
         img_id = index_h5[frame_id, ...]
         frame_h5 = self.store_handle['crop2'][frame_id, ...]
         poses_h5 = self.store_handle['pose_c'][frame_id, ...].reshape(-1, 3)

@@ -133,22 +133,25 @@ if __name__ == "__main__":
     mpl = import_module('matplotlib')
     mpl.use('Agg')
     methlist = [
-        # # 'localizer2',
-        # 'voxel_offset',
+        'super_edt2',
+        # 'super_edt3',
+        # 'super_dist3',
         # 'voxel_regre',
+        # 'voxel_offset',
         # 'voxel_detect',
         # 'dense_regre',
         # 'direc_tsdf',
         # 'trunc_dist',
-        'base_conv3',
+        # 'base_conv3',
         # 'base_conv3_inres',
-        'ortho3view',
+        # 'ortho3view',
         # 'base_regre',
         # 'base_clean',
         # 'base_regre_inres',
         # 'base_clean_inres',
         # 'base_regre_hg',
         # 'base_clean_hg',
+        # # 'localizer2',
     ]
     for meth in methlist:
         with args_holder() as argsholder:

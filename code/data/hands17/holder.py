@@ -363,4 +363,6 @@ class hands17holder:
             'vxudir': datapro.prow_vxudir,
             'hmap2': datapro.prow_hmap2,
             'udir2': datapro.prow_udir2,
+            'vxedt': datapro.prow_vxedt,
+            'edt2': datapro.prow_edt2,
         }

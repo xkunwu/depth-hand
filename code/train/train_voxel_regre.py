@@ -40,6 +40,7 @@ class train_voxel_regre(train_abc):
             loss_l2, loss_udir, loss_unit, loss_reg = self.args.model_inst.get_loss(
                 pred_op, poses_op, vxudir_op, end_points)
             loss_op = 1e-4 * loss_l2 + 1e-7 * loss_udir + 1e-7 * loss_unit + 1e-1 * loss_reg
+            test_op = 1e-4 * loss_l2
             tf.summary.scalar('loss', loss_op)
             tf.summary.scalar('loss_l2', loss_l2)
             tf.summary.scalar('loss_udir', loss_udir)
@@ -50,7 +51,7 @@ class train_voxel_regre(train_abc):
             tf.summary.scalar('learning_rate', learning_rate)
 
             hmap_size = self.args.model_inst.hmap_size
-            num_j = self.args.model_inst.out_dim
+            num_j = self.args.model_inst.join_num
             joint_id = num_j - 1
             frame = frames_op[0, ..., 0]
             vxdist_echt = vxudir_op[0, ..., joint_id]
@@ -141,6 +142,7 @@ class train_voxel_regre(train_abc):
                     'step': global_step,
                     'train_op': train_op,
                     'loss_op': loss_op,
+                    'test_op': test_op,
                     'pred_op': pred_op
                 }
                 self._train_iter(
@@ -205,7 +207,7 @@ class train_voxel_regre(train_abc):
             }
             summary, step, loss_val, pred_val = sess.run(
                 [ops['summary_op'], ops['step'],
-                    ops['loss_op'], ops['pred_op']],
+                    ops['test_op'], ops['pred_op']],
                 feed_dict=feed_dict)
             loss_sum += loss_val / self.args.batch_size
             if batch_count % 10 == 0:
@@ -243,9 +245,10 @@ class train_voxel_regre(train_abc):
                 self.args.bn_decay, self.args.regu_scale)
             # loss_op = self.args.model_inst.get_loss(
             #     pred_op, poses_op, vxudir_op, end_points)
-            loss, loss_udir, loss_unit, loss_reg = self.args.model_inst.get_loss(
+            loss_l2, loss_udir, loss_unit, loss_reg = self.args.model_inst.get_loss(
                 pred_op, poses_op, vxudir_op, end_points)
-            loss_op = loss + 1e-6 * loss_udir + loss_reg
+            loss_op = 1e-4 * loss_l2 + 1e-7 * loss_udir + 1e-7 * loss_unit + 1e-1 * loss_reg
+            test_op = 1e-4 * loss_l2
 
             saver = tf.train.Saver()
 
@@ -266,6 +269,7 @@ class train_voxel_regre(train_abc):
                     'batch_vxudir': vxudir_op,
                     'is_training': is_training_tf,
                     'loss_op': loss_op,
+                    'test_op': test_op,
                     'pred_op': pred_op
                 }
 
@@ -296,7 +300,7 @@ class train_voxel_regre(train_abc):
                 ops['is_training']: False
             }
             loss_val, pred_val = sess.run(
-                [ops['loss_op'], ops['pred_op']],
+                [ops['test_op'], ops['pred_op']],
                 feed_dict=feed_dict)
             self.args.model_inst.evaluate_batch(pred_val)
             loss_sum += loss_val

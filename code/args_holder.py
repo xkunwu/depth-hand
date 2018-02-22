@@ -6,11 +6,14 @@ import logging
 from utils.coder import file_pack
 
 model_map = {
-    'direc_tsdf': 'model.direc_tsdf',
-    'trunc_dist': 'model.trunc_dist',
+    'super_edt2': 'model.super_edt2',
+    'super_edt3': 'model.super_edt3',
+    'super_dist3': 'model.super_dist3',
     'voxel_regre': 'model.voxel_regre',
     'voxel_offset': 'model.voxel_offset',
     'voxel_detect': 'model.voxel_detect',
+    'direc_tsdf': 'model.direc_tsdf',
+    'trunc_dist': 'model.trunc_dist',
     'base_conv3': 'model.base_conv3',
     'base_conv3_inres': 'model.base_inres',
     'ortho3view': 'model.ortho3view',
@@ -103,10 +106,10 @@ class args_holder:
             '--bn_decay', type=float, default=0.9997,
             help='decay rate during batch normalization [default: 0.9997]')
         self.parser.add_argument(
-            '--regu_scale', type=float, default=0.0004,
-            help='regularization scale [default: 0.0004]')
+            '--regu_scale', type=float, default=0.0001,
+            help='regularization scale [default: 0.0001]')
         self.parser.add_argument(
-            '--learning_rate', type=float, default=0.01,
+            '--learning_rate', type=float, default=0.001,
             help='Initial learning rate [default: 0.001]')
         self.parser.add_argument(
             '--decay_step', type=int, default=2e6,
@@ -171,8 +174,8 @@ class args_holder:
             )
         fileHandler.setFormatter(self.logFormatter)
         logger.addHandler(fileHandler)
-        if 0 < self.args.gpu_id:  # do not messy console
-            return
+        # if 0 < self.args.gpu_id:  # do not messy console
+        #     return
         consoleHandler = logging.StreamHandler(stream=sys.stdout)
         consoleHandler.setFormatter(self.logFormatter)
         logger.addHandler(consoleHandler)

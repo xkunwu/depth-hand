@@ -15,6 +15,56 @@ def depth_cmap(cmap):
     return mycmap
 
 
+def transparent_cmap(cmap, tmax=0.99, N=255):
+    mycmap = cmap
+    mycmap._init()
+    mycmap._lut[:, -1] = np.linspace(0, tmax, N + 4)
+    return mycmap
+
+
+def draw_edt2(fig, ax, edt2):
+    img_edt2 = ax.imshow(edt2, transparent_cmap(mpplot.cm.jet))
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    fig.colorbar(img_edt2, cax=cax)
+
+
+def figure_edt2(edt2):
+    fig, ax = tfplot.subplots(figsize=(4, 4))
+    draw_edt2(fig, ax, edt2)
+    ax.axis('off')
+    return fig
+
+tfplot_edt2 = tfplot.wrap(figure_edt2, batch=False)
+
+
+def draw_dist3(vxdist, voxize_crop, scale):
+    from mayavi import mlab
+    # should reverser y-axis
+    mlab.figure(
+        bgcolor=(1, 1, 1), fgcolor=(0., 0., 0.),
+        size=(800, 800))
+    xx, yy, zz = np.where(1e-2 < vxdist)
+    vv = vxdist[np.where(1e-2 < vxdist)]
+    xx *= scale
+    yy *= scale
+    zz *= scale
+    # vc = transparent_cmap(mpplot.cm.jet)(vv)
+    yy = voxize_crop - 1 - yy
+    nodes = mlab.points3d(
+        xx, yy, zz, vv,
+        mode="cube", opacity=0.5,
+        # color=Color('khaki').rgb,
+        colormap='hot',
+        scale_factor=0.9)
+    nodes.module_manager.scalar_lut_manager.reverse_lut = True
+    nodes.glyph.scale_mode = 'scale_by_vector'
+    # nodes.mlab_source.dataset.point_data.scalars = vv
+    mlab.gcf().scene.parallel_projection = True
+    mlab.view(0, 0)
+    mlab.gcf().scene.camera.zoom(1.5)
+
+
 def draw_udir(vxdist, vxunit, voxize_crop, scale):
     from mayavi import mlab
     from colour import Color
@@ -55,13 +105,6 @@ def draw_udir(vxdist, vxunit, voxize_crop, scale):
     mlab.gcf().scene.parallel_projection = True
     mlab.view(0, 0)
     mlab.gcf().scene.camera.zoom(1.5)
-
-
-def transparent_cmap(cmap, tmax=0.99, N=255):
-    mycmap = cmap
-    mycmap._init()
-    mycmap._lut[:, -1] = np.linspace(0, tmax, N + 4)
-    return mycmap
 
 
 def draw_uomap3d(fig, ax, vxcnt_crop, uomap):

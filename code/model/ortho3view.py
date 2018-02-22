@@ -1,24 +1,11 @@
 import os
-import sys
 from importlib import import_module
 import numpy as np
 import tensorflow as tf
 from tensorflow.contrib import slim
-import h5py
 import matplotlib.pyplot as mpplot
 from model.base_regre import base_regre
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-BASE_DIR = os.path.abspath(os.path.join(BASE_DIR, os.pardir))
-sys.path.append(BASE_DIR)
-file_pack = getattr(
-    import_module('utils.coder'),
-    'file_pack'
-)
-iso_cube = getattr(
-    import_module('utils.iso_boxes'),
-    'iso_cube'
-)
+from utils.iso_boxes import iso_cube
 
 
 class ortho3view(base_regre):
@@ -73,12 +60,10 @@ class ortho3view(base_regre):
         }
 
     def draw_random(self, thedata, args):
-        from cv2 import resize as cv2resize
-
         index_h5 = self.store_handle['index']
         store_size = index_h5.shape[0]
         frame_id = np.random.choice(store_size)
-        # frame_id = 0
+        # frame_id = 0  # frame_id = img_id - 1
         img_id = index_h5[frame_id, ...]
         frame_h5 = self.store_handle['ortho3'][frame_id, ...]
         poses_h5 = self.store_handle['pose_c'][frame_id, ...].reshape(-1, 3)
@@ -93,16 +78,13 @@ class ortho3view(base_regre):
         cube = iso_cube()
         cube.load(resce3)
         # need to maintain both image and poses at the same scale
-        sizel = np.floor(resce3[0]).astype(int)
         for spi in range(3):
             ax = mpplot.subplot(2, 3, spi + 4)
             img = frame_h5[..., spi]
-            ax.imshow(
-                cv2resize(img, (sizel, sizel)),
-                cmap=mpplot.cm.bone_r)
+            ax.imshow(img, cmap=mpplot.cm.bone_r)
             pose3d = cube.trans_scale_to(poses_h5)
             pose2d, _ = cube.project_ortho(pose3d, roll=spi, sort=False)
-            pose2d *= sizel
+            pose2d *= self.crop_size
             args.data_draw.draw_pose2d(
                 ax, thedata,
                 pose2d,

@@ -7,7 +7,6 @@ import tensorflow as tf
 import progressbar
 from functools import reduce
 from args_holder import args_holder
-from utils.coder import file_pack
 
 
 class train_abc():

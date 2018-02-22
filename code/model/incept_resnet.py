@@ -166,16 +166,25 @@ class incept_resnet:
                  scope=None, reuse=None):
         """ supposed to work best with 8x8 input """
         with tf.variable_scope(scope, 'pullout8', [net], reuse=reuse):
-            net = slim.avg_pool2d(  # --> 2x2x?
-                net, 5, stride=3, padding='VALID',
-                scope='avgpool8_5x5_3')
+            net = incept_resnet.conv_maxpool(net, scope='conv_pool_8')
+            print(net.shape)
+            net = incept_resnet.conv_maxpool(net, scope='conv_pool_4')
+            print(net.shape)
+            shape2 = net.get_shape()
+            fc_num = shape2[3] * 2
+            net = slim.conv3d(
+                net, fc_num, shape2[1:3],
+                padding='VALID', scope='fullconn4')
+            # net = slim.avg_pool2d(  # --> 2x2x?
+            #     net, 5, stride=3, padding='VALID',
+            #     scope='avgpool8_5x5_3')
             print(net.shape)
             # net = slim.conv2d(net, 64, 1, scope='reduce8')
             # print(net.shape)
-            net = slim.conv2d(  # --> 1x1x?
-                net, 128, net.get_shape()[1:3],
-                padding='VALID', scope='fullconn8')
-            print(net.shape)
+            # net = slim.conv2d(  # --> 1x1x?
+            #     net, 128, net.get_shape()[1:3],
+            #     padding='VALID', scope='fullconn8')
+            # print(net.shape)
             net = slim.flatten(net)
             print(net.shape)
             net = slim.dropout(

@@ -2,14 +2,10 @@ import os
 from importlib import import_module
 import numpy as np
 import tensorflow as tf
-import progressbar
-import h5py
 import matplotlib.pyplot as mpplot
 from cv2 import resize as cv2resize
 from model.base_regre import base_regre
 from utils.iso_boxes import iso_cube
-from model.incept_resnet import incept_resnet
-from model.hourglass import hourglass
 from utils.image_ops import draw_hmap2, draw_olmap, draw_uomap
 
 
@@ -112,8 +108,10 @@ class dense_regre(base_regre):
     def yanker_hmap(self, resce, hmap2, olmap, uomap, depth, caminfo):
         cube = iso_cube()
         cube.load(resce)
-        return self.data_module.ops.offset_to_raw(
-            hmap2, olmap, uomap, depth, cube, caminfo)
+        # return self.data_module.ops.offset_to_raw(  # often sum weight to 0
+        #     hmap2, olmap, uomap, depth, cube, caminfo)
+        return self.data_module.ops.udir2_to_raw(
+            olmap, uomap, depth, cube, caminfo)
 
     def evaluate_batch(self, pred_val):
         batch_index = self.batch_data['batch_index']
@@ -189,7 +187,7 @@ class dense_regre(base_regre):
         index_h5 = self.store_handle['index']
         store_size = index_h5.shape[0]
         frame_id = np.random.choice(store_size)
-        # frame_id = 0
+        # frame_id = 0  # frame_id = img_id - 1
         img_id = index_h5[frame_id, ...]
         frame_h5 = self.store_handle['clean'][frame_id, ...]
         poses_h5 = self.store_handle['poses'][frame_id, ...].reshape(-1, 3)
@@ -308,6 +306,8 @@ class dense_regre(base_regre):
             return name == final_endpoint
 
         from tensorflow.contrib import slim
+        from model.incept_resnet import incept_resnet
+        from model.hourglass import hourglass
         # ~/anaconda2/lib/python2.7/site-packages/tensorflow/contrib/layers/
         with tf.variable_scope(
                 scope, self.name_desc, [input_tensor]):
@@ -366,7 +366,7 @@ class dense_regre(base_regre):
                         return net, end_points
                     sc = 'stage32_image'
                     net = incept_resnet.resnet_k(
-                        net, scope='stage32_residual')
+                        net, scope='stage32_res')
                     net = slim.conv2d(
                         net, num_feature, 1, scope='stage32_out')
                     self.end_point_list.append(sc)
@@ -436,13 +436,22 @@ class dense_regre(base_regre):
                 self.join_num * 5))
         return frames_tf, poses_tf
 
+    @staticmethod
+    def smooth_l1(xa):
+        return tf.where(
+            1 < xa,
+            xa - 0.5,
+            0.5 * (xa ** 2)
+        )
+
     def get_loss(self, pred, echt, end_points):
         """ simple sum-of-squares loss
             pred: BxHxWx(J*5)
             echt: BxHxWx(J*5)
         """
-        # num_joint = self.join_num
-        loss_l2 = 0
+        num_j = self.join_num
+        loss_udir = 0
+        loss_unit = 0
         for name, net in end_points.items():
             if not name.startswith('hourglass_'):
                 continue
@@ -451,7 +460,15 @@ class dense_regre(base_regre):
             #         targets=echt[:, :num_joint],
             #         logits=pred[:, :num_joint])
             # )
-            loss_l2 += tf.nn.l2_loss(net - echt)  # already divided by 2
+            # loss_l2 += tf.nn.l2_loss(net - echt)  # already divided by 2
+            loss_udir += tf.reduce_sum(
+                self.smooth_l1(tf.abs(net - echt)))
+            uomap_pred = tf.reshape(
+                net[..., (2 * num_j):],
+                (-1, 3))
+            loss_unit += tf.reduce_sum(
+                self.smooth_l1(tf.abs(
+                    1 - tf.reduce_sum(uomap_pred ** 2, axis=-1))))
         loss_reg = tf.add_n(tf.get_collection(
             tf.GraphKeys.REGULARIZATION_LOSSES))
-        return loss_l2, loss_reg
+        return loss_udir, loss_unit, loss_reg

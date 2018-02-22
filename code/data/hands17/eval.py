@@ -168,14 +168,14 @@ def evaluate_poses(thedata, model_name, predict_dir, predict_file):
     mpplot.close(fig)
     # mpplot.gcf().clear()
     fig = mpplot.figure(figsize=(2 * 5, 1 * 5))
-    draw_error_per_joint(
+    err_mean = draw_error_per_joint(
         errors, [model_name], mpplot.gca(), thedata.join_name)
     fname = '{}_error_bar.png'.format(model_name)
     mpplot.savefig(os.path.join(predict_dir, fname))
     mpplot.close(fig)
 
     print('figures saved: {}'.format(fname))
-    return np.max(np.mean(errors, axis=1))
+    return np.max(np.mean(errors, axis=1)), err_mean
 
     # draw_sum = 3
     # draw_i = 1

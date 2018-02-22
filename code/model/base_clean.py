@@ -86,7 +86,6 @@ class base_clean(base_regre):
 
     def draw_random(self, thedata, args):
         import matplotlib.pyplot as mpplot
-        from cv2 import resize as cv2resize
 
         # from colour import Color
         # points3 = np.random.rand(1000, 3)
@@ -107,7 +106,7 @@ class base_clean(base_regre):
         index_h5 = self.store_handle['index']
         store_size = index_h5.shape[0]
         frame_id = np.random.choice(store_size)
-        # frame_id = 0
+        # frame_id = 0  # frame_id = img_id - 1
         img_id = index_h5[frame_id, ...]
         frame_h5 = self.store_handle['clean'][frame_id, ...]
         poses_h5 = self.store_handle['pose_c'][frame_id, ...].reshape(-1, 3)

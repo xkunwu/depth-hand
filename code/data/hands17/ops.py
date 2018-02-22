@@ -119,8 +119,10 @@ def raw_to_udir2(image_crop, pose_raw, cube, caminfo):
     from numpy import linalg
     step = caminfo.hmap_size
     scale = int(image_crop.shape[0] / step)
-    # return np.zeros((hmap_size, hmap_size, 21)), np.zeros((hmap_size, hmap_size, 21)), np.zeros((hmap_size, hmap_size, 63))
-    image_hmap = image_crop[::scale, ::scale]  # downsampling
+    if 1 == scale:
+        image_hmap = image_crop
+    else:
+        image_hmap = image_crop[::scale, ::scale]  # downsampling
     coord, depth = cube.image_to_unit(image_hmap)
     depth_raw = cube.unit_to_raw(coord, depth)
     offset = pose_raw[:, None] - depth_raw  # JxPx3
@@ -150,8 +152,10 @@ def raw_to_offset(image_crop, pose_raw, cube, caminfo):
     """
     hmap_size = caminfo.hmap_size
     scale = int(image_crop.shape[0] / hmap_size)
-    # return np.zeros((hmap_size, hmap_size, 21)), np.zeros((hmap_size, hmap_size, 21)), np.zeros((hmap_size, hmap_size, 63))
-    image_hmap = image_crop[::scale, ::scale]  # downsampling
+    if 1 == scale:
+        image_hmap = image_crop
+    else:
+        image_hmap = image_crop[::scale, ::scale]  # downsampling
     coord, depth = cube.image_to_unit(image_hmap)
     depth_raw = cube.unit_to_raw(coord, depth)
     # points3_pick = cube.pick(img_to_raw(image_crop, caminfo))
@@ -224,6 +228,42 @@ def raw_to_offset(image_crop, pose_raw, cube, caminfo):
     return offset_map, olmap, uomap
 
 
+def udir2_to_raw(
+    olmap, uomap, image_crop,
+        cube, caminfo, nn=5):
+    from sklearn.preprocessing import normalize
+    hmap_size = caminfo.hmap_size
+    num_joint = olmap.shape[2]
+    theta = caminfo.region_size * 2
+    pose_out = np.empty([num_joint, 3])
+    scale = int(image_crop.shape[0] / hmap_size)
+    if 1 == scale:
+        image_hmap = image_crop
+    else:
+        image_hmap = image_crop[::scale, ::scale]  # downsampling
+    for joint in range(num_joint):
+        # restore from 3d
+        om = olmap[..., joint]
+        # hm[np.where(1e-2 > image_hmap)] = 0  # mask out void is wrong - joint not on the surface
+        top_id = om.argpartition(-nn, axis=None)[-nn:]  # top elements
+        x3, y3 = np.unravel_index(top_id, om.shape)
+        conf = om[x3, y3]
+        dist = theta - om[x3, y3] * theta  # inverse propotional
+        uom = uomap[..., 3 * joint:3 * (joint + 1)]
+        unit_off = uom[x3, y3, :]
+        unit_off = normalize(unit_off, norm='l2')
+        offset = unit_off * np.tile(dist, [3, 1]).T
+        p0 = cube.unit_to_raw(
+            np.vstack([x3, y3]).astype(float).T / hmap_size,
+            image_hmap[x3, y3])
+        pred3 = p0 + offset
+        pred32 = np.sum(
+            pred3 * np.tile(conf, [3, 1]).T, axis=0
+        ) / np.sum(conf)
+        pose_out[joint, :] = pred32
+    return pose_out
+
+
 def offset_to_raw(
     hmap2, olmap, uomap, image_crop,
         cube, caminfo, nn=5):
@@ -233,7 +273,11 @@ def offset_to_raw(
     num_joint = olmap.shape[2]
     theta = caminfo.region_size * 2
     pose_out = np.empty([num_joint, 3])
-    image_hmap = image_crop[::4, ::4]
+    scale = int(image_crop.shape[0] / hmap_size)
+    if 1 == scale:
+        image_hmap = image_crop
+    else:
+        image_hmap = image_crop[::scale, ::scale]  # downsampling
     for joint in range(num_joint):
         # restore from 3d
         hm = hmap2[..., joint]
@@ -477,6 +521,70 @@ def trunc_belief(pcnt):
         pcnt_r = np.rollaxis(pcnt_r, -1)
         befs.append(direc_belief(pcnt_r))
     return np.stack(befs, axis=3)
+
+
+def prop_edt2(image_crop, pose_raw, cube, caminfo):
+    from scipy.ndimage.morphology import distance_transform_edt
+    hmap_size = caminfo.hmap_size
+    scale = int(image_crop.shape[0] / hmap_size)
+    if 1 == scale:
+        image_hmap = image_crop
+    else:
+        image_hmap = cv2resize(image_crop, (hmap_size, hmap_size))
+    mask = (1e-4 > image_hmap)
+    masked_edt = np.ma.masked_array(
+        distance_transform_edt(image_hmap),
+        mask)
+    pose3d = cube.transform_center_shrink(pose_raw)
+    pose2d, _ = cube.project_ortho(pose3d, roll=0, sort=False)
+    pose2d = np.floor(pose2d * hmap_size).astype(int)
+    vol_l = []
+    for pose in pose2d:
+        phi = masked_edt.copy()
+        phi[pose[0], pose[1]] = 0.
+        df = skfmm.distance(phi, dx=1e-1)
+        df_max = np.max(df)
+        df = (df_max - df) / df_max
+        df[mask] = 0.
+        df[1. < df] = 0.  # outside isolated region have value > 1
+        vol_l.append(df)
+    return np.stack(vol_l, axis=2)
+
+
+def prop_edt3(vxhit, pose_raw, cube, caminfo):
+    from scipy.ndimage.morphology import distance_transform_edt
+    step = caminfo.hmap_size
+    scale = int(vxhit.shape[0] / step)
+    vol_shape = (step, step, step)
+    if 1 == scale:
+        vxhit_hmap = vxhit
+    else:
+        vxhit_hmap = np.zeros(vol_shape)
+        for i0 in np.mgrid[0:scale, 0:scale, 0:scale].reshape(3, -1).T:
+            vxhit_hmap += vxhit[i0[0]::scale, i0[1]::scale, i0[2]::scale]
+        # print(np.sum(vxhit_hmap) - np.sum(vxhit))
+    mask = (1e-4 > vxhit_hmap)
+    masked_edt = np.ma.masked_array(
+        distance_transform_edt(vxhit_hmap),
+        mask)
+    # masked_edt = np.ma.masked_array(
+    #     vxhit_hmap,
+    #     mask)
+    grid = regu_grid()
+    grid.from_cube(cube, step)
+    indices = grid.putit(pose_raw)
+    vol_l = []
+    for index in indices:
+        # phi = np.zeros_like(masked_edt)
+        # phi[index[0], index[1], index[2]] = 1.
+        phi = masked_edt.copy()
+        phi[index[0], index[1], index[2]] = 0.
+        df = skfmm.distance(phi, dx=1e-1)
+        df_max = np.max(df)
+        df = (df_max - df) / df_max
+        df[mask] = 0.
+        vol_l.append(df)
+    return np.stack(vol_l, axis=3)
 
 
 def prop_dist(pcnt):

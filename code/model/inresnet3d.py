@@ -101,10 +101,10 @@ class inresnet3d:
             print(net.shape)
             net = inresnet3d.conv_maxpool(net, scope='conv_pool_4')
             print(net.shape)
-            shape4 = net.get_shape()
-            fc_num = shape4[4] * 2
+            shape2 = net.get_shape()
+            fc_num = shape2[4] * 2
             net = slim.conv3d(
-                net, fc_num, shape4[1:4],
+                net, fc_num, shape2[1:4],
                 padding='VALID', scope='fullconn4')
             # net = slim.avg_pool3d(
             #     net, 5, stride=3, padding='VALID',

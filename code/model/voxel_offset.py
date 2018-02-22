@@ -2,12 +2,12 @@ import os
 from importlib import import_module
 import numpy as np
 import tensorflow as tf
-from .voxel_detect import voxel_detect
+from .base_conv3 import base_conv3
 from utils.iso_boxes import iso_cube
 from utils.regu_grid import regu_grid
 
 
-class voxel_offset(voxel_detect):
+class voxel_offset(base_conv3):
     """ 3d offset detection based method
     """
     @staticmethod
@@ -51,6 +51,7 @@ class voxel_offset(voxel_detect):
     def receive_data(self, thedata, args):
         """ Receive parameters specific to the data """
         super(voxel_offset, self).receive_data(thedata, args)
+        thedata.hmap_size = self.hmap_size
         self.out_dim = (self.hmap_size ** 3) * self.join_num * 4
         self.store_name = {
             'index': self.train_file,
@@ -101,7 +102,7 @@ class voxel_offset(voxel_detect):
         index_h5 = self.store_handle['index']
         store_size = index_h5.shape[0]
         frame_id = np.random.choice(store_size)
-        # frame_id = 0
+        # frame_id = 0  # frame_id = img_id - 1
         img_id = index_h5[frame_id, ...]
         frame_h5 = self.store_handle['pcnt3'][frame_id, ...]
         poses_h5 = self.store_handle['poses'][frame_id, ...].reshape(-1, 3)
@@ -189,43 +190,6 @@ class voxel_offset(voxel_detect):
             mlab.options.offscreen = True
         else:
             from utils.image_ops import draw_udir
-            # # should reverser y-axis
-            # mlab.figure(
-            #     bgcolor=(1, 1, 1), fgcolor=(0., 0., 0.),
-            #     size=(800, 800))
-            # xx, yy, zz = np.where(1e-2 < vxdist)
-            # vv = vxdist[np.where(1e-2 < vxdist)]
-            # xx *= scale
-            # yy *= scale
-            # zz *= scale
-            # vc = transparent_cmap(mpplot.cm.jet)(vv)
-            # yy = voxize_crop - 1 - yy
-            # nodes = mlab.points3d(
-            #     xx, yy, zz,
-            #     mode="cube", opacity=0.5,
-            #     # color=Color('khaki').rgb,
-            #     # colormap='hot',
-            #     scale_factor=0.9)
-            # nodes.glyph.scale_mode = 'scale_by_vector'
-            # nodes.mlab_source.dataset.point_data.scalars = vc
-            # xx, yy, zz = np.mgrid[
-            #     # (scale / 2):(voxize_crop + (scale / 2)):scale,
-            #     # (scale / 2):(voxize_crop + (scale / 2)):scale,
-            #     # (scale / 2):(voxize_crop + (scale / 2)):scale]
-            #     0:voxize_crop:scale,
-            #     0:voxize_crop:scale,
-            #     0:voxize_crop:scale]
-            # yy = voxize_crop - 1 - yy
-            # mlab.quiver3d(
-            #     xx, yy, zz,
-            #     vxunit[..., 0], -vxunit[..., 1], vxunit[..., 2],
-            #     mode="arrow",
-            #     color=Color('red').rgb,
-            #     line_width=8, scale_factor=2)
-            # mlab.gcf().scene.parallel_projection = True
-            # mlab.view(0, 0)
-            # mlab.gcf().scene.camera.zoom(1.5)
-            # # mlab.outline()
             draw_udir(vxdist, vxunit, voxize_crop, scale)
             mlab.draw()
             mlab.savefig(os.path.join(
@@ -383,17 +347,19 @@ class voxel_offset(voxel_detect):
         """
         num_j = self.join_num
         loss_udir = 0
+        loss_unit = 0
         for name, net in end_points.items():
             if not name.startswith('hourglass_'):
                 continue
-            loss_udir += tf.nn.l2_loss(net - echt)
+            # loss_udir += tf.nn.l2_loss(net - vxudir)
+            loss_udir += tf.reduce_sum(
+                self.smooth_l1(tf.abs(net - echt)))
             vxunit_pred = tf.reshape(
                 net[..., num_j:],
                 (-1, 3))
-            loss_unit = tf.reduce_sum(vxunit_pred ** 2, axis=-1)
-            loss_unit = tf.reduce_sum(
-                self.smooth_l1(tf.abs(1 - loss_unit)))
-            loss_udir += loss_unit
+            loss_unit += tf.reduce_sum(
+                self.smooth_l1(tf.abs(
+                    1 - tf.reduce_sum(vxunit_pred ** 2, axis=-1))))
         loss_reg = tf.add_n(tf.get_collection(
             tf.GraphKeys.REGULARIZATION_LOSSES))
-        return loss_udir + loss_reg
+        return loss_udir, loss_unit, loss_reg

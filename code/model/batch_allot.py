@@ -155,6 +155,34 @@ class batch_clean(batch_crop2):
         return h5file['clean'], batch_data
 
 
+class batch_edt2(batch_clean):
+    def __init__(self, model_inst, store_size=-1):
+        super(batch_edt2, self).__init__(model_inst, store_size)
+        self.create_fn['edt2'] = self.create_edt2
+
+    def create_edt2(self, filepack, h5file_name, num_line):
+        hmap_size = self.model_inst.hmap_size
+        out_dim = self.model_inst.join_num
+        h5file = filepack.write_h5(h5file_name)
+        h5file.create_dataset(
+            'edt2',
+            (num_line,
+                hmap_size, hmap_size,
+                out_dim),
+            chunks=(1,
+                    hmap_size, hmap_size,
+                    out_dim),
+            compression='lzf',
+            dtype='f4')
+        batch_data = np.empty(
+            shape=(
+                self.store_size,
+                hmap_size, hmap_size,
+                out_dim),
+            dtype='f4')
+        return h5file['edt2'], batch_data
+
+
 class batch_ortho3(batch_clean):
     def __init__(self, model_inst, store_size=-1):
         super(batch_ortho3, self).__init__(model_inst, store_size)
@@ -318,6 +346,34 @@ class batch_vxhit(batch_conv3):
                 self.store_size, out_dim),
             dtype='f4')
         return h5file['pose_lab'], batch_data
+
+
+class batch_vxedt(batch_vxhit):
+    def __init__(self, model_inst, store_size=-1):
+        super(batch_vxhit, self).__init__(model_inst, store_size)
+        self.create_fn['vxedt'] = self.create_vxedt
+
+    def create_vxedt(self, filepack, h5file_name, num_line):
+        hmap_size = self.model_inst.hmap_size
+        out_dim = self.model_inst.join_num
+        h5file = filepack.write_h5(h5file_name)
+        h5file.create_dataset(
+            'vxedt',
+            (num_line,
+                hmap_size, hmap_size, hmap_size,
+                out_dim),
+            chunks=(1,
+                    hmap_size, hmap_size, hmap_size,
+                    out_dim),
+            compression='lzf',
+            dtype='f4')
+        batch_data = np.empty(
+            shape=(
+                self.store_size,
+                hmap_size, hmap_size, hmap_size,
+                out_dim),
+            dtype='f4')
+        return h5file['vxedt'], batch_data
 
 
 class batch_vxoff(batch_vxhit):

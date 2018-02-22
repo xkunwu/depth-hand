@@ -1,19 +1,19 @@
 import os
-# from importlib import import_module
+import numpy as np
 import tensorflow as tf
 import progressbar
 from functools import reduce
 from train.train_abc import train_abc
-from utils.image_ops import tfplot_hmap2, tfplot_olmap, tfplot_uomap
+from utils.image_ops import tfplot_edt2
 
 
-class train_dense_regre(train_abc):
+class train_super_edt2(train_abc):
     def train(self):
         self.logger.info('######## Training ########')
         tf.reset_default_graph()
         with tf.Graph().as_default(), \
                 tf.device('/gpu:' + str(self.args.gpu_id)):
-            frames_op, poses_op = \
+            frames_op, poses_op, edt2_op = \
                 self.args.model_inst.placeholder_inputs()
             is_training_tf = tf.placeholder(
                 tf.bool, shape=(), name='is_training')
@@ -34,14 +34,14 @@ class train_dense_regre(train_abc):
             self.args.logger.info(
                 'network structure:\n{}'.format(shapestr))
             # loss_op = self.args.model_inst.get_loss(
-            #     pred_op, poses_op, end_points)
-            loss_udir, loss_unit, loss_reg = self.args.model_inst.get_loss(
-                pred_op, poses_op, end_points)
-            loss_op = 1e-4 * loss_udir + 1e-5 * loss_unit + 1e-1 * loss_reg
-            test_op = 1e-4 * loss_udir + 1e-5 * loss_unit
+            #     pred_op, poses_op, edt2_op, end_points)
+            loss_l2, loss_edt, loss_reg = self.args.model_inst.get_loss(
+                pred_op, poses_op, edt2_op, end_points)
+            loss_op = 1e-4 * loss_l2 + 1e-5 * loss_edt + 1e-1 * loss_reg
+            test_op = 1e-4 * loss_l2
             tf.summary.scalar('loss', loss_op)
-            tf.summary.scalar('loss_udir', loss_udir)
-            tf.summary.scalar('loss_unit', loss_unit)
+            tf.summary.scalar('loss_l2', loss_l2)
+            tf.summary.scalar('loss_edt', loss_edt)
             tf.summary.scalar('loss_reg', loss_reg)
 
             learning_rate = self.get_learning_rate(global_step)
@@ -49,49 +49,22 @@ class train_dense_regre(train_abc):
 
             num_j = self.args.model_inst.join_num
             joint_id = num_j - 1
-            frame = frames_op[0, ..., 0]
-            hmap2_echt = poses_op[0, ..., joint_id]
-            hmap2_pred = pred_op[0, ..., joint_id]
-            olmap_echt = poses_op[0, ..., num_j + joint_id]
-            olmap_pred = pred_op[0, ..., num_j + joint_id]
-            uomap_echt = poses_op[
-                0, ...,
-                2 * num_j + 3 * joint_id:2 * num_j + 3 * (joint_id + 1)]
-            uomap_pred = pred_op[
-                0, ...,
-                2 * num_j + 3 * joint_id:2 * num_j + 3 * (joint_id + 1)]
-            hmap2_echt_op = tf.expand_dims(tfplot_hmap2(
-                frame, hmap2_echt), axis=0)
-            tf.summary.image('hmap2_echt/', hmap2_echt_op, max_outputs=1)
-            hmap2_pred_op = tf.expand_dims(tfplot_hmap2(
-                frame, hmap2_pred), axis=0)
-            tf.summary.image('hmap2_pred/', hmap2_pred_op, max_outputs=1)
-            olmap_echt_op = tf.expand_dims(tfplot_olmap(
-                frame, olmap_echt), axis=0)
-            tf.summary.image('olmap_echt/', olmap_echt_op, max_outputs=1)
-            olmap_pred_op = tf.expand_dims(tfplot_olmap(
-                frame, olmap_pred), axis=0)
-            tf.summary.image('olmap_pred/', olmap_pred_op, max_outputs=1)
-            uomap_echt_op = tf.expand_dims(tfplot_uomap(
-                frame, uomap_echt), axis=0)
-            tf.summary.image('uomap_echt/', uomap_echt_op, max_outputs=1)
-            uomap_pred_op = tf.expand_dims(tfplot_uomap(
-                frame, uomap_pred), axis=0)
-            tf.summary.image('uomap_pred/', uomap_pred_op, max_outputs=1)
-
-            num_j = self.args.model_inst.join_num
-            tf.summary.histogram(
-                'hmap2_value_echt', poses_op[..., :num_j])
-            tf.summary.histogram(
-                'hmap2_value_pred', pred_op[..., :num_j])
-            tf.summary.histogram(
-                'olmap_value_echt', poses_op[..., num_j:num_j * 2])
-            tf.summary.histogram(
-                'olmap_value_pred', pred_op[..., num_j:num_j * 2])
-            tf.summary.histogram(
-                'uomap_value_echt', poses_op[..., - num_j * 3:])
-            tf.summary.histogram(
-                'uomap_value_pred', pred_op[..., - num_j * 3:])
+            edt2_echt = edt2_op[0, ..., joint_id]
+            edt2_echt_op = tf.expand_dims(tfplot_edt2(
+                edt2_echt), axis=0)
+            tf.summary.image('edt2_echt/', edt2_echt_op, max_outputs=1)
+            netid = 0
+            for ends in self.args.model_inst.end_point_list:
+                if not ends.startswith('hourglass_'):
+                    continue
+                net = end_points[ends]
+                edt2_pred = net[0, ..., joint_id]
+                edt2_pred_op = tf.expand_dims(tfplot_edt2(
+                    edt2_pred), axis=0)
+                tf.summary.image(
+                    'edt2_pred_{:d}/'.format(netid),
+                    edt2_pred_op, max_outputs=1)
+                netid += 1
 
             optimizer = tf.train.AdamOptimizer(learning_rate)
             # train_op = optimizer.minimize(
@@ -138,6 +111,7 @@ class train_dense_regre(train_abc):
                 ops = {
                     'batch_frame': frames_op,
                     'batch_poses': poses_op,
+                    'batch_edt2': edt2_op,
                     'is_training': is_training_tf,
                     'summary_op': summary_op,
                     'step': global_step,
@@ -150,6 +124,48 @@ class train_dense_regre(train_abc):
                     sess, ops, saver,
                     model_path, train_writer, valid_writer)
 
+    def train_one_epoch(self, sess, ops, train_writer):
+        """ ops: dict mapping from string to tf ops """
+        batch_count = 0
+        loss_sum = 0
+        while True:
+            batch_data = self.args.model_inst.fetch_batch()
+            if batch_data is None:
+                break
+            feed_dict = {
+                ops['batch_frame']: batch_data['batch_frame'],
+                ops['batch_poses']: batch_data['batch_poses'],
+                ops['batch_edt2']: batch_data['batch_edt2'],
+                ops['is_training']: True
+            }
+            summary, step, _, loss_val, pred_val = sess.run(
+                [ops['summary_op'], ops['step'], ops['train_op'],
+                    ops['loss_op'], ops['pred_op']],
+                feed_dict=feed_dict)
+            loss_sum += loss_val / self.args.batch_size
+            if batch_count % 10 == 0:
+                if 'locor' == self.args.model_inst.net_type:
+                    self.args.model_inst.debug_compare(
+                        pred_val, self.logger)
+                    did = np.random.randint(0, self.args.batch_size)
+                    self.args.model_inst._debug_draw_prediction(
+                        did, pred_val[did, ...]
+                    )
+                # elif 'poser' == self.args.model_inst.net_type:
+                #     self.args.model_inst.debug_compare(
+                #         pred_val, self.logger)
+                self.logger.info(
+                    'batch {} training loss: {}'.format(
+                        batch_count, loss_val))
+            if batch_count % 100 == 0:
+                train_writer.add_summary(summary, step)
+            batch_count += 1
+        mean_loss = loss_sum / batch_count
+        self.args.logger.info(
+            'epoch training mean loss: {:.4f}'.format(
+                mean_loss))
+        return mean_loss
+
     def valid_one_epoch(self, sess, ops, valid_writer):
         """ ops: dict mapping from string to tf ops """
         batch_count = 0
@@ -161,6 +177,7 @@ class train_dense_regre(train_abc):
             feed_dict = {
                 ops['batch_frame']: batch_data['batch_frame'],
                 ops['batch_poses']: batch_data['batch_poses'],
+                ops['batch_edt2']: batch_data['batch_edt2'],
                 ops['is_training']: False
             }
             summary, step, loss_val, pred_val = sess.run(
@@ -193,7 +210,7 @@ class train_dense_regre(train_abc):
         with tf.Graph().as_default(), \
                 tf.device('/gpu:' + str(self.args.gpu_id)):
             # sequential evaluate, suited for streaming
-            frames_op, poses_op = \
+            frames_op, poses_op, edt2_op = \
                 self.args.model_inst.placeholder_inputs(1)
             is_training_tf = tf.placeholder(
                 tf.bool, shape=(), name='is_training')
@@ -202,11 +219,11 @@ class train_dense_regre(train_abc):
                 frames_op, is_training_tf,
                 self.args.bn_decay, self.args.regu_scale)
             # loss_op = self.args.model_inst.get_loss(
-            #     pred_op, poses_op, end_points)
-            loss_udir, loss_unit, loss_reg = self.args.model_inst.get_loss(
-                pred_op, poses_op, end_points)
-            loss_op = 1e-4 * loss_udir + 1e-5 * loss_unit + 1e-1 * loss_reg
-            test_op = 1e-4 * loss_udir + 1e-5 * loss_unit
+            #     pred_op, poses_op, edt2_op, end_points)
+            loss_l2, loss_edt, loss_reg = self.args.model_inst.get_loss(
+                pred_op, poses_op, edt2_op, end_points)
+            loss_op = 1e-4 * loss_l2 + 1e-5 * loss_edt + 1e-1 * loss_reg
+            test_op = 1e-4 * loss_l2
 
             saver = tf.train.Saver()
 
@@ -224,6 +241,7 @@ class train_dense_regre(train_abc):
                 ops = {
                     'batch_frame': frames_op,
                     'batch_poses': poses_op,
+                    'batch_edt2': edt2_op,
                     'is_training': is_training_tf,
                     'loss_op': loss_op,
                     'test_op': test_op,
@@ -253,6 +271,7 @@ class train_dense_regre(train_abc):
             feed_dict = {
                 ops['batch_frame']: batch_data['batch_frame'],
                 ops['batch_poses']: batch_data['batch_poses'],
+                ops['batch_edt2']: batch_data['batch_edt2'],
                 ops['is_training']: False
             }
             loss_val, pred_val = sess.run(

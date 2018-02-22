@@ -2,25 +2,25 @@ import os
 from importlib import import_module
 import numpy as np
 import tensorflow as tf
-import progressbar
-import h5py
-from .voxel_offset import voxel_offset
+import matplotlib.pyplot as mpplot
+from model.base_regre import base_regre
 from utils.iso_boxes import iso_cube
-from utils.regu_grid import regu_grid
 
 
-class voxel_regre(voxel_offset):
-    """ 3d regression with offset supervisation
-    """
+class super_edt2(base_regre):
     @staticmethod
     def get_trainer(args, new_log):
-        from train.train_voxel_regre import train_voxel_regre
-        return train_voxel_regre(args, new_log)
+        from train.train_super_edt2 import train_super_edt2
+        return train_super_edt2(args, new_log)
 
     def __init__(self, args):
-        super(voxel_regre, self).__init__(args)
-        self.crop_size = 32
-        self.hmap_size = 16
+        super(super_edt2, self).__init__(args)
+        self.batch_allot = getattr(
+            import_module('model.batch_allot'),
+            'batch_edt2'
+        )
+        self.crop_size = 128
+        self.hmap_size = 32
         self.map_scale = self.crop_size / self.hmap_size
 
     def fetch_batch(self, fetch_size=None):
@@ -35,14 +35,12 @@ class voxel_regre(voxel_offset):
         if batch_end >= self.split_end:
             return None
         self.batch_data['batch_frame'] = np.expand_dims(
-            self.store_handle['pcnt3'][self.batch_beg:batch_end, ...],
+            self.store_handle['clean'][self.batch_beg:batch_end, ...],
             axis=-1)
         self.batch_data['batch_poses'] = \
             self.store_handle['pose_c'][self.batch_beg:batch_end, ...]
-        # self.batch_data['batch_poses'] = \
-        #     self.store_handle['pose_c1'][self.batch_beg:batch_end, ...]
-        self.batch_data['batch_vxudir'] = \
-            self.store_handle['vxudir'][self.batch_beg:batch_end, ...]
+        self.batch_data['batch_edt2'] = \
+            self.store_handle['edt2'][self.batch_beg:batch_end, ...]
         self.batch_data['batch_index'] = \
             self.store_handle['index'][self.batch_beg:batch_end, ...]
         self.batch_data['batch_resce'] = \
@@ -52,28 +50,26 @@ class voxel_regre(voxel_offset):
 
     def receive_data(self, thedata, args):
         """ Receive parameters specific to the data """
-        super(voxel_offset, self).receive_data(thedata, args)
+        super(super_edt2, self).receive_data(thedata, args)
         thedata.hmap_size = self.hmap_size
         self.out_dim = self.join_num * 3
         self.store_name = {
             'index': self.train_file,
             'poses': self.train_file,
             'resce': self.train_file,
-            'pcnt3': os.path.join(
-                self.prepare_dir, 'pcnt3_{}'.format(self.crop_size)),
-            'vxudir': os.path.join(
-                self.prepare_dir, 'vxudir_{}'.format(self.hmap_size)),
             'pose_c': os.path.join(self.prepare_dir, 'pose_c'),
-            # 'pose_c1': os.path.join(self.prepare_dir, 'pose_c1'),
+            'clean': os.path.join(
+                self.prepare_dir, 'clean_{}'.format(self.crop_size)),
+            'edt2': os.path.join(
+                self.prepare_dir, 'edt2_{}'.format(self.hmap_size)),
         }
         self.store_precon = {
             'index': [],
             'poses': [],
             'resce': [],
-            'pcnt3': ['index', 'resce'],
-            'vxudir': ['pcnt3', 'poses', 'resce'],
             'pose_c': ['poses', 'resce'],
-            # 'pose_c1': ['poses', 'resce'],
+            'clean': ['index', 'resce'],
+            'edt2': ['clean', 'poses', 'resce'],
         }
 
     def yanker(self, pose_local, resce, caminfo):
@@ -87,32 +83,105 @@ class voxel_regre(voxel_offset):
         batch_resce = self.batch_data['batch_resce']
         batch_poses = pred_val
         num_elem = batch_index.shape[0]
-        poses_out = np.empty(batch_poses.shape)
+        poses_out = np.empty((num_elem, self.join_num * 3))
         for ei, resce, poses in zip(range(num_elem), batch_resce, batch_poses):
             pose_local = poses.reshape(-1, 3)
             pose_raw = self.yanker(pose_local, resce, self.caminfo)
-            poses_out[ei] = pose_raw.flatten()
+            poses_out[ei] = pose_raw.reshape(1, -1)
         self.eval_pred.append(poses_out)
+
+    def draw_random(self, thedata, args):
+        index_h5 = self.store_handle['index']
+        store_size = index_h5.shape[0]
+        frame_id = np.random.choice(store_size)
+        # frame_id = 892  # frame_id = img_id - 1
+        img_id = index_h5[frame_id, ...]
+        frame_h5 = self.store_handle['clean'][frame_id, ...]
+        poses_h5 = self.store_handle['pose_c'][frame_id, ...].reshape(-1, 3)
+        resce_h5 = self.store_handle['resce'][frame_id, ...]
+        edt2_h5 = self.store_handle['edt2'][frame_id, ...]
+
+        print('[{}] drawing image #{:d} ...'.format(self.name_desc, img_id))
+        print(np.min(frame_h5), np.max(frame_h5))
+        print(np.histogram(frame_h5, range=(1e-4, np.max(frame_h5))))
+        print(np.min(poses_h5, axis=0), np.max(poses_h5, axis=0))
+        from colour import Color
+        colors = [Color('orange').rgb, Color('red').rgb, Color('lime').rgb]
+        fig, _ = mpplot.subplots(nrows=2, ncols=2, figsize=(2 * 5, 2 * 5))
+
+        ax = mpplot.subplot(2, 2, 2)
+        mpplot.gca().set_title('test storage read')
+        resce3 = resce_h5[0:4]
+        cube = iso_cube()
+        cube.load(resce3)
+        # draw_pose_pred(
+        #     fig, ax, frame_h5, poses_h5, resce_h5,
+        #     args.data_draw.draw_pose2d, thedata)
+        ax.imshow(frame_h5, cmap=mpplot.cm.bone_r)
+        pose3d = cube.trans_scale_to(poses_h5)
+        pose2d, _ = cube.project_ortho(pose3d, roll=0, sort=False)
+        pose2d *= self.crop_size
+        args.data_draw.draw_pose2d(
+            ax, thedata,
+            pose2d,
+        )
+
+        ax = mpplot.subplot(2, 2, 1)
+        mpplot.gca().set_title('test image - {:d}'.format(img_id))
+        img_name = args.data_io.index2imagename(img_id)
+        img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
+        ax.imshow(img, cmap=mpplot.cm.bone_r)
+        pose_raw = self.yanker(poses_h5, resce_h5, self.caminfo)
+        args.data_draw.draw_pose2d(
+            ax, thedata,
+            args.data_ops.raw_to_2d(pose_raw, thedata)
+        )
+        rects = cube.proj_rects_3(
+            args.data_ops.raw_to_2d, self.caminfo
+        )
+        for ii, rect in enumerate(rects):
+            rect.draw(ax, colors[ii])
+
+        from utils.image_ops import draw_edt2
+        ax = mpplot.subplot(2, 2, 3)
+        joint_id = self.join_num - 1
+        edt2 = edt2_h5[..., joint_id]
+        draw_edt2(fig, ax, edt2)
+
+        ax = mpplot.subplot(2, 2, 4)
+        joint_id = self.join_num - 1 - 9
+        edt2 = edt2_h5[..., joint_id]
+        draw_edt2(fig, ax, edt2)
+
+        mpplot.savefig(os.path.join(
+            args.predict_dir,
+            'draw_{}_{}.png'.format(self.name_desc, img_id)))
+        if self.args.show_draw:
+            mpplot.show()
+        print('[{}] drawing image #{:d} - done.'.format(
+            self.name_desc, img_id))
 
     def get_model(
             self, input_tensor, is_training,
             bn_decay, regu_scale,
             hg_repeat=2, scope=None):
-        """ input_tensor: BxHxWxDxC
-            out_dim: BxHxWxDx(J*5), where J is number of joints
+        """ input_tensor: BxHxWxC
+            out_dim: BxHxWx(J*5), where J is number of joints
         """
         end_points = {}
         self.end_point_list = []
         final_endpoint = 'stage_out'
         num_joint = self.join_num
-        num_feature = 128
+        # num_out_map = num_joint * 5  # hmap2, olmap, uomap
+        num_feature = 32
 
         def add_and_check_final(name, net):
             end_points[name] = net
             return name == final_endpoint
 
         from tensorflow.contrib import slim
-        from inresnet3d import inresnet3d
+        from model.incept_resnet import incept_resnet
+        from model.hourglass import hourglass
         # ~/anaconda2/lib/python2.7/site-packages/tensorflow/contrib/layers/
         with tf.variable_scope(
                 scope, self.name_desc, [input_tensor]):
@@ -137,72 +206,78 @@ class voxel_regre(voxel_offset):
                     activation_fn=tf.nn.relu,
                     normalizer_fn=slim.batch_norm), \
                 slim.arg_scope(
-                    [slim.max_pool3d, slim.avg_pool3d],
+                    [slim.max_pool2d, slim.avg_pool2d],
                     stride=2, padding='SAME'), \
                 slim.arg_scope(
-                    [slim.conv3d_transpose],
+                    [slim.conv2d_transpose],
                     stride=2, padding='SAME',
                     weights_regularizer=slim.l2_regularizer(regu_scale),
                     biases_regularizer=slim.l2_regularizer(regu_scale),
                     activation_fn=tf.nn.relu,
                     normalizer_fn=slim.batch_norm), \
                 slim.arg_scope(
-                    [slim.conv3d],
+                    [slim.conv2d],
                     stride=1, padding='SAME',
                     weights_regularizer=slim.l2_regularizer(regu_scale),
                     biases_regularizer=slim.l2_regularizer(regu_scale),
                     activation_fn=tf.nn.relu,
                     normalizer_fn=slim.batch_norm):
-                with tf.variable_scope('stage64'):
-                    # sc = 'stage64'
-                    # net = slim.conv3d(input_tensor, 8, 3)
-                    # net = inresnet3d.conv_maxpool(net, scope=sc)
-                    # self.end_point_list.append(sc)
-                    # if add_and_check_final(sc, net):
-                    #     return net, end_points
-                    sc = 'stage32'
-                    net = slim.conv3d(input_tensor, 16, 3)
-                    # net = inresnet3d.resnet_k(
-                    #     net, scope='stage32_residual')
-                    net = inresnet3d.conv_maxpool(net, scope=sc)
-                    net = slim.conv3d(
-                        net, num_feature, 1, scope='stage32_out')
+                with tf.variable_scope('stage128'):
+                    sc = 'stage128'
+                    net = slim.conv2d(input_tensor, 8, 3)
+                    net = incept_resnet.conv_maxpool(net, scope=sc)
+                    self.end_point_list.append(sc)
+                    if add_and_check_final(sc, net):
+                        return net, end_points
+                    sc = 'stage64'
+                    net = incept_resnet.conv_maxpool(net, scope=sc)
+                    # net = incept_resnet.resnet_k(
+                    #     net, scope='stage64_residual')
+                    # net = incept_resnet.reduce_net(
+                    #     net, scope='stage64_reduce')
+                    self.end_point_list.append(sc)
+                    if add_and_check_final(sc, net):
+                        return net, end_points
+                    sc = 'stage32_pre'
+                    net = incept_resnet.resnet_k(
+                        net, scope='stage32_res')
+                    # net = slim.conv2d(
+                    #     net, num_feature, 1, scope='stage32_out')
                     self.end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points
                 for hg in range(hg_repeat):
                     sc = 'hourglass_{}'.format(hg)
                     with tf.variable_scope(sc):
-                        # branch0 = inresnet3d.hourglass3d(
-                        #     net, 2, scope=sc + '_hg')
-                        branch0 = inresnet3d.resnet_k(
-                            net, scope='_res')
-                        branch_olm = slim.conv3d(
+                        branch0 = hourglass.hg_net(
+                            net, 2, scope=sc + '_hg')
+                        branch0 = incept_resnet.resnet_k(
+                            branch0, scope='_res')
+                        net_maps = slim.conv2d(
                             branch0, num_joint, 1,
-                            # normalizer_fn=None, activation_fn=tf.nn.relu)
+                            # normalizer_fn=None, activation_fn=tf.nn.softmax)
                             normalizer_fn=None, activation_fn=None)
-                        branch_uom = slim.conv3d(
-                            branch0, num_joint * 3, 1,
-                            # normalizer_fn=None, activation_fn=tf.nn.sigmoid)
-                            normalizer_fn=None, activation_fn=None)
-                        net_maps = tf.concat(
-                            [branch_olm, branch_uom],
-                            axis=-1)
                         self.end_point_list.append(sc)
                         if add_and_check_final(sc, net_maps):
                             return net_maps, end_points
-                        branch1 = slim.conv3d(
+                        branch1 = slim.conv2d(
                             net_maps, num_feature, 1)
                         net = net + branch0 + branch1
+                with tf.variable_scope('stage32'):
+                    sc = 'stage32_post'
+                    net = incept_resnet.conv_maxpool(net, scope=sc)
+                    self.end_point_list.append(sc)
+                    if add_and_check_final(sc, net):
+                        return net, end_points
                 with tf.variable_scope('stage16'):
                     sc = 'stage16'
-                    net = slim.max_pool3d(net, 3, scope=sc)
+                    net = incept_resnet.conv_maxpool(net, scope=sc)
                     self.end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points
                 with tf.variable_scope('stage8'):
                     sc = 'stage_out'
-                    net = inresnet3d.pullout8(
+                    net = incept_resnet.pullout8(
                         net, self.out_dim, is_training,
                         scope=sc)
                     self.end_point_list.append(sc)
@@ -214,18 +289,18 @@ class voxel_regre(voxel_offset):
         frames_tf = tf.placeholder(
             tf.float32, shape=(
                 batch_size,
-                self.crop_size, self.crop_size, self.crop_size,
+                self.crop_size, self.crop_size,
                 1))
         poses_tf = tf.placeholder(
             tf.float32, shape=(
                 batch_size,
                 self.out_dim))
-        vxudir_tf = tf.placeholder(
+        edt2_tf = tf.placeholder(
             tf.float32, shape=(
                 batch_size,
-                self.hmap_size, self.hmap_size, self.hmap_size,
-                self.join_num * 4))
-        return frames_tf, poses_tf, vxudir_tf
+                self.hmap_size, self.hmap_size,
+                self.join_num))
+        return frames_tf, poses_tf, edt2_tf
 
     @staticmethod
     def smooth_l1(xa):
@@ -235,28 +310,19 @@ class voxel_regre(voxel_offset):
             0.5 * (xa ** 2)
         )
 
-    def get_loss(self, pred, echt, vxudir, end_points):
+    def get_loss(self, pred, echt, edt2, end_points):
         """ simple sum-of-squares loss
-            pred: BxHxWxDxJ
-            echt: BxJ
+            pred: BxHxWx(J*5)
+            echt: BxHxWx(J*5)
         """
         loss_l2 = tf.nn.l2_loss(pred - echt)
-        num_j = self.join_num
-        loss_udir = 0
-        loss_unit = 0
+        loss_edt = 0
         for name, net in end_points.items():
             if not name.startswith('hourglass_'):
                 continue
-            # loss_udir += tf.nn.l2_loss(net - vxudir)
-            loss_udir += tf.reduce_sum(
-                self.smooth_l1(tf.abs(net - vxudir)))
-            vxunit_pred = tf.reshape(
-                net[..., num_j:],
-                (-1, 3))
-            loss_unit += tf.reduce_sum(
-                self.smooth_l1(tf.abs(
-                    1 - tf.reduce_sum(vxunit_pred ** 2, axis=-1))))
-            # loss_udir += loss_unit
+            # loss_edt += tf.nn.l2_loss(net - edt2)
+            loss_edt += tf.reduce_sum(
+                self.smooth_l1(tf.abs(net - edt2)))
         loss_reg = tf.add_n(tf.get_collection(
             tf.GraphKeys.REGULARIZATION_LOSSES))
-        return loss_l2, loss_udir, loss_unit, loss_reg
+        return loss_l2, loss_edt, loss_reg

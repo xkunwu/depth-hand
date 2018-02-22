@@ -6,6 +6,26 @@ from utils.iso_boxes import iso_cube
 from utils.regu_grid import latice_image
 
 
+def prow_edt2(args, thedata, batch_data):
+    bi, clean, poses, resce = \
+        args[0], args[1], args[2], args[3]
+    cube = iso_cube()
+    cube.load(resce)
+    edt2 = dataops.prop_edt2(
+        clean, poses.reshape(-1, 3), cube, thedata)
+    batch_data[bi, ...] = edt2
+
+
+def prow_vxedt(args, thedata, batch_data):
+    bi, vxhit, poses, resce = \
+        args[0], args[1], args[2], args[3]
+    cube = iso_cube()
+    cube.load(resce)
+    vxedt = dataops.prop_edt3(
+        vxhit, poses.reshape(-1, 3), cube, thedata)
+    batch_data[bi, ...] = vxedt
+
+
 def prow_udir2(args, thedata, batch_data):
     bi, clean, poses, resce, = \
         args[0], args[1], args[2], args[3]
