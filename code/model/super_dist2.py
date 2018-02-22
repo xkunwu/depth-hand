@@ -6,17 +6,17 @@ import matplotlib.pyplot as mpplot
 from cv2 import resize as cv2resize
 from model.base_regre import base_regre
 from utils.iso_boxes import iso_cube
-from utils.image_ops import draw_hmap2, draw_olmap, draw_uomap
+from utils.image_ops import draw_olmap, draw_uomap
 
 
-class dense_regre(base_regre):
+class super_dist2(base_regre):
     @staticmethod
     def get_trainer(args, new_log):
-        from train.train_dense_regre import train_dense_regre
-        return train_dense_regre(args, new_log)
+        from train.train_super_dist2 import train_super_dist2
+        return train_super_dist2(args, new_log)
 
     def __init__(self, args):
-        super(dense_regre, self).__init__(args)
+        super(super_dist2, self).__init__(args)
         self.batch_allot = getattr(
             import_module('model.batch_allot'),
             'batch_udir2'
@@ -40,12 +40,11 @@ class dense_regre(base_regre):
         self.batch_data['batch_frame'] = np.expand_dims(
             self.store_handle['clean'][self.batch_beg:batch_end, ...],
             axis=-1)
-        hmap2 = self.store_handle['hmap2'][self.batch_beg:batch_end, ...]
-        udir2 = self.store_handle['udir2'][self.batch_beg:batch_end, ...]
-        batch_hmaps = np.empty((fetch_size, self.hmap_size, self.hmap_size, self.join_num * 5))
-        batch_hmaps[..., :self.join_num] = hmap2
-        batch_hmaps[..., self.join_num:] = udir2
-        self.batch_data['batch_poses'] = batch_hmaps
+        self.batch_data['batch_poses'] = \
+            self.store_handle['pose_c'][self.batch_beg:batch_end, ...]
+        self.batch_data['batch_udir2'] = \
+            self.store_handle['udir2'][
+                self.batch_beg:batch_end, ..., :self.join_num]
         self.batch_data['batch_index'] = \
             self.store_handle['index'][self.batch_beg:batch_end, ...]
         self.batch_data['batch_resce'] = \
@@ -55,17 +54,16 @@ class dense_regre(base_regre):
 
     def receive_data(self, thedata, args):
         """ Receive parameters specific to the data """
-        super(dense_regre, self).receive_data(thedata, args)
+        super(super_dist2, self).receive_data(thedata, args)
         thedata.hmap_size = self.hmap_size
-        self.out_dim = self.join_num * 5
+        self.out_dim = self.join_num * 3
         self.store_name = {
             'index': self.train_file,
             'poses': self.train_file,
             'resce': self.train_file,
+            'pose_c': os.path.join(self.prepare_dir, 'pose_c'),
             'clean': os.path.join(
                 self.prepare_dir, 'clean_{}'.format(self.crop_size)),
-            'hmap2': os.path.join(
-                self.prepare_dir, 'hmap2_{}'.format(self.hmap_size)),
             'udir2': os.path.join(
                 self.prepare_dir, 'udir2_{}'.format(self.hmap_size)),
         }
@@ -73,12 +71,18 @@ class dense_regre(base_regre):
             'index': [],
             'poses': [],
             'resce': [],
+            'pose_c': ['poses', 'resce'],
             'clean': ['index', 'resce'],
-            'hmap2': ['poses', 'resce'],
             'udir2': ['clean', 'poses', 'resce'],
         }
 
-    def yanker_hmap(self, resce, hmap2, olmap, uomap, depth, caminfo):
+    def yanker(self, pose_local, resce, caminfo):
+        cube = iso_cube()
+        cube.load(resce)
+        return cube.transform_add_center(pose_local)
+        # return cube.transform_expand_move(pose_local)
+
+    def yanker_hmap(self, resce, olmap, uomap, depth, caminfo):
         cube = iso_cube()
         cube.load(resce)
         # return self.data_module.ops.offset_to_raw(  # often sum weight to 0
@@ -89,72 +93,14 @@ class dense_regre(base_regre):
     def evaluate_batch(self, pred_val):
         batch_index = self.batch_data['batch_index']
         batch_resce = self.batch_data['batch_resce']
-        batch_frame = self.batch_data['batch_frame']
-        num_j = self.join_num
+        batch_poses = pred_val
         num_elem = batch_index.shape[0]
         poses_out = np.empty((num_elem, self.join_num * 3))
-        for ei in range(num_elem):
-            resce = batch_resce[ei, :]
-            depth = np.squeeze(batch_frame[ei, ...])
-            hmap2 = pred_val[ei, ..., 0 * num_j:1 * num_j]
-            olmap = pred_val[ei, ..., 1 * num_j:2 * num_j]
-            uomap = pred_val[ei, ..., 2 * num_j:]
-            pose_raw = self.yanker_hmap(
-                resce, hmap2, olmap, uomap, depth, self.caminfo)
+        for ei, resce, poses in zip(range(num_elem), batch_resce, batch_poses):
+            pose_local = poses.reshape(-1, 3)
+            pose_raw = self.yanker(pose_local, resce, self.caminfo)
             poses_out[ei] = pose_raw.reshape(1, -1)
         self.eval_pred.append(poses_out)
-
-    # def write_pred(self, fanno, caminfo,
-    #                batch_index, batch_resce,
-    #                batch_frame, batch_poses):
-    #     num_j = self.join_num
-    #     for ii in range(batch_index.shape[0]):
-    #         img_name = self.data_module.io.index2imagename(batch_index[ii, 0])
-    #         resce = batch_resce[ii, :]
-    #         depth = np.squeeze(batch_frame[ii, ...])
-    #         hmap2 = batch_poses[ii, ..., 0 * num_j:1 * num_j]
-    #         olmap = batch_poses[ii, ..., 1 * num_j:2 * num_j]
-    #         uomap = batch_poses[ii, ..., 2 * num_j:]
-    #         pose_raw = self.yanker_hmap(
-    #             resce, hmap2, olmap, uomap, depth,
-    #             self.hmap_size, caminfo)
-    #         fanno.write(
-    #             img_name +
-    #             '\t' + '\t'.join("%.4f" % x for x in pose_raw.flatten()) +
-    #             '\n')
-
-    # def fetch_batch(self, fetch_size=None):
-    #     if fetch_size is None:
-    #         fetch_size = self.batch_size
-    #     batch_end = self.batch_beg + fetch_size
-    #     if batch_end >= self.store_size:
-    #         self.batch_beg = batch_end
-    #         batch_end = self.batch_beg + fetch_size
-    #         self.split_end -= self.store_size
-    #     # print(self.batch_beg, batch_end, self.split_end)
-    #     if batch_end >= self.split_end:
-    #         return None
-    #     # self.batch_data = {
-    #     #     'batch_index': self.store_file['index'][self.batch_beg:batch_end, ...],
-    #     #     'batch_frame': self.store_file['frame'][self.batch_beg:batch_end, ...],
-    #     #     'batch_poses': self.store_file['poses'][self.batch_beg:batch_end, ...],
-    #     #     'batch_hmap2': self.store_file['hmap2'][self.batch_beg:batch_end, ...],
-    #     #     'batch_olmap': self.store_file['olmap'][self.batch_beg:batch_end, ...],
-    #     #     'batch_uomap': self.store_file['uomap'][self.batch_beg:batch_end, ...],
-    #     #     'batch_resce': self.store_file['resce'][self.batch_beg:batch_end, ...]
-    #     # }
-    #     batch_hmaps = []
-    #     batch_hmaps.append(self.store_file['hmap2'][self.batch_beg:batch_end, ...])
-    #     batch_hmaps.append(self.store_file['olmap'][self.batch_beg:batch_end, ...])
-    #     batch_hmaps.append(self.store_file['uomap'][self.batch_beg:batch_end, ...])
-    #     self.batch_data = {
-    #         'batch_index': self.store_file['index'][self.batch_beg:batch_end, ...],
-    #         'batch_frame': self.store_file['frame'][self.batch_beg:batch_end, ...],
-    #         'batch_poses': np.concatenate(batch_hmaps, axis=-1),
-    #         'batch_resce': self.store_file['resce'][self.batch_beg:batch_end, ...]
-    #     }
-    #     self.batch_beg = batch_end
-    #     return self.batch_data
 
     def draw_random(self, thedata, args):
         index_h5 = self.store_handle['index']
@@ -165,7 +111,6 @@ class dense_regre(base_regre):
         frame_h5 = self.store_handle['clean'][frame_id, ...]
         poses_h5 = self.store_handle['poses'][frame_id, ...].reshape(-1, 3)
         resce_h5 = self.store_handle['resce'][frame_id, ...]
-        hmap2_h5 = self.store_handle['hmap2'][frame_id, ...]
         udir2_h5 = self.store_handle['udir2'][frame_id, ...]
         print(self.store_handle['udir2'])
 
@@ -186,7 +131,6 @@ class dense_regre(base_regre):
         joint_id = self.join_num - 1
         olmap_h5 = udir2_h5[..., :self.join_num]
         uomap_h5 = udir2_h5[..., self.join_num:]
-        hmap2 = hmap2_h5[..., joint_id]
         olmap = olmap_h5[..., joint_id]
         uomap = uomap_h5[..., 3 * joint_id:3 * (joint_id + 1)]
         depth_crop = cv2resize(frame_h5, (sizel, sizel))
@@ -201,9 +145,6 @@ class dense_regre(base_regre):
             pose2d,
         )
 
-        ax = mpplot.subplot(2, 3, 4)
-        draw_hmap2(fig, ax, frame_h5, hmap2)
-
         ax = mpplot.subplot(2, 3, 5)
         draw_uomap(fig, ax, frame_h5, uomap)
 
@@ -212,7 +153,7 @@ class dense_regre(base_regre):
 
         ax = mpplot.subplot(2, 3, 3)
         pose_out = self.yanker_hmap(
-            resce_h5, hmap2_h5, olmap_h5, uomap_h5,
+            resce_h5, olmap_h5, uomap_h5,
             frame_h5, self.caminfo)
         err_re = np.sum(np.abs(pose_out - pose_raw))
         if 1e-2 < err_re:
@@ -233,6 +174,7 @@ class dense_regre(base_regre):
         img_name = args.data_io.index2imagename(img_id)
         img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
         ax.imshow(img, cmap=mpplot.cm.bone_r)
+        pose_raw = self.yanker(poses_h5, resce_h5, self.caminfo)
         args.data_draw.draw_pose2d(
             ax, thedata,
             args.data_ops.raw_to_2d(pose_raw, thedata)
@@ -268,7 +210,7 @@ class dense_regre(base_regre):
         """
         end_points = {}
         self.end_point_list = []
-        final_endpoint = 'hourglass_{}'.format(hg_repeat - 1)
+        final_endpoint = 'stage_out'
         num_joint = self.join_num
         # num_out_map = num_joint * 5  # hmap2, olmap, uomap
         num_feature = 128
@@ -342,33 +284,38 @@ class dense_regre(base_regre):
                         #     net, 2, scope=sc + '_hg')
                         branch0 = incept_resnet.resnet_k(
                             net, scope='_res')
-                        branch_hm2 = slim.conv2d(
-                            branch0, num_joint, 1,
-                            # normalizer_fn=None, activation_fn=tf.nn.softmax)
-                            normalizer_fn=None, activation_fn=None)
-                        branch_olm = slim.conv2d(
+                        net_maps = slim.conv2d(
                             branch0, num_joint, 1,
                             # normalizer_fn=None, activation_fn=tf.nn.relu)
                             normalizer_fn=None, activation_fn=None)
-                        branch_uom = slim.conv2d(
-                            branch0, num_joint * 3, 1,
-                            # normalizer_fn=None, activation_fn=tf.nn.sigmoid)
-                            normalizer_fn=None, activation_fn=None)
-                        net_maps = tf.concat(
-                            [branch_hm2, branch_olm, branch_uom],
-                            axis=-1)
                         self.end_point_list.append(sc)
                         if add_and_check_final(sc, net_maps):
-                            # flat_soft = tf.reshape(branch_hit, [-1, num_vol, num_joint])
-                            # flat_soft = tf.nn.softmax(flat_soft, dim=1)
-                            # branch_hit = tf.reshape(flat_soft, [-1, vol_shape, num_joint])
-                            # net_maps = tf.concat(
-                            #     [branch_hit, branch_olm, branch_uom],
-                            #     axis=-1)
                             return net_maps, end_points
                         branch1 = slim.conv2d(
                             net_maps, num_feature, 1)
                         net = net + branch0 + branch1
+                with tf.variable_scope('stage32'):
+                    sc = 'stage32_post'
+                    # net = incept_resnet.conv_maxpool(net, scope=sc)
+                    net = slim.max_pool2d(net, 3, scope=sc)
+                    self.end_point_list.append(sc)
+                    if add_and_check_final(sc, net):
+                        return net, end_points
+                with tf.variable_scope('stage16'):
+                    sc = 'stage16'
+                    # net = incept_resnet.conv_maxpool(net, scope=sc)
+                    net = slim.max_pool2d(net, 3, scope=sc)
+                    self.end_point_list.append(sc)
+                    if add_and_check_final(sc, net):
+                        return net, end_points
+                with tf.variable_scope('stage8'):
+                    sc = 'stage_out'
+                    net = incept_resnet.pullout8(
+                        net, self.out_dim, is_training,
+                        scope=sc)
+                    self.end_point_list.append(sc)
+                    if add_and_check_final(sc, net):
+                        return net, end_points
         raise ValueError('final_endpoint (%s) not recognized', final_endpoint)
 
     def placeholder_inputs(self, batch_size=None):
@@ -377,27 +324,16 @@ class dense_regre(base_regre):
                 batch_size,
                 self.crop_size, self.crop_size,
                 1))
-        # hmap2_tf = tf.placeholder(
-        #     tf.float32, shape=(
-        #         batch_size,
-        #         self.hmap_size, self.hmap_size,
-        #         self.join_num))
-        # olmap_tf = tf.placeholder(
-        #     tf.float32, shape=(
-        #         batch_size,
-        #         self.hmap_size, self.hmap_size,
-        #         self.join_num))
-        # uomap_tf = tf.placeholder(
-        #     tf.float32, shape=(
-        #         batch_size,
-        #         self.hmap_size, self.hmap_size,
-        #         self.join_num * 3))
         poses_tf = tf.placeholder(
             tf.float32, shape=(
                 batch_size,
+                self.out_dim))
+        udir2_tf = tf.placeholder(
+            tf.float32, shape=(
+                batch_size,
                 self.hmap_size, self.hmap_size,
-                self.join_num * 5))
-        return frames_tf, poses_tf
+                self.join_num))
+        return frames_tf, poses_tf, udir2_tf
 
     @staticmethod
     def smooth_l1(xa):
@@ -407,31 +343,20 @@ class dense_regre(base_regre):
             0.5 * (xa ** 2)
         )
 
-    def get_loss(self, pred, echt, end_points):
+    def get_loss(self, pred, echt, udir2, end_points):
         """ simple sum-of-squares loss
-            pred: BxHxWx(J*5)
-            echt: BxHxWx(J*5)
+            pred: BxJ
+            echt: BxJ
+            udir2: BxHxWx(J*4)
         """
-        num_j = self.join_num
+        loss_l2 = tf.nn.l2_loss(pred - echt)
         loss_udir = 0
-        loss_unit = 0
         for name, net in end_points.items():
             if not name.startswith('hourglass_'):
                 continue
-            # loss_hm2 = tf.reduce_sum(
-            #     tf.nn.cross_entropy_with_logits(
-            #         targets=echt[:, :num_joint],
-            #         logits=pred[:, :num_joint])
-            # )
-            # loss_l2 += tf.nn.l2_loss(net - echt)  # already divided by 2
+            # loss_udir += tf.nn.l2_loss(net - vxudir)
             loss_udir += tf.reduce_sum(
-                self.smooth_l1(tf.abs(net - echt)))
-            uomap_pred = tf.reshape(
-                net[..., (2 * num_j):],
-                (-1, 3))
-            loss_unit += tf.reduce_sum(
-                self.smooth_l1(tf.abs(
-                    1 - tf.reduce_sum(uomap_pred ** 2, axis=-1))))
+                self.smooth_l1(tf.abs(net - udir2)))
         loss_reg = tf.add_n(tf.get_collection(
             tf.GraphKeys.REGULARIZATION_LOSSES))
-        return loss_udir, loss_unit, loss_reg
+        return loss_l2, loss_udir, loss_reg

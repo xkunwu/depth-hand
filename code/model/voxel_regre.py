@@ -240,8 +240,8 @@ class voxel_regre(voxel_offset):
             pred: BxHxWxDxJ
             echt: BxJ
         """
-        loss_l2 = tf.nn.l2_loss(pred - echt)
         num_j = self.join_num
+        loss_l2 = tf.nn.l2_loss(pred - echt)
         loss_udir = 0
         loss_unit = 0
         for name, net in end_points.items():
@@ -256,7 +256,6 @@ class voxel_regre(voxel_offset):
             loss_unit += tf.reduce_sum(
                 self.smooth_l1(tf.abs(
                     1 - tf.reduce_sum(vxunit_pred ** 2, axis=-1))))
-            # loss_udir += loss_unit
         loss_reg = tf.add_n(tf.get_collection(
             tf.GraphKeys.REGULARIZATION_LOSSES))
         return loss_l2, loss_udir, loss_unit, loss_reg

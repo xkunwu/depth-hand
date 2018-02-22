@@ -92,9 +92,6 @@ class base_regre(object):
         self.batch_beg = batch_end
         return self.batch_data
 
-    def end_train(self):
-        pass
-
     def start_evaluate(self):
         self.batch_beg = self.args.data_inst.train_test_split
         self.split_end = self.args.data_inst.num_training

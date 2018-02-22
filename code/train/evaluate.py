@@ -1,5 +1,5 @@
 import os
-import sys
+import progressbar
 from importlib import import_module
 from shutil import copyfile
 import numpy as np
@@ -30,8 +30,18 @@ def draw_compare(args, predict_dir=None):
         if m:
             predictions.append(os.path.join(predict_dir, file))
             methods.append(m.group(1))
+    num_method = len(methods)
+    print('{:d} methods collected for comparison ...'.format(num_method))
     annot_test = args.data_inst.training_annot_test
     error_l = []
+    timerbar = progressbar.ProgressBar(
+        maxval=num_method,
+        widgets=[
+            progressbar.Percentage(),
+            ' ', progressbar.Bar('=', '[', ']'),
+            ' ', progressbar.ETA()]
+    ).start()
+    mi = 0
     for predict in predictions:
         error = dataeval.compare_error(
             args.data_inst,
@@ -40,7 +50,11 @@ def draw_compare(args, predict_dir=None):
         )
         # print(error.shape)
         error_l.append(error)
+        mi += 1
+        timerbar.update(mi)
+    timerbar.finish()
     errors = np.stack(error_l, axis=0)
+    print('drawing figures ...')
     fig = mpplot.figure(figsize=(2 * 5, 1 * 5))
     dataeval.draw_error_percentage_curve(
         errors, methods, mpplot.gca())
@@ -130,19 +144,22 @@ if __name__ == "__main__":
     #     argsholder.append_log()
     #
     #     # draw_compare(args)
+    # import sys
     # sys.exit()
 
     mpl = import_module('matplotlib')
     mpl.use('Agg')
     methlist = [
-        'super_ov3edt2',
+        # 'super_ov3edt2',
         # 'super_edt2',
         # 'super_edt3',
         # 'super_dist3',
         # 'voxel_regre',
         # 'voxel_offset',
         # 'voxel_detect',
-        # 'dense_regre',
+        'super_dist2',
+        'super_udir2',
+        'dense_regre',
         # 'direc_tsdf',
         # 'trunc_dist',
         # 'base_conv3',

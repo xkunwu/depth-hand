@@ -41,9 +41,8 @@ class super_dist3(base_conv3):
             axis=-1)
         self.batch_data['batch_poses'] = \
             self.store_handle['pose_c'][self.batch_beg:batch_end, ...]
-        vxdist = self.store_handle['vxudir'][
+        self.batch_data['batch_vxudir'] = self.store_handle['vxudir'][
             self.batch_beg:batch_end, ..., :self.join_num]
-        self.batch_data['batch_vxudir'] = vxdist
         self.batch_data['batch_index'] = \
             self.store_handle['index'][self.batch_beg:batch_end, ...]
         self.batch_data['batch_resce'] = \

@@ -10,6 +10,8 @@ model_map = {
     'super_edt2': 'model.super_edt2',
     'super_edt3': 'model.super_edt3',
     'super_dist3': 'model.super_dist3',
+    'super_dist2': 'model.super_dist2',
+    'super_udir2': 'model.super_udir2',
     'voxel_regre': 'model.voxel_regre',
     'voxel_offset': 'model.voxel_offset',
     'voxel_detect': 'model.voxel_detect',

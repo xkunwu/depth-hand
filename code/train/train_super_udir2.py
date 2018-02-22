@@ -1,95 +1,19 @@
 import os
-import sys
-# from importlib import import_module
-import logging
 import numpy as np
 import tensorflow as tf
 import progressbar
 from functools import reduce
-from args_holder import args_holder
+from train.train_abc import train_abc
+from utils.image_ops import tfplot_olmap, tfplot_uomap
 
 
-class train_abc():
-    """ This is the training class.
-        args: holds parameters.
-    """
-
-    @staticmethod
-    def transform_image_summary(tensor, ii=0):
-        """ tensor: BxIxIxF """
-        isize = int(tensor.shape[1])
-        fsize = int(tensor.shape[3])
-        num = np.ceil(np.sqrt(int(tensor.shape[-1]))).astype(int)
-        t0 = tf.expand_dims(
-            tf.transpose(tensor[ii, ...], [2, 0, 1]), axis=-1)
-        pad = tf.zeros([num * num - fsize, isize, isize, 1])
-        t1 = tf.unstack(
-            tf.concat(axis=0, values=[t0, pad]), axis=0)
-        rows = []
-        for ri in range(num):
-            rows.append(tf.concat(
-                axis=0, values=t1[ri * num:(ri + 1) * num]))
-        t2 = tf.concat(axis=1, values=rows)
-        return tf.expand_dims(t2, axis=0)
-
-    def _train_iter(self, sess, ops, saver,
-                    model_path, train_writer, valid_writer):
-        valid_loss = np.inf
-        from timeit import default_timer as timer
-        from datetime import timedelta
-        epoch = 0
-        time_all_s = timer()
-        self.args.model_inst.start_train()
-        while epoch < self.args.max_epoch:
-            epoch += 1
-            self.logger.info(
-                '**** Epoch #{:03d} ****'.format(epoch))
-            sys.stdout.flush()
-
-            # split_beg, split_end = \
-            #     self.args.data_inst.next_valid_split()
-            # # print(split_beg, split_end)
-
-            time_s = timer()
-            self.logger.info('** Training **')
-            self.args.model_inst.start_epoch_train()
-            self.train_one_epoch(sess, ops, train_writer)
-            self.logger.info('** Validating **')
-            self.args.model_inst.start_epoch_valid()
-            mean_loss = self.valid_one_epoch(
-                sess, ops, valid_writer)
-            time_e = str(timedelta(
-                seconds=(timer() - time_s)))
-            self.args.logger.info(
-                'Epoch #{:03d} processing time: {}'.format(
-                    epoch, time_e))
-            if mean_loss > (valid_loss * 1.1):
-                self.args.logger.info(
-                    'Break due to validation loss starts to grow: {} --> {}'.format(
-                        valid_loss, mean_loss))
-                break
-            elif mean_loss > valid_loss:
-                self.args.logger.info(
-                    'NOTE: validation loss starts to grow: {} --> {}'.format(
-                        valid_loss, mean_loss))
-            else:
-                # only save model when validation loss decrease
-                valid_loss = mean_loss
-                save_path = saver.save(sess, model_path)
-                self.logger.info(
-                    'Model saved in file: {}'.format(save_path))
-        time_all_e = timer() - time_all_s
-        self.args.logger.info(
-            'Total training time: {} for {:d} epoches, average: {}.'.format(
-                str(timedelta(seconds=time_all_e)), epoch,
-                str(timedelta(seconds=(time_all_e / epoch)))))
-
+class train_super_udir2(train_abc):
     def train(self):
         self.logger.info('######## Training ########')
         tf.reset_default_graph()
         with tf.Graph().as_default(), \
                 tf.device('/gpu:' + str(self.args.gpu_id)):
-            frames_op, poses_op = \
+            frames_op, poses_op, udir2_op = \
                 self.args.model_inst.placeholder_inputs()
             is_training_tf = tf.placeholder(
                 tf.bool, shape=(), name='is_training')
@@ -107,38 +31,62 @@ class train_abc():
                     net.shape[0],
                     reduce(lambda x, y: x * y, net.shape[1:])
                 )
-                if (2 == self.args.model_inst.net_rank and
-                        'image' in ends):
-                    tf.summary.image(
-                        ends, self.transform_image_summary(net))
             self.args.logger.info(
                 'network structure:\n{}'.format(shapestr))
             # loss_op = self.args.model_inst.get_loss(
-            #     pred_op, poses_op, end_points)
-            loss_l2, loss_reg = self.args.model_inst.get_loss(
-                pred_op, poses_op, end_points)
-            loss_op = 1e-4 * loss_l2 + 1e-1 * loss_reg
+            #     pred_op, poses_op, udir2_op, end_points)
+            loss_l2, loss_udir, loss_unit, loss_reg = self.args.model_inst.get_loss(
+                pred_op, poses_op, udir2_op, end_points)
+            loss_op = 1e-4 * loss_l2 + 1e-7 * loss_udir + 1e-7 * loss_unit + 1e-1 * loss_reg
             test_op = 1e-4 * loss_l2
             tf.summary.scalar('loss', loss_op)
             tf.summary.scalar('loss_l2', loss_l2)
+            tf.summary.scalar('loss_udir', loss_udir)
+            tf.summary.scalar('loss_unit', loss_unit)
             tf.summary.scalar('loss_reg', loss_reg)
 
             learning_rate = self.get_learning_rate(global_step)
             tf.summary.scalar('learning_rate', learning_rate)
 
-            tf.summary.histogram('out_value_echt', poses_op)
-            tf.summary.histogram('out_value_pred', pred_op)
-
-            # from model.base_clean import tfplot_pose_pred
-            # frame = frames_op[0, ...]
-            # pose_pred = pred_op[0, ...]
-            # resce_op = tf.placeholder(tf.float32, shape=(None, 4,))
-            # resce = resce_op[0, ...]
-            # pose_pred_op = tf.expand_dims(tfplot_pose_pred(
-            #     frame, pose_pred, resce,
-            #     self.args.data_draw.draw_pose2d,
-            #     self.args.data_inst), axis=0)
-            # tf.summary.image('pose_pred/', pose_pred_op, max_outputs=1)
+            num_j = self.args.model_inst.join_num
+            joint_id = num_j - 1
+            frame = frames_op[0, ..., 0]
+            dist2_echt = udir2_op[0, ..., joint_id]
+            dist2_echt_op = tf.expand_dims(tfplot_olmap(
+                frame, dist2_echt), axis=0)
+            tf.summary.image('dist2_echt/', dist2_echt_op, max_outputs=1)
+            netid = 0
+            for ends in self.args.model_inst.end_point_list:
+                if not ends.startswith('hourglass_'):
+                    continue
+                net = end_points[ends]
+                dist2_pred = net[0, ..., joint_id]
+                dist2_pred_op = tf.expand_dims(tfplot_olmap(
+                    frame, dist2_pred), axis=0)
+                tf.summary.image(
+                    'dist2_pred_{:d}/'.format(netid),
+                    dist2_pred_op, max_outputs=1)
+                netid += 1
+            unit2_echt = udir2_op[
+                0, ...,
+                num_j + 3 * joint_id:num_j + 3 * (joint_id + 1)]
+            unit2_echt_op = tf.expand_dims(tfplot_uomap(
+                frame, unit2_echt), axis=0)
+            tf.summary.image('unit2_echt/', unit2_echt_op, max_outputs=1)
+            netid = 0
+            for ends in self.args.model_inst.end_point_list:
+                if not ends.startswith('hourglass_'):
+                    continue
+                net = end_points[ends]
+                unit2_pred = net[
+                    0, ...,
+                    num_j + 3 * joint_id:num_j + 3 * (joint_id + 1)]
+                unit2_pred_op = tf.expand_dims(tfplot_uomap(
+                    frame, unit2_pred), axis=0)
+                tf.summary.image(
+                    'unit2_pred_{:d}/'.format(netid),
+                    unit2_pred_op, max_outputs=1)
+                netid += 1
 
             optimizer = tf.train.AdamOptimizer(learning_rate)
             # train_op = optimizer.minimize(
@@ -185,7 +133,7 @@ class train_abc():
                 ops = {
                     'batch_frame': frames_op,
                     'batch_poses': poses_op,
-                    # 'batch_resce': resce_op,
+                    'batch_udir2': udir2_op,
                     'is_training': is_training_tf,
                     'summary_op': summary_op,
                     'step': global_step,
@@ -209,10 +157,9 @@ class train_abc():
             feed_dict = {
                 ops['batch_frame']: batch_data['batch_frame'],
                 ops['batch_poses']: batch_data['batch_poses'],
+                ops['batch_udir2']: batch_data['batch_udir2'],
                 ops['is_training']: True
             }
-            # sess.run(ops['batch_resce'], feed_dict={
-            #     ops['batch_resce']: batch_data['batch_resce']})
             summary, step, _, loss_val, pred_val = sess.run(
                 [ops['summary_op'], ops['step'], ops['train_op'],
                     ops['loss_op'], ops['pred_op']],
@@ -252,6 +199,7 @@ class train_abc():
             feed_dict = {
                 ops['batch_frame']: batch_data['batch_frame'],
                 ops['batch_poses']: batch_data['batch_poses'],
+                ops['batch_udir2']: batch_data['batch_udir2'],
                 ops['is_training']: False
             }
             summary, step, loss_val, pred_val = sess.run(
@@ -284,7 +232,7 @@ class train_abc():
         with tf.Graph().as_default(), \
                 tf.device('/gpu:' + str(self.args.gpu_id)):
             # sequential evaluate, suited for streaming
-            frames_op, poses_op = \
+            frames_op, poses_op, udir2_op = \
                 self.args.model_inst.placeholder_inputs(1)
             is_training_tf = tf.placeholder(
                 tf.bool, shape=(), name='is_training')
@@ -293,10 +241,10 @@ class train_abc():
                 frames_op, is_training_tf,
                 self.args.bn_decay, self.args.regu_scale)
             # loss_op = self.args.model_inst.get_loss(
-            #     pred_op, poses_op, end_points)
-            loss_l2, loss_reg = self.args.model_inst.get_loss(
-                pred_op, poses_op, end_points)
-            loss_op = 1e-4 * loss_l2 + 1e-1 * loss_reg
+            #     pred_op, poses_op, udir2_op, end_points)
+            loss_l2, loss_udir, loss_unit, loss_reg = self.args.model_inst.get_loss(
+                pred_op, poses_op, udir2_op, end_points)
+            loss_op = 1e-4 * loss_l2 + 1e-7 * loss_udir + 1e-7 * loss_unit + 1e-1 * loss_reg
             test_op = 1e-4 * loss_l2
 
             saver = tf.train.Saver()
@@ -315,6 +263,7 @@ class train_abc():
                 ops = {
                     'batch_frame': frames_op,
                     'batch_poses': poses_op,
+                    'batch_udir2': udir2_op,
                     'is_training': is_training_tf,
                     'loss_op': loss_op,
                     'test_op': test_op,
@@ -330,7 +279,6 @@ class train_abc():
         batch_count = 0
         loss_sum = 0
         num_stores = self.args.model_inst.store_size
-        eval_size = 1
         timerbar = progressbar.ProgressBar(
             maxval=num_stores,
             widgets=[
@@ -339,12 +287,13 @@ class train_abc():
                 ' ', progressbar.ETA()]
         ).start()
         while True:
-            batch_data = self.args.model_inst.fetch_batch(eval_size)
+            batch_data = self.args.model_inst.fetch_batch(1)
             if batch_data is None:
                 break
             feed_dict = {
                 ops['batch_frame']: batch_data['batch_frame'],
                 ops['batch_poses']: batch_data['batch_poses'],
+                ops['batch_udir2']: batch_data['batch_udir2'],
                 ops['is_training']: False
             }
             loss_val, pred_val = sess.run(
@@ -352,36 +301,11 @@ class train_abc():
                 feed_dict=feed_dict)
             self.args.model_inst.evaluate_batch(pred_val)
             loss_sum += loss_val
-            batch_count += eval_size
             timerbar.update(batch_count)
+            batch_count += 1
         timerbar.finish()
         mean_loss = loss_sum / batch_count
         self.args.logger.info(
             'epoch evaluate mean loss: {:.4f}'.format(
                 mean_loss))
         return mean_loss
-
-    def get_learning_rate(self, global_step):
-        learning_rate = tf.train.exponential_decay(
-            self.args.learning_rate,
-            global_step,
-            self.args.decay_step,
-            self.args.decay_rate,
-            staircase=True
-        )
-        learning_rate = tf.maximum(learning_rate, 1e-6)
-        return learning_rate
-
-    def __init__(self, args, new_log=True):
-        self.args = args
-        self.logger = logging.getLogger('train')
-
-
-if __name__ == "__main__":
-    # python train_abc.py --max_epoch=1 --batch_size=16 --model_name=base_regre
-    with args_holder() as argsholder:
-        argsholder.parse_args()
-        argsholder.create_instance()
-        trainer = train_abc(argsholder.args)
-        trainer.train()
-        trainer.evaluate()
