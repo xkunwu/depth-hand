@@ -201,6 +201,7 @@ class voxel_offset(base_conv3):
             # draw_udir(vxdist, vxunit, voxize_crop, scale)
             # mlab.draw()
 
+        fig.tight_layout()
         mpplot.savefig(os.path.join(
             args.predict_dir,
             # 'draw_{}.png'.format(self.name_desc)))

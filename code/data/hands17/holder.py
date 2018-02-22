@@ -365,4 +365,5 @@ class hands17holder:
             'udir2': datapro.prow_udir2,
             'vxedt': datapro.prow_vxedt,
             'edt2': datapro.prow_edt2,
+            'ov3edt2': datapro.prow_ov3edt2,
         }

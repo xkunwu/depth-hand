@@ -196,6 +196,7 @@ class direc_tsdf(base_conv3):
                 # print(volume3[12:20, 12:20, 16])
                 mlab.outline()
 
+        fig.tight_layout()
         mpplot.savefig(os.path.join(
             args.predict_dir,
             'draw_{}_{}.png'.format(self.name_desc, img_id)))

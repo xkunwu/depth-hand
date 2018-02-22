@@ -75,7 +75,7 @@ class localizer3(base_conv3):
         self.batchallot = None
         fig = mpplot.figure(figsize=(2 * 5, 1 * 5))
         self.draw_prediction(thedata, args)
-        mpplot.tight_layout()
+        fig.tight_layout()
         fname = 'detection_{}.png'.format(self.name_desc)
         mpplot.savefig(os.path.join(self.predict_dir, fname))
         mpplot.close(fig)
@@ -206,7 +206,7 @@ class localizer3(base_conv3):
 
         print('[{}] drawing image #{:d} ...'.format(self.name_desc, img_id))
         # colors = [Color('orange').rgb, Color('red').rgb, Color('lime').rgb]
-        mpplot.subplots(nrows=2, ncols=2, figsize=(2 * 5, 2 * 5))
+        fig, _ = mpplot.subplots(nrows=2, ncols=2, figsize=(2 * 5, 2 * 5))
         ax = mpplot.subplot(2, 2, 1)
         mpplot.gca().set_title('test input')
         annot_line = args.data_io.get_line(
@@ -298,6 +298,7 @@ class localizer3(base_conv3):
         # print(frame[12:20, 12:20, 16])
         mlab.outline()
 
+        fig.tight_layout()
         mpplot.savefig(os.path.join(
             args.predict_dir,
             'draw_{}_{}.png'.format(self.name_desc, img_id)))

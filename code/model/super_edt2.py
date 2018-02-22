@@ -153,6 +153,7 @@ class super_edt2(base_regre):
         edt2 = edt2_h5[..., joint_id]
         draw_edt2(fig, ax, edt2)
 
+        fig.tight_layout()
         mpplot.savefig(os.path.join(
             args.predict_dir,
             'draw_{}_{}.png'.format(self.name_desc, img_id)))

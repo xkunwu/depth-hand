@@ -278,7 +278,7 @@ class dense_regre(base_regre):
         #     frame_h5, pose_raw, cube, self.hmap_size, self.caminfo
         # )
 
-        # mpplot.tight_layout()
+        fig.tight_layout()
         mpplot.savefig(os.path.join(
             args.predict_dir,
             'draw_{}_{}.png'.format(self.name_desc, img_id)))

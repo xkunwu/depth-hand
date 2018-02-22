@@ -172,6 +172,7 @@ class base_regre(object):
             self.predict_file,
             thedata
         )
+        fig.tight_layout()
         fname = 'detection_{}_{:d}.png'.format(self.name_desc, img_id)
         mpplot.savefig(os.path.join(self.predict_dir, fname))
         mpplot.close(fig)
@@ -405,7 +406,7 @@ class base_regre(object):
         cube.load(resce3)
         from colour import Color
         colors = [Color('orange').rgb, Color('red').rgb, Color('lime').rgb]
-        mpplot.subplots(nrows=1, ncols=2, figsize=(2 * 5, 1 * 5))
+        fig, _ = mpplot.subplots(nrows=1, ncols=2, figsize=(2 * 5, 1 * 5))
 
         ax = mpplot.subplot(1, 2, 2)
         mpplot.gca().set_title('test storage read')
@@ -445,7 +446,7 @@ class base_regre(object):
         #     print(np.linalg.norm(poses_h5 - poses))
         #     print('ERROR - h5 storage corrupted!')
 
-        mpplot.tight_layout()
+        fig.tight_layout()
         mpplot.savefig(os.path.join(
             args.predict_dir,
             'draw_{}_{}.png'.format(self.name_desc, img_id)))

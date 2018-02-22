@@ -44,12 +44,14 @@ def draw_compare(args, predict_dir=None):
     fig = mpplot.figure(figsize=(2 * 5, 1 * 5))
     dataeval.draw_error_percentage_curve(
         errors, methods, mpplot.gca())
+    fig.tight_layout()
     mpplot.savefig(os.path.join(predict_dir, 'error_rate.png'))
     mpplot.close(fig)
     # mpplot.gcf().clear()
     fig = mpplot.figure(figsize=(2 * 5, 1 * 5))
     err_mean = dataeval.draw_error_per_joint(
         errors, methods, mpplot.gca(), args.data_inst.join_name)
+    fig.tight_layout()
     mpplot.savefig(os.path.join(predict_dir, 'error_bar.png'))
     mpplot.close(fig)
 
@@ -133,7 +135,8 @@ if __name__ == "__main__":
     mpl = import_module('matplotlib')
     mpl.use('Agg')
     methlist = [
-        'super_edt2',
+        'super_ov3edt2',
+        # 'super_edt2',
         # 'super_edt3',
         # 'super_dist3',
         # 'voxel_regre',

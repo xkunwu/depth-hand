@@ -89,7 +89,7 @@ class localizer2(base_regre):
         self.batchallot = None
         fig = mpplot.figure(figsize=(2 * 5, 1 * 5))
         self.draw_prediction(thedata, args)
-        mpplot.tight_layout()
+        fig.tight_layout()
         fname = 'detection_{}.png'.format(self.name_desc)
         mpplot.savefig(os.path.join(self.predict_dir, fname))
         mpplot.close(fig)
@@ -125,7 +125,7 @@ class localizer2(base_regre):
         mpplot.xlim([0, 1.])
         # mpplot.xlim(left=0)
         # mpplot.xlim(right=100)
-        mpplot.tight_layout()
+        fig.tight_layout()
         fname = 'evaluate_confidence_{}.png'.format(
             self.name_desc)
         mpplot.savefig(os.path.join(self.predict_dir, fname))
@@ -145,7 +145,7 @@ class localizer2(base_regre):
         mpplot.xlabel('Recall')
         mpplot.title('Hand detection: AP={0:0.2f}'.format(
             avg_ps))
-        mpplot.tight_layout()
+        fig.tight_layout()
         fname = 'evaluate_pr_{}.png'.format(self.name_desc)
         mpplot.savefig(os.path.join(self.predict_dir, fname))
         print('figures saved: {}'.format(fname))
@@ -227,8 +227,8 @@ class localizer2(base_regre):
         )
         for ii, rect in enumerate(rects):
             rect.draw(ax, colors[ii])
-        mpplot.tight_layout()
         mpplot.gca().set_title('Prediction')
+        fig.tight_layout()
         fname = 'debug_train_{}.png'.format(self.name_desc)
         mpplot.savefig(os.path.join(self.predict_dir, fname))
         mpplot.close(fig)
@@ -293,7 +293,7 @@ class localizer2(base_regre):
 
         print('[{}] drawing image #{:d} ...'.format(self.name_desc, img_id))
         colors = [Color('orange').rgb, Color('red').rgb, Color('lime').rgb]
-        mpplot.subplots(nrows=2, ncols=2, figsize=(2 * 5, 2 * 5))
+        fig, _ = mpplot.subplots(nrows=2, ncols=2, figsize=(2 * 5, 2 * 5))
         ax = mpplot.subplot(2, 2, 1)
         mpplot.gca().set_title('test input')
         annot_line = args.data_io.get_line(
@@ -377,6 +377,7 @@ class localizer2(base_regre):
         for ii, rect in enumerate(rects):
             rect.draw(ax, colors[ii])
 
+        fig.tight_layout()
         mpplot.savefig(os.path.join(
             args.predict_dir,
             'draw_{}_{}.png'.format(self.name_desc, img_id)))

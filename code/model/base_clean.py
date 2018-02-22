@@ -153,6 +153,7 @@ class base_clean(base_regre):
         for ii, rect in enumerate(rects):
             rect.draw(ax, colors[ii])
 
+        fig.tight_layout()
         mpplot.savefig(os.path.join(
             args.predict_dir,
             'draw_{}_{}.png'.format(self.name_desc, img_id)))

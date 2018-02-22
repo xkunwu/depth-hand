@@ -523,7 +523,7 @@ def trunc_belief(pcnt):
     return np.stack(befs, axis=3)
 
 
-def prop_edt2(image_crop, pose_raw, cube, caminfo):
+def prop_edt2(image_crop, pose_raw, cube, caminfo, roll=0):
     from scipy.ndimage.morphology import distance_transform_edt
     hmap_size = caminfo.hmap_size
     scale = int(image_crop.shape[0] / hmap_size)
@@ -536,9 +536,9 @@ def prop_edt2(image_crop, pose_raw, cube, caminfo):
         distance_transform_edt(image_hmap),
         mask)
     pose3d = cube.transform_center_shrink(pose_raw)
-    pose2d, _ = cube.project_ortho(pose3d, roll=0, sort=False)
+    pose2d, _ = cube.project_ortho(pose3d, roll=roll, sort=False)
     pose2d = np.floor(pose2d * hmap_size).astype(int)
-    vol_l = []
+    edt_l = []
     for pose in pose2d:
         phi = masked_edt.copy()
         phi[pose[0], pose[1]] = 0.
@@ -547,8 +547,19 @@ def prop_edt2(image_crop, pose_raw, cube, caminfo):
         df = (df_max - df) / df_max
         df[mask] = 0.
         df[1. < df] = 0.  # outside isolated region have value > 1
-        vol_l.append(df)
-    return np.stack(vol_l, axis=2)
+        edt_l.append(df)
+    return np.stack(edt_l, axis=2)
+
+
+def prop_ov3edt2(ortho3_crop, pose_raw, cube, caminfo, roll=0):
+    crop_size = caminfo.crop_size
+    images = ortho3_crop.reshape((crop_size, crop_size, 3))
+    edt_l = []
+    for dd in range(3):
+        edt_l.append(prop_edt2(
+            images[..., dd], pose_raw, cube, caminfo, roll=dd
+        ))
+    return np.concatenate(edt_l, axis=2)
 
 
 def prop_edt3(vxhit, pose_raw, cube, caminfo):
