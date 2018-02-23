@@ -96,6 +96,8 @@ class super_edt2(base_regre):
         frame_id = np.random.choice(store_size)
         # frame_id = 892  # frame_id = img_id - 1
         # frame_id = 886  # frame_id = img_id - 1
+        # frame_id = 218  # palm
+        frame_id = 30
         img_id = index_h5[frame_id, ...]
         frame_h5 = self.store_handle['clean'][frame_id, ...]
         poses_h5 = self.store_handle['pose_c1'][frame_id, ...].reshape(-1, 3)
@@ -176,7 +178,7 @@ class super_edt2(base_regre):
         final_endpoint = 'stage_out'
         num_joint = self.join_num
         # num_out_map = num_joint * 5  # hmap2, olmap, uomap
-        num_feature = 32
+        num_feature = 128
 
         def add_and_check_final(name, net):
             end_points[name] = net
@@ -244,18 +246,18 @@ class super_edt2(base_regre):
                     sc = 'stage32_pre'
                     net = incept_resnet.resnet_k(
                         net, scope='stage32_res')
-                    # net = slim.conv2d(
-                    #     net, num_feature, 1, scope='stage32_out')
+                    net = slim.conv2d(
+                        net, num_feature, 1, scope='stage32_out')
                     self.end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points
                 for hg in range(hg_repeat):
                     sc = 'hourglass_{}'.format(hg)
                     with tf.variable_scope(sc):
-                        branch0 = hourglass.hg_net(
-                            net, 2, scope=sc + '_hg')
+                        # branch0 = hourglass.hg_net(
+                        #     net, 2, scope=sc + '_hg')
                         branch0 = incept_resnet.resnet_k(
-                            branch0, scope='_res')
+                            net, scope='_res')
                         net_maps = slim.conv2d(
                             branch0, num_joint, 1,
                             # normalizer_fn=None, activation_fn=tf.nn.softmax)
@@ -268,13 +270,15 @@ class super_edt2(base_regre):
                         net = net + branch0 + branch1
                 with tf.variable_scope('stage32'):
                     sc = 'stage32_post'
-                    net = incept_resnet.conv_maxpool(net, scope=sc)
+                    # net = incept_resnet.conv_maxpool(net, scope=sc)
+                    net = slim.max_pool2d(net, 3, scope=sc)
                     self.end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points
                 with tf.variable_scope('stage16'):
                     sc = 'stage16'
-                    net = incept_resnet.conv_maxpool(net, scope=sc)
+                    # net = incept_resnet.conv_maxpool(net, scope=sc)
+                    net = slim.max_pool2d(net, 3, scope=sc)
                     self.end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points

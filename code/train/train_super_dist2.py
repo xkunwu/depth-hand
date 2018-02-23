@@ -4,7 +4,7 @@ import tensorflow as tf
 import progressbar
 from functools import reduce
 from train.train_abc import train_abc
-from utils.image_ops import tfplot_olmap, tfplot_uomap
+from utils.image_ops import tfplot_olmap
 
 
 class train_super_dist2(train_abc):

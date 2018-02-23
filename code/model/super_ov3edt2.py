@@ -10,8 +10,8 @@ from utils.iso_boxes import iso_cube
 class super_ov3edt2(super_edt2):
     @staticmethod
     def get_trainer(args, new_log):
-        from train.train_super_ov3edt2 import train_super_ov3edt2
-        return train_super_ov3edt2(args, new_log)
+        from train.train_super_edt2 import train_super_edt2
+        return train_super_edt2(args, new_log)
 
     def __init__(self, args):
         super(super_ov3edt2, self).__init__(args)
@@ -38,7 +38,7 @@ class super_ov3edt2(super_edt2):
             self.store_handle['ortho3'][self.batch_beg:batch_end, ...]
         self.batch_data['batch_poses'] = \
             self.store_handle['pose_c1'][self.batch_beg:batch_end, ...]
-        self.batch_data['batch_ov3edt2'] = \
+        self.batch_data['batch_edt2'] = \
             self.store_handle['ov3edt2'][self.batch_beg:batch_end, ...]
         self.batch_data['batch_index'] = \
             self.store_handle['index'][self.batch_beg:batch_end, ...]
@@ -95,6 +95,7 @@ class super_ov3edt2(super_edt2):
         frame_id = np.random.choice(store_size)
         # frame_id = 886  # frame_id = img_id - 1
         # frame_id = 125  # frame_id = img_id - 1
+        # frame_id = 218  # palm
         img_id = index_h5[frame_id, ...]
         frame_h5 = self.store_handle['ortho3'][frame_id, ...]
         poses_h5 = self.store_handle['pose_c1'][frame_id, ...].reshape(-1, 3)
@@ -274,7 +275,8 @@ class super_ov3edt2(super_edt2):
                         return net, end_points
                 with tf.variable_scope('stage16'):
                     sc = 'stage16'
-                    net = incept_resnet.conv_maxpool(net, scope=sc)
+                    # net = incept_resnet.conv_maxpool(net, scope=sc)
+                    net = slim.max_pool2d(net, 3, scope=sc)
                     self.end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points

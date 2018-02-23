@@ -62,7 +62,6 @@ class super_vxhit(voxel_detect):
                 self.prepare_dir, 'pose_lab_{}'.format(self.hmap_size)),
             'vxhit': os.path.join(
                 self.prepare_dir, 'vxhit_{}'.format(self.crop_size)),
-            # 'pose_c1': os.path.join(self.prepare_dir, 'pose_c1'),
             'pose_c1': os.path.join(self.prepare_dir, 'pose_c1'),
         }
         self.store_precon = {
@@ -71,7 +70,6 @@ class super_vxhit(voxel_detect):
             'resce': [],
             'pose_lab': ['poses', 'resce'],
             'vxhit': ['index', 'resce'],
-            # 'pose_c1': ['poses', 'resce'],
             'pose_c1': ['poses', 'resce'],
         }
 

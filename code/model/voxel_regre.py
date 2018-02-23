@@ -64,7 +64,6 @@ class voxel_regre(voxel_offset):
             'vxudir': os.path.join(
                 self.prepare_dir, 'vxudir_{}'.format(self.hmap_size)),
             'pose_c1': os.path.join(self.prepare_dir, 'pose_c1'),
-            # 'pose_c1': os.path.join(self.prepare_dir, 'pose_c1'),
         }
         self.store_precon = {
             'index': [],
@@ -73,7 +72,6 @@ class voxel_regre(voxel_offset):
             'pcnt3': ['index', 'resce'],
             'vxudir': ['pcnt3', 'poses', 'resce'],
             'pose_c1': ['poses', 'resce'],
-            # 'pose_c1': ['poses', 'resce'],
         }
 
     def yanker(self, pose_local, resce, caminfo):

@@ -3,10 +3,8 @@ import numpy as np
 import tensorflow as tf
 import progressbar
 from functools import reduce
-from utils.coder import file_pack
-from utils.tf_utils import unravel_index
 from train.train_abc import train_abc
-from utils.image_ops import tfplot_vxmap, tfplot_uomap3d
+from utils.image_ops import tfplot_vxmap
 
 
 class train_super_dist3(train_abc):

@@ -105,20 +105,20 @@ def test_dataops(args):
     #     data_inst,
     #     data_inst.training_images,
     #     data_inst.training_annot_cleaned,
-    #     219  # palm
+    #     218  # palm
     # )
     # mpplot.subplot(1, 2, 2)
     # datadraw.draw_pose_raw_random(
     #     data_inst,
     #     data_inst.training_cropped,
     #     data_inst.training_annot_cropped,
-    #     219  # palm
+    #     218  # palm
     # )
     # mpplot.show()
 
 
 if __name__ == "__main__":
-    # python -m train.evaluate --max_epoch=1 --batch_size=8 --bn_decay=0.9 --show_draw=True --model_name=base_clean
+    # python -m train.evaluate --max_epoch=1 --batch_size=5 --bn_decay=0.9 --show_draw=True --model_name=base_clean
     # import pdb; pdb.set_trace()
 
     from args_holder import args_holder
@@ -151,23 +151,25 @@ if __name__ == "__main__":
     mpl.use('Agg')
     methlist = [
         # 'super_edt3',
+        # 'super_ov3edt2m',
         # 'super_ov3edt2',
+        # 'super_edt2m',
         # 'super_edt2',
         # 'super_dist3',
         # 'voxel_regre',
         # 'voxel_offset',
-        'super_vxhit',
+        # 'super_vxhit',
         # 'voxel_detect',
         # 'super_dist2',
         # 'super_udir2',
         # 'dense_regre',
         # 'direc_tsdf',
         # 'trunc_dist',
-        'base_conv3',
+        # 'base_conv3',
         # 'base_conv3_inres',
         # 'ortho3view',
         # 'base_regre',
-        # 'base_clean',
+        'base_clean',
         # 'base_regre_inres',
         # 'base_clean_inres',
         # 'base_regre_hg',

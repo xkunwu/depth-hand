@@ -12,8 +12,8 @@ from utils.image_ops import draw_olmap, draw_uomap
 class super_dist2(base_regre):
     @staticmethod
     def get_trainer(args, new_log):
-        from train.train_super_dist2 import train_super_dist2
-        return train_super_dist2(args, new_log)
+        from train.train_super_edt2 import train_super_edt2
+        return train_super_edt2(args, new_log)
 
     def __init__(self, args):
         super(super_dist2, self).__init__(args)
@@ -22,7 +22,7 @@ class super_dist2(base_regre):
             'batch_udir2'
         )
         # self.num_appen = 4
-        self.crop_size = 64
+        self.crop_size = 128
         self.hmap_size = 32
         self.map_scale = self.crop_size / self.hmap_size
 
@@ -107,6 +107,8 @@ class super_dist2(base_regre):
         store_size = index_h5.shape[0]
         frame_id = np.random.choice(store_size)
         # frame_id = 0  # frame_id = img_id - 1
+        # frame_id = 218  # palm
+        # frame_id = 239
         img_id = index_h5[frame_id, ...]
         frame_h5 = self.store_handle['clean'][frame_id, ...]
         poses_h5 = self.store_handle['poses'][frame_id, ...].reshape(-1, 3)
@@ -128,30 +130,11 @@ class super_dist2(base_regre):
         colors = [Color('orange').rgb, Color('red').rgb, Color('lime').rgb]
         fig, _ = mpplot.subplots(nrows=2, ncols=3, figsize=(3 * 5, 2 * 5))
         pose_raw = poses_h5
-        joint_id = self.join_num - 1
         olmap_h5 = udir2_h5[..., :self.join_num]
         uomap_h5 = udir2_h5[..., self.join_num:]
-        olmap = olmap_h5[..., joint_id]
-        uomap = uomap_h5[..., 3 * joint_id:3 * (joint_id + 1)]
         depth_crop = cv2resize(frame_h5, (sizel, sizel))
 
-        ax = mpplot.subplot(2, 3, 2)
-        ax.imshow(depth_crop, cmap=mpplot.cm.bone_r)
-        pose3d = cube.transform_center_shrink(poses_h5)
-        pose2d, _ = cube.project_ortho(pose3d, roll=0, sort=False)
-        pose2d *= sizel
-        args.data_draw.draw_pose2d(
-            ax, thedata,
-            pose2d,
-        )
-
-        ax = mpplot.subplot(2, 3, 5)
-        draw_uomap(fig, ax, frame_h5, uomap)
-
-        ax = mpplot.subplot(2, 3, 6)
-        draw_olmap(fig, ax, frame_h5, olmap)
-
-        ax = mpplot.subplot(2, 3, 3)
+        ax = mpplot.subplot(2, 3, 4)
         pose_out = self.yanker_hmap(
             resce_h5, olmap_h5, uomap_h5,
             frame_h5, self.caminfo)
@@ -163,7 +146,7 @@ class super_dist2(base_regre):
         ax.imshow(depth_crop, cmap=mpplot.cm.bone_r)
         pose3d = cube.transform_center_shrink(pose_out)
         pose2d, _ = cube.project_ortho(pose3d, roll=0, sort=False)
-        pose2d *= sizel
+        pose2d *= self.crop_size
         args.data_draw.draw_pose2d(
             ax, thedata,
             pose2d,
@@ -184,6 +167,22 @@ class super_dist2(base_regre):
         )
         for ii, rect in enumerate(rects):
             rect.draw(ax, colors[ii])
+
+        joint_id = self.join_num - 1
+        olmap = olmap_h5[..., joint_id]
+        uomap = uomap_h5[..., 3 * joint_id:3 * (joint_id + 1)]
+        ax = mpplot.subplot(2, 3, 2)
+        draw_uomap(fig, ax, frame_h5, uomap)
+        ax = mpplot.subplot(2, 3, 3)
+        draw_olmap(fig, ax, frame_h5, olmap)
+
+        joint_id = self.join_num - 1 - 9
+        olmap = olmap_h5[..., joint_id]
+        uomap = uomap_h5[..., 3 * joint_id:3 * (joint_id + 1)]
+        ax = mpplot.subplot(2, 3, 5)
+        draw_uomap(fig, ax, frame_h5, uomap)
+        ax = mpplot.subplot(2, 3, 6)
+        draw_olmap(fig, ax, frame_h5, olmap)
 
         # hmap2 = self.data_module.ops.raw_to_heatmap2(
         #     pose_raw, cube, self.hmap_size, self.caminfo
@@ -263,13 +262,22 @@ class super_dist2(base_regre):
                     activation_fn=tf.nn.relu,
                     normalizer_fn=slim.batch_norm):
                 with tf.variable_scope('stage128'):
-                    sc = 'stage64_image'
-                    net = slim.conv2d(input_tensor, 16, 3)
+                    sc = 'stage128'
+                    net = slim.conv2d(input_tensor, 8, 3)
                     net = incept_resnet.conv_maxpool(net, scope=sc)
                     self.end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points
-                    sc = 'stage32_image'
+                    sc = 'stage64'
+                    net = incept_resnet.conv_maxpool(net, scope=sc)
+                    # net = incept_resnet.resnet_k(
+                    #     net, scope='stage64_residual')
+                    # net = incept_resnet.reduce_net(
+                    #     net, scope='stage64_reduce')
+                    self.end_point_list.append(sc)
+                    if add_and_check_final(sc, net):
+                        return net, end_points
+                    sc = 'stage32_pre'
                     net = incept_resnet.resnet_k(
                         net, scope='stage32_res')
                     net = slim.conv2d(

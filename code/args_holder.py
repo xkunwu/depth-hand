@@ -7,7 +7,9 @@ from utils.coder import file_pack
 
 model_map = {
     'super_edt3': 'model.super_edt3',
+    # 'super_ov3edt2m': 'model.super_ov3edt2m',
     'super_ov3edt2': 'model.super_ov3edt2',
+    'super_edt2m': 'model.super_edt2m',
     'super_edt2': 'model.super_edt2',
     'super_dist3': 'model.super_dist3',
     'voxel_regre': 'model.voxel_regre',

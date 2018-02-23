@@ -526,8 +526,9 @@ def trunc_belief(pcnt):
 def prop_edt2(image_crop, pose_raw, cube, caminfo, roll=0):
     from scipy.ndimage.morphology import distance_transform_edt
     hmap_size = caminfo.hmap_size
-    istep = 1. / hmap_size
+    istep = 2. / hmap_size
     scale = int(image_crop.shape[0] / hmap_size)
+    # image_hmap = image_crop
     if 1 == scale:
         image_hmap = image_crop
     else:
@@ -555,6 +556,8 @@ def prop_edt2(image_crop, pose_raw, cube, caminfo, roll=0):
         df = (df_max - df) / df_max
         df[mask] = 0.
         df[1. < df] = 0.  # outside isolated region have value > 1
+        # if 1 != scale:
+        #     df = df[::scale, ::scale]  # downsampling
         edt_l.append(df)
     return np.stack(edt_l, axis=2)
 

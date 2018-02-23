@@ -6,6 +6,13 @@ from utils.iso_boxes import iso_cube
 from utils.regu_grid import latice_image
 
 
+def prow_edt2m(args, thedata, batch_data):
+    bi, edt2, udir2 = \
+        args[0], args[1], args[2]
+    edt2m = np.multiply(edt2, udir2[..., :thedata.join_num])
+    batch_data[bi, ...] = edt2m
+
+
 def prow_ov3edt2(args, thedata, batch_data):
     bi, ortho3, poses, resce = \
         args[0], args[1], args[2], args[3]
