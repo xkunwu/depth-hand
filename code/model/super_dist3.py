@@ -21,7 +21,7 @@ class super_dist3(base_conv3):
             import_module('model.batch_allot'),
             'batch_vxudir'
         )
-        self.crop_size = 32
+        self.crop_size = 64
         self.hmap_size = 16
         self.map_scale = self.crop_size / self.hmap_size
 
@@ -40,7 +40,7 @@ class super_dist3(base_conv3):
             self.store_handle['pcnt3'][self.batch_beg:batch_end, ...],
             axis=-1)
         self.batch_data['batch_poses'] = \
-            self.store_handle['pose_c'][self.batch_beg:batch_end, ...]
+            self.store_handle['pose_c1'][self.batch_beg:batch_end, ...]
         self.batch_data['batch_vxudir'] = self.store_handle['vxudir'][
             self.batch_beg:batch_end, ..., :self.join_num]
         self.batch_data['batch_index'] = \
@@ -63,7 +63,7 @@ class super_dist3(base_conv3):
                 self.prepare_dir, 'pcnt3_{}'.format(self.crop_size)),
             'vxudir': os.path.join(
                 self.prepare_dir, 'vxudir_{}'.format(self.hmap_size)),
-            'pose_c': os.path.join(self.prepare_dir, 'pose_c'),
+            'pose_c1': os.path.join(self.prepare_dir, 'pose_c1'),
             # 'pose_c1': os.path.join(self.prepare_dir, 'pose_c1'),
         }
         self.store_precon = {
@@ -72,15 +72,15 @@ class super_dist3(base_conv3):
             'resce': [],
             'pcnt3': ['index', 'resce'],
             'vxudir': ['pcnt3', 'poses', 'resce'],
-            'pose_c': ['poses', 'resce'],
+            'pose_c1': ['poses', 'resce'],
             # 'pose_c1': ['poses', 'resce'],
         }
 
     def yanker(self, pose_local, resce, caminfo):
         cube = iso_cube()
         cube.load(resce)
-        return cube.transform_add_center(pose_local)
-        # return cube.transform_expand_move(pose_local)
+        # return cube.transform_add_center(pose_local)
+        return cube.transform_expand_move(pose_local)
 
     def yanker_hmap(self, resce, vxhit, vxudir, caminfo):
         cube = iso_cube()
@@ -278,14 +278,13 @@ class super_dist3(base_conv3):
                     activation_fn=tf.nn.relu,
                     normalizer_fn=slim.batch_norm):
                 with tf.variable_scope('stage64'):
-                    # sc = 'stage64'
-                    # net = slim.conv3d(input_tensor, 16, 3)
-                    # net = inresnet3d.conv_maxpool(net, scope=sc)
-                    # self.end_point_list.append(sc)
-                    # if add_and_check_final(sc, net):
-                    #     return net, end_points
+                    sc = 'stage64'
+                    net = slim.conv3d(input_tensor, 8, 3)
+                    net = inresnet3d.conv_maxpool(net, scope=sc)
+                    self.end_point_list.append(sc)
+                    if add_and_check_final(sc, net):
+                        return net, end_points
                     sc = 'stage32'
-                    net = slim.conv3d(input_tensor, 16, 3)
                     # net = inresnet3d.resnet_k(
                     #     net, scope='stage32_res')
                     net = inresnet3d.conv_maxpool(net, scope=sc)
@@ -363,7 +362,7 @@ class super_dist3(base_conv3):
             if not name.startswith('hourglass_'):
                 continue
             # loss_udir += tf.nn.l2_loss(net - vxudir)
-            loss_udir += tf.reduce_sum(
+            loss_udir += tf.reduce_mean(
                 self.smooth_l1(tf.abs(net - vxudir)))
         loss_reg = tf.add_n(tf.get_collection(
             tf.GraphKeys.REGULARIZATION_LOSSES))

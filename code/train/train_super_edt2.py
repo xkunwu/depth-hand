@@ -37,8 +37,8 @@ class train_super_edt2(train_abc):
             #     pred_op, poses_op, edt2_op, end_points)
             loss_l2, loss_edt, loss_reg = self.args.model_inst.get_loss(
                 pred_op, poses_op, edt2_op, end_points)
-            loss_op = 1e-4 * loss_l2 + 1e-5 * loss_edt + 1e-1 * loss_reg
-            test_op = 1e-4 * loss_l2
+            test_op = loss_l2 + loss_edt
+            loss_op = test_op + loss_reg
             tf.summary.scalar('loss', loss_op)
             tf.summary.scalar('loss_l2', loss_l2)
             tf.summary.scalar('loss_edt', loss_edt)
@@ -222,8 +222,8 @@ class train_super_edt2(train_abc):
             #     pred_op, poses_op, edt2_op, end_points)
             loss_l2, loss_edt, loss_reg = self.args.model_inst.get_loss(
                 pred_op, poses_op, edt2_op, end_points)
-            loss_op = 1e-4 * loss_l2 + 1e-5 * loss_edt + 1e-1 * loss_reg
-            test_op = 1e-4 * loss_l2
+            test_op = loss_l2 + loss_edt
+            loss_op = test_op + loss_reg
 
             saver = tf.train.Saver()
 

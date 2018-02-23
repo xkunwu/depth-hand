@@ -2,24 +2,25 @@ import os
 from importlib import import_module
 import numpy as np
 import tensorflow as tf
-import matplotlib.pyplot as mpplot
-from model.super_edt2 import super_edt2
+from .voxel_detect import voxel_detect
 from utils.iso_boxes import iso_cube
 
 
-class super_ov3edt2(super_edt2):
+class super_vxhit(voxel_detect):
+    """ this might not be a good idea: intermediate layers -> 0
+    """
     @staticmethod
     def get_trainer(args, new_log):
-        from train.train_super_ov3edt2 import train_super_ov3edt2
-        return train_super_ov3edt2(args, new_log)
+        from train.train_super_vxhit import train_super_vxhit
+        return train_super_vxhit(args, new_log)
 
     def __init__(self, args):
-        super(super_ov3edt2, self).__init__(args)
+        super(super_vxhit, self).__init__(args)
         self.batch_allot = getattr(
             import_module('model.batch_allot'),
-            'batch_ov3edt2'
+            'batch_vxhit'
         )
-        self.crop_size = 128
+        self.crop_size = 64
         self.hmap_size = 32
         self.map_scale = self.crop_size / self.hmap_size
 
@@ -34,12 +35,13 @@ class super_ov3edt2(super_edt2):
         # # print(self.batch_beg, batch_end, self.split_end)
         if batch_end >= self.split_end:
             return None
-        self.batch_data['batch_frame'] = \
-            self.store_handle['ortho3'][self.batch_beg:batch_end, ...]
+        self.batch_data['batch_frame'] = np.expand_dims(
+            self.store_handle['vxhit'][self.batch_beg:batch_end, ...],
+            axis=-1)
         self.batch_data['batch_poses'] = \
             self.store_handle['pose_c1'][self.batch_beg:batch_end, ...]
-        self.batch_data['batch_ov3edt2'] = \
-            self.store_handle['ov3edt2'][self.batch_beg:batch_end, ...]
+        self.batch_data['batch_vxhit'] = self.store_handle['pose_lab'][
+            self.batch_beg:batch_end, ..., :self.join_num]
         self.batch_data['batch_index'] = \
             self.store_handle['index'][self.batch_beg:batch_end, ...]
         self.batch_data['batch_resce'] = \
@@ -49,26 +51,28 @@ class super_ov3edt2(super_edt2):
 
     def receive_data(self, thedata, args):
         """ Receive parameters specific to the data """
-        super(super_ov3edt2, self).receive_data(thedata, args)
+        super(super_vxhit, self).receive_data(thedata, args)
         thedata.hmap_size = self.hmap_size
         self.out_dim = self.join_num * 3
         self.store_name = {
             'index': self.train_file,
             'poses': self.train_file,
             'resce': self.train_file,
+            'pose_lab': os.path.join(
+                self.prepare_dir, 'pose_lab_{}'.format(self.hmap_size)),
+            'vxhit': os.path.join(
+                self.prepare_dir, 'vxhit_{}'.format(self.crop_size)),
+            # 'pose_c1': os.path.join(self.prepare_dir, 'pose_c1'),
             'pose_c1': os.path.join(self.prepare_dir, 'pose_c1'),
-            'ortho3': os.path.join(
-                self.prepare_dir, 'ortho3_{}'.format(self.crop_size)),
-            'ov3edt2': os.path.join(
-                self.prepare_dir, 'ov3edt2_{}'.format(self.hmap_size)),
         }
         self.store_precon = {
             'index': [],
             'poses': [],
             'resce': [],
+            'pose_lab': ['poses', 'resce'],
+            'vxhit': ['index', 'resce'],
+            # 'pose_c1': ['poses', 'resce'],
             'pose_c1': ['poses', 'resce'],
-            'ortho3': ['index', 'resce'],
-            'ov3edt2': ['ortho3', 'poses', 'resce'],
         }
 
     def yanker(self, pose_local, resce, caminfo):
@@ -89,101 +93,26 @@ class super_ov3edt2(super_edt2):
             poses_out[ei] = pose_raw.reshape(1, -1)
         self.eval_pred.append(poses_out)
 
-    def draw_random(self, thedata, args):
-        index_h5 = self.store_handle['index']
-        store_size = index_h5.shape[0]
-        frame_id = np.random.choice(store_size)
-        # frame_id = 886  # frame_id = img_id - 1
-        # frame_id = 125  # frame_id = img_id - 1
-        img_id = index_h5[frame_id, ...]
-        frame_h5 = self.store_handle['ortho3'][frame_id, ...]
-        poses_h5 = self.store_handle['pose_c1'][frame_id, ...].reshape(-1, 3)
-        resce_h5 = self.store_handle['resce'][frame_id, ...]
-        ov3edt2_h5 = self.store_handle['ov3edt2'][frame_id, ...]
-
-        print('[{}] drawing image #{:d} ...'.format(self.name_desc, img_id))
-        print(np.min(frame_h5), np.max(frame_h5))
-        print(np.histogram(frame_h5, range=(1e-4, np.max(frame_h5))))
-        print(np.min(poses_h5, axis=0), np.max(poses_h5, axis=0))
-        from colour import Color
-        colors = [Color('orange').rgb, Color('red').rgb, Color('lime').rgb]
-        fig, _ = mpplot.subplots(nrows=3, ncols=4, figsize=(4 * 5, 3 * 5))
-        resce3 = resce_h5[0:4]
-        cube = iso_cube()
-        cube.load(resce3)
-
-        ax = mpplot.subplot(3, 4, 1)
-        mpplot.gca().set_title('test image - {:d}'.format(img_id))
-        img_name = args.data_io.index2imagename(img_id)
-        img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
-        ax.imshow(img, cmap=mpplot.cm.bone_r)
-        pose_raw = self.yanker(poses_h5, resce_h5, self.caminfo)
-        args.data_draw.draw_pose2d(
-            ax, thedata,
-            args.data_ops.raw_to_2d(pose_raw, thedata)
-        )
-        rects = cube.proj_rects_3(
-            args.data_ops.raw_to_2d, self.caminfo
-        )
-        for ii, rect in enumerate(rects):
-            rect.draw(ax, colors[ii])
-
-        for spi in range(3):
-            ax = mpplot.subplot(3, 4, spi + 2)
-            img = frame_h5[..., spi]
-            ax.imshow(img, cmap=mpplot.cm.bone_r)
-            pose3d = poses_h5
-            # pose3d = cube.trans_scale_to(poses_h5)
-            pose2d, _ = cube.project_ortho(pose3d, roll=spi, sort=False)
-            pose2d *= self.crop_size
-            args.data_draw.draw_pose2d(
-                ax, thedata,
-                pose2d,
-            )
-
-        from utils.image_ops import draw_edt2
-        joint_id = self.join_num - 1
-        for spi in range(3):
-            ax = mpplot.subplot(3, 4, spi + 6)
-            edt2 = ov3edt2_h5[..., spi * self.join_num + joint_id]
-            draw_edt2(fig, ax, edt2)
-
-        joint_id = self.join_num - 1 - 9
-        for spi in range(3):
-            ax = mpplot.subplot(3, 4, spi + 10)
-            edt2 = ov3edt2_h5[..., spi * self.join_num + joint_id]
-            draw_edt2(fig, ax, edt2)
-
-        fig.tight_layout()
-        mpplot.savefig(os.path.join(
-            args.predict_dir,
-            'draw_{}_{}.png'.format(self.name_desc, img_id)))
-        if self.args.show_draw:
-            mpplot.show()
-        print('[{}] drawing image #{:d} - done.'.format(
-            self.name_desc, img_id))
-
     def get_model(
             self, input_tensor, is_training,
             bn_decay, regu_scale,
             hg_repeat=2, scope=None):
-        """ input_tensor: BxHxWxC
-            out_dim: BxHxWx(J*5), where J is number of joints
+        """ input_tensor: BxHxWxDxC
+            out_dim: BxHxWxDx(J*4), where J is number of joints
         """
         end_points = {}
         self.end_point_list = []
         final_endpoint = 'stage_out'
         num_joint = self.join_num
-        # num_out_map = num_joint * 5  # hmap2, olmap, uomap
-        num_feature = 64
+        num_feature = 32
+        num_vol = self.hmap_size * self.hmap_size * self.hmap_size
 
         def add_and_check_final(name, net):
             end_points[name] = net
             return name == final_endpoint
 
         from tensorflow.contrib import slim
-        from model.incept_resnet import incept_resnet
-        from model.hourglass import hourglass
+        from inresnet3d import inresnet3d
         # ~/anaconda2/lib/python2.7/site-packages/tensorflow/contrib/layers/
         with tf.variable_scope(
                 scope, self.name_desc, [input_tensor]):
@@ -208,79 +137,72 @@ class super_ov3edt2(super_edt2):
                     activation_fn=tf.nn.relu,
                     normalizer_fn=slim.batch_norm), \
                 slim.arg_scope(
-                    [slim.max_pool2d, slim.avg_pool2d],
+                    [slim.max_pool3d, slim.avg_pool3d],
                     stride=2, padding='SAME'), \
                 slim.arg_scope(
-                    [slim.conv2d_transpose],
+                    [slim.conv3d_transpose],
                     stride=2, padding='SAME',
                     weights_regularizer=slim.l2_regularizer(regu_scale),
                     biases_regularizer=slim.l2_regularizer(regu_scale),
                     activation_fn=tf.nn.relu,
                     normalizer_fn=slim.batch_norm), \
                 slim.arg_scope(
-                    [slim.conv2d],
+                    [slim.conv3d],
                     stride=1, padding='SAME',
                     weights_regularizer=slim.l2_regularizer(regu_scale),
                     biases_regularizer=slim.l2_regularizer(regu_scale),
                     activation_fn=tf.nn.relu,
                     normalizer_fn=slim.batch_norm):
-                with tf.variable_scope('stage128'):
-                    sc = 'stage128'
-                    net = slim.conv2d(input_tensor, 8, 3)
-                    net = incept_resnet.conv_maxpool(net, scope=sc)
-                    self.end_point_list.append(sc)
-                    if add_and_check_final(sc, net):
-                        return net, end_points
+                with tf.variable_scope('stage64'):
                     sc = 'stage64'
-                    net = incept_resnet.conv_maxpool(net, scope=sc)
-                    # net = incept_resnet.resnet_k(
-                    #     net, scope='stage64_residual')
-                    # net = incept_resnet.reduce_net(
-                    #     net, scope='stage64_reduce')
+                    net = slim.conv3d(input_tensor, 8, 3)
+                    net = inresnet3d.conv_maxpool(net, scope=sc)
                     self.end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points
                     sc = 'stage32_pre'
-                    net = incept_resnet.resnet_k(
+                    net = inresnet3d.resnet_k(
                         net, scope='stage32_res')
-                    net = slim.conv2d(
+                    net = slim.conv3d(
                         net, num_feature, 1, scope='stage32_out')
                     self.end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points
-                for hg in range(hg_repeat):
+                for hg in range(hg_repeat):  # 32x32x32
                     sc = 'hourglass_{}'.format(hg)
                     with tf.variable_scope(sc):
-                        branch0 = hourglass.hg_net(
-                            net, 2, scope=sc + '_hg')
-                        branch0 = incept_resnet.resnet_k(
-                            branch0, scope='_res')
-                        net_maps = slim.conv2d(
-                            branch0, num_joint * 3, 1,
+                        # branch0 = inresnet3d.hourglass3d(
+                        #     net, 2, scope=sc + '_hg')
+                        branch0 = inresnet3d.resnet_k(
+                            net, scope='_res')
+                        branch_det = slim.conv3d(
+                            branch0, num_joint, 1,
                             # normalizer_fn=None, activation_fn=tf.nn.softmax)
                             normalizer_fn=None, activation_fn=None)
+                        branch_flat = tf.reshape(
+                            branch_det,
+                            [-1, num_vol, num_joint])
                         self.end_point_list.append(sc)
-                        if add_and_check_final(sc, net_maps):
-                            return net_maps, end_points
-                        branch1 = slim.conv2d(
-                            net_maps, num_feature, 1)
+                        if add_and_check_final(sc, branch_flat):
+                            return branch_flat, end_points
+                        branch1 = slim.conv3d(
+                            branch_det, num_feature, 1)
                         net = net + branch0 + branch1
                 with tf.variable_scope('stage32'):
                     sc = 'stage32_post'
-                    # net = incept_resnet.conv_maxpool(net, scope=sc)
-                    net = slim.max_pool2d(net, 3, scope=sc)
+                    net = inresnet3d.conv_maxpool(net, scope=sc)
                     self.end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points
                 with tf.variable_scope('stage16'):
                     sc = 'stage16'
-                    net = incept_resnet.conv_maxpool(net, scope=sc)
+                    net = inresnet3d.conv_maxpool(net, scope=sc)
                     self.end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points
                 with tf.variable_scope('stage8'):
                     sc = 'stage_out'
-                    net = incept_resnet.pullout8(
+                    net = inresnet3d.pullout8(
                         net, self.out_dim, is_training,
                         scope=sc)
                     self.end_point_list.append(sc)
@@ -292,15 +214,43 @@ class super_ov3edt2(super_edt2):
         frames_tf = tf.placeholder(
             tf.float32, shape=(
                 batch_size,
-                self.crop_size, self.crop_size,
-                3))
+                self.crop_size, self.crop_size, self.crop_size,
+                1))
         poses_tf = tf.placeholder(
             tf.float32, shape=(
                 batch_size,
                 self.out_dim))
-        ov3edt2_tf = tf.placeholder(
-            tf.float32, shape=(
+        vxhit_tf = tf.placeholder(
+            tf.int32, shape=(
                 batch_size,
-                self.hmap_size, self.hmap_size,
-                self.join_num * 3))
-        return frames_tf, poses_tf, ov3edt2_tf
+                # self.hmap_size, self.hmap_size, self.hmap_size,
+                self.join_num))
+        return frames_tf, poses_tf, vxhit_tf
+
+    @staticmethod
+    def smooth_l1(xa):
+        return tf.where(
+            1 < xa,
+            xa - 0.5,
+            0.5 * (xa ** 2)
+        )
+
+    def get_loss(self, pred, echt, vxhit, end_points):
+        """ simple sum-of-squares loss
+            pred: BxHxWxDxJ
+            echt: BxJ
+        """
+        loss_l2 = tf.nn.l2_loss(pred - echt)
+        loss_ce = 0
+        for name, net in end_points.items():
+            if not name.startswith('hourglass_'):
+                continue
+            echt_l = tf.unstack(vxhit, axis=-1)
+            pred_l = tf.unstack(net, axis=-1)
+            losses_vxhit = [
+                tf.nn.sparse_softmax_cross_entropy_with_logits(
+                    labels=e, logits=p) for e, p in zip(echt_l, pred_l)]
+            loss_ce += tf.reduce_mean(tf.add_n(losses_vxhit))
+        loss_reg = tf.add_n(tf.get_collection(
+            tf.GraphKeys.REGULARIZATION_LOSSES))
+        return loss_l2, loss_ce, loss_reg

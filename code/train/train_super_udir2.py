@@ -37,8 +37,8 @@ class train_super_udir2(train_abc):
             #     pred_op, poses_op, udir2_op, end_points)
             loss_l2, loss_udir, loss_unit, loss_reg = self.args.model_inst.get_loss(
                 pred_op, poses_op, udir2_op, end_points)
-            loss_op = 1e-4 * loss_l2 + 1e-7 * loss_udir + 1e-7 * loss_unit + 1e-1 * loss_reg
-            test_op = 1e-4 * loss_l2
+            test_op = loss_l2 + loss_udir + loss_unit
+            loss_op = test_op + loss_reg
             tf.summary.scalar('loss', loss_op)
             tf.summary.scalar('loss_l2', loss_l2)
             tf.summary.scalar('loss_udir', loss_udir)
@@ -244,8 +244,8 @@ class train_super_udir2(train_abc):
             #     pred_op, poses_op, udir2_op, end_points)
             loss_l2, loss_udir, loss_unit, loss_reg = self.args.model_inst.get_loss(
                 pred_op, poses_op, udir2_op, end_points)
-            loss_op = 1e-4 * loss_l2 + 1e-7 * loss_udir + 1e-7 * loss_unit + 1e-1 * loss_reg
-            test_op = 1e-4 * loss_l2
+            test_op = loss_l2 + loss_udir + loss_unit
+            loss_op = test_op + loss_reg
 
             saver = tf.train.Saver()
 

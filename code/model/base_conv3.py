@@ -18,7 +18,7 @@ class base_conv3(base_regre):
             'batch_conv3'
         )
         self.net_rank = 3
-        self.crop_size = 32
+        self.crop_size = 64
         # self.num_appen = 4
 
     def fetch_batch(self, fetch_size=None):
@@ -36,7 +36,7 @@ class base_conv3(base_regre):
             self.store_handle['pcnt3'][self.batch_beg:batch_end, ...],
             axis=-1)
         self.batch_data['batch_poses'] = \
-            self.store_handle['pose_c'][self.batch_beg:batch_end, ...]
+            self.store_handle['pose_c1'][self.batch_beg:batch_end, ...]
         self.batch_data['batch_index'] = \
             self.store_handle['index'][self.batch_beg:batch_end, ...]
         self.batch_data['batch_resce'] = \
@@ -51,7 +51,7 @@ class base_conv3(base_regre):
             'index': self.train_file,
             'poses': self.train_file,
             'resce': self.train_file,
-            'pose_c': os.path.join(self.prepare_dir, 'pose_c'),
+            'pose_c1': os.path.join(self.prepare_dir, 'pose_c1'),
             'pcnt3': os.path.join(
                 self.prepare_dir, 'pcnt3_{}'.format(self.crop_size)),
         }
@@ -59,7 +59,7 @@ class base_conv3(base_regre):
             'index': [],
             'poses': [],
             'resce': [],
-            'pose_c': ['poses', 'resce'],
+            'pose_c1': ['poses', 'resce'],
             'pcnt3': ['index', 'resce'],
         }
 
@@ -97,7 +97,7 @@ class base_conv3(base_regre):
         # frame_id = 0  # frame_id = img_id - 1
         img_id = index_h5[frame_id, ...]
         frame_h5 = self.store_handle['pcnt3'][frame_id, ...]
-        poses_h5 = self.store_handle['pose_c'][frame_id, ...].reshape(-1, 3)
+        poses_h5 = self.store_handle['pose_c1'][frame_id, ...].reshape(-1, 3)
         resce_h5 = self.store_handle['resce'][frame_id, ...]
 
         print('[{}] drawing image #{:d} ...'.format(self.name_desc, img_id))
@@ -108,7 +108,7 @@ class base_conv3(base_regre):
         resce3 = resce_h5[0:4]
         cube = iso_cube()
         cube.load(resce3)
-        mpplot.subplots(nrows=2, ncols=2, figsize=(2 * 5, 2 * 5))
+        fig, _ = mpplot.subplots(nrows=2, ncols=2, figsize=(2 * 5, 2 * 5))
 
         ax = mpplot.subplot(2, 2, 1)
         img_name = args.data_io.index2imagename(img_id)
@@ -140,7 +140,8 @@ class base_conv3(base_regre):
         ax.scatter(
             points3_trans[:, 0], points3_trans[:, 1], points3_trans[:, 2],
             color=Color('lightsteelblue').rgb)
-        args.data_draw.draw_raw3d_pose(ax, thedata, poses_h5)
+        pose_c = cube.transform_to_center(pose_raw)
+        args.data_draw.draw_raw3d_pose(ax, thedata, pose_c)
         corners = cube.transform_to_center(cube.get_corners())
         cube.draw_cube_wire(ax, corners)
         ax.view_init(azim=-120, elev=-150)
@@ -272,17 +273,15 @@ class base_conv3(base_regre):
                     biases_regularizer=slim.l2_regularizer(regu_scale),
                     activation_fn=tf.nn.relu,
                     normalizer_fn=slim.batch_norm):
-                # with tf.variable_scope('stage64'):
-                #     sc = 'stage64'
-                #     net = slim.conv3d(input_tensor, 16, 3)
-                #     # net = slim.max_pool3d(net, 3)
-                #     net = inresnet3d.conv_maxpool(net, scope=sc)
-                #     self.end_point_list.append(sc)
-                #     if add_and_check_final(sc, net):
-                #         return net, end_points
+                with tf.variable_scope('stage64'):
+                    sc = 'stage64'
+                    net = slim.conv3d(input_tensor, 16, 3)
+                    net = inresnet3d.conv_maxpool(net, scope=sc)
+                    self.end_point_list.append(sc)
+                    if add_and_check_final(sc, net):
+                        return net, end_points
                 with tf.variable_scope('stage32'):
                     sc = 'stage32'
-                    net = slim.conv3d(input_tensor, 32, 3)
                     net = inresnet3d.conv_maxpool(net, scope=sc)
                     self.end_point_list.append(sc)
                     if add_and_check_final(sc, net):

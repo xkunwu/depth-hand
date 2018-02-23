@@ -1,19 +1,19 @@
 import os
-import numpy as np
 import tensorflow as tf
-import progressbar
 from functools import reduce
+import progressbar
 from train.train_abc import train_abc
-from utils.image_ops import tfplot_edt2
+from utils.image_ops import tfplot_vxlab, tfplot_vxflt
+from utils.tf_utils import unravel_index
 
 
-class train_super_ov3edt2(train_abc):
+class train_super_vxhit(train_abc):
     def train(self):
         self.logger.info('######## Training ########')
         tf.reset_default_graph()
         with tf.Graph().as_default(), \
                 tf.device('/gpu:' + str(self.args.gpu_id)):
-            frames_op, poses_op, ov3edt2_op = \
+            frames_op, poses_op, vxhit_op = \
                 self.args.model_inst.placeholder_inputs()
             is_training_tf = tf.placeholder(
                 tf.bool, shape=(), name='is_training')
@@ -33,38 +33,17 @@ class train_super_ov3edt2(train_abc):
                 )
             self.args.logger.info(
                 'network structure:\n{}'.format(shapestr))
-            # loss_op = self.args.model_inst.get_loss(
-            #     pred_op, poses_op, ov3edt2_op, end_points)
-            loss_l2, loss_edt, loss_reg = self.args.model_inst.get_loss(
-                pred_op, poses_op, ov3edt2_op, end_points)
-            test_op = loss_l2 + loss_edt
+            loss_l2, loss_ce, loss_reg = self.args.model_inst.get_loss(
+                pred_op, poses_op, vxhit_op, end_points)
+            test_op = loss_l2 + loss_ce + loss_reg
             loss_op = test_op + loss_reg
             tf.summary.scalar('loss', loss_op)
             tf.summary.scalar('loss_l2', loss_l2)
-            tf.summary.scalar('loss_edt', loss_edt)
+            tf.summary.scalar('loss_ce', loss_ce)
             tf.summary.scalar('loss_reg', loss_reg)
 
             learning_rate = self.get_learning_rate(global_step)
             tf.summary.scalar('learning_rate', learning_rate)
-
-            num_j = self.args.model_inst.join_num
-            joint_id = num_j - 1
-            edt2_echt = ov3edt2_op[0, ..., joint_id]
-            edt2_echt_op = tf.expand_dims(tfplot_edt2(
-                edt2_echt), axis=0)
-            tf.summary.image('edt2_echt/', edt2_echt_op, max_outputs=1)
-            netid = 0
-            for ends in self.args.model_inst.end_point_list:
-                if not ends.startswith('hourglass_'):
-                    continue
-                net = end_points[ends]
-                edt2_pred = net[0, ..., joint_id]
-                edt2_pred_op = tf.expand_dims(tfplot_edt2(
-                    edt2_pred), axis=0)
-                tf.summary.image(
-                    'edt2_pred_{:d}/'.format(netid),
-                    edt2_pred_op, max_outputs=1)
-                netid += 1
 
             optimizer = tf.train.AdamOptimizer(learning_rate)
             # train_op = optimizer.minimize(
@@ -111,7 +90,7 @@ class train_super_ov3edt2(train_abc):
                 ops = {
                     'batch_frame': frames_op,
                     'batch_poses': poses_op,
-                    'batch_ov3edt2': ov3edt2_op,
+                    'batch_vxhit': vxhit_op,
                     'is_training': is_training_tf,
                     'summary_op': summary_op,
                     'step': global_step,
@@ -135,7 +114,7 @@ class train_super_ov3edt2(train_abc):
             feed_dict = {
                 ops['batch_frame']: batch_data['batch_frame'],
                 ops['batch_poses']: batch_data['batch_poses'],
-                ops['batch_ov3edt2']: batch_data['batch_ov3edt2'],
+                ops['batch_vxhit']: batch_data['batch_vxhit'],
                 ops['is_training']: True
             }
             summary, step, _, loss_val, pred_val = sess.run(
@@ -144,16 +123,6 @@ class train_super_ov3edt2(train_abc):
                 feed_dict=feed_dict)
             loss_sum += loss_val / self.args.batch_size
             if batch_count % 10 == 0:
-                if 'locor' == self.args.model_inst.net_type:
-                    self.args.model_inst.debug_compare(
-                        pred_val, self.logger)
-                    did = np.random.randint(0, self.args.batch_size)
-                    self.args.model_inst._debug_draw_prediction(
-                        did, pred_val[did, ...]
-                    )
-                # elif 'poser' == self.args.model_inst.net_type:
-                #     self.args.model_inst.debug_compare(
-                #         pred_val, self.logger)
                 self.logger.info(
                     'batch {} training loss: {}'.format(
                         batch_count, loss_val))
@@ -177,7 +146,7 @@ class train_super_ov3edt2(train_abc):
             feed_dict = {
                 ops['batch_frame']: batch_data['batch_frame'],
                 ops['batch_poses']: batch_data['batch_poses'],
-                ops['batch_ov3edt2']: batch_data['batch_ov3edt2'],
+                ops['batch_vxhit']: batch_data['batch_vxhit'],
                 ops['is_training']: False
             }
             summary, step, loss_val, pred_val = sess.run(
@@ -210,7 +179,7 @@ class train_super_ov3edt2(train_abc):
         with tf.Graph().as_default(), \
                 tf.device('/gpu:' + str(self.args.gpu_id)):
             # sequential evaluate, suited for streaming
-            frames_op, poses_op, ov3edt2_op = \
+            frames_op, poses_op, vxhit_op = \
                 self.args.model_inst.placeholder_inputs(1)
             is_training_tf = tf.placeholder(
                 tf.bool, shape=(), name='is_training')
@@ -218,11 +187,9 @@ class train_super_ov3edt2(train_abc):
             pred_op, end_points = self.args.model_inst.get_model(
                 frames_op, is_training_tf,
                 self.args.bn_decay, self.args.regu_scale)
-            # loss_op = self.args.model_inst.get_loss(
-            #     pred_op, poses_op, ov3edt2_op, end_points)
-            loss_l2, loss_edt, loss_reg = self.args.model_inst.get_loss(
-                pred_op, poses_op, ov3edt2_op, end_points)
-            test_op = loss_l2 + loss_edt
+            loss_l2, loss_ce, loss_reg = self.args.model_inst.get_loss(
+                pred_op, poses_op, vxhit_op, end_points)
+            test_op = loss_l2 + loss_ce + loss_reg
             loss_op = test_op + loss_reg
 
             saver = tf.train.Saver()
@@ -241,7 +208,7 @@ class train_super_ov3edt2(train_abc):
                 ops = {
                     'batch_frame': frames_op,
                     'batch_poses': poses_op,
-                    'batch_ov3edt2': ov3edt2_op,
+                    'batch_vxhit': vxhit_op,
                     'is_training': is_training_tf,
                     'loss_op': loss_op,
                     'test_op': test_op,
@@ -257,6 +224,7 @@ class train_super_ov3edt2(train_abc):
         batch_count = 0
         loss_sum = 0
         num_stores = self.args.model_inst.store_size
+        eval_size = 1
         timerbar = progressbar.ProgressBar(
             maxval=num_stores,
             widgets=[
@@ -265,13 +233,13 @@ class train_super_ov3edt2(train_abc):
                 ' ', progressbar.ETA()]
         ).start()
         while True:
-            batch_data = self.args.model_inst.fetch_batch(1)
+            batch_data = self.args.model_inst.fetch_batch(eval_size)
             if batch_data is None:
                 break
             feed_dict = {
                 ops['batch_frame']: batch_data['batch_frame'],
                 ops['batch_poses']: batch_data['batch_poses'],
-                ops['batch_ov3edt2']: batch_data['batch_ov3edt2'],
+                ops['batch_vxhit']: batch_data['batch_vxhit'],
                 ops['is_training']: False
             }
             loss_val, pred_val = sess.run(
@@ -279,8 +247,8 @@ class train_super_ov3edt2(train_abc):
                 feed_dict=feed_dict)
             self.args.model_inst.evaluate_batch(pred_val)
             loss_sum += loss_val
+            batch_count += eval_size
             timerbar.update(batch_count)
-            batch_count += 1
         timerbar.finish()
         mean_loss = loss_sum / batch_count
         self.args.logger.info(

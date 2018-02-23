@@ -418,18 +418,17 @@ class dense_regre(base_regre):
         for name, net in end_points.items():
             if not name.startswith('hourglass_'):
                 continue
-            # loss_hm2 = tf.reduce_sum(
+            # loss_hm2 = tf.reduce_mean(
             #     tf.nn.cross_entropy_with_logits(
-            #         targets=echt[:, :num_joint],
-            #         logits=pred[:, :num_joint])
+            #         targets=echt[:, :num_j],
+            #         logits=pred[:, :num_j])
             # )
-            # loss_l2 += tf.nn.l2_loss(net - echt)  # already divided by 2
-            loss_udir += tf.reduce_sum(
+            loss_udir += tf.reduce_mean(
                 self.smooth_l1(tf.abs(net - echt)))
             uomap_pred = tf.reshape(
                 net[..., (2 * num_j):],
                 (-1, 3))
-            loss_unit += tf.reduce_sum(
+            loss_unit += tf.reduce_mean(
                 self.smooth_l1(tf.abs(
                     1 - tf.reduce_sum(uomap_pred ** 2, axis=-1))))
         loss_reg = tf.add_n(tf.get_collection(

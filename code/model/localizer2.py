@@ -550,16 +550,16 @@ class localizer2(base_regre):
             echt: BxO
         """
         anchor_num = self.anchor_num ** 2
-        loss_cls = tf.reduce_sum(
+        loss_cls = tf.reduce_mean(
             tf.nn.weighted_cross_entropy_with_logits(
                 targets=echt[:, :anchor_num],
                 logits=pred[:, :anchor_num],
                 pos_weight=10))
-        loss_reg = tf.reduce_sum(
+        loss_reg = tf.reduce_mean(
             self.smooth_l1(tf.abs(
                 pred[:, anchor_num:] - echt[:, anchor_num:]))
         )
-        # loss_reg = tf.reduce_sum(
+        # loss_reg = tf.reduce_mean(
         #     (pred[:, anchor_num:] - echt[:, anchor_num:]) ** 2)
         loss_l2 = loss_cls + self.loss_lambda * loss_reg
         # loss_l2 = loss_cls

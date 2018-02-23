@@ -6,15 +6,17 @@ import logging
 from utils.coder import file_pack
 
 model_map = {
+    'super_edt3': 'model.super_edt3',
     'super_ov3edt2': 'model.super_ov3edt2',
     'super_edt2': 'model.super_edt2',
-    'super_edt3': 'model.super_edt3',
     'super_dist3': 'model.super_dist3',
-    'super_dist2': 'model.super_dist2',
-    'super_udir2': 'model.super_udir2',
     'voxel_regre': 'model.voxel_regre',
     'voxel_offset': 'model.voxel_offset',
+    'super_vxhit': 'model.super_vxhit',
     'voxel_detect': 'model.voxel_detect',
+    'super_dist2': 'model.super_dist2',
+    'super_udir2': 'model.super_udir2',
+    'dense_regre': 'model.dense_regre',
     'direc_tsdf': 'model.direc_tsdf',
     'trunc_dist': 'model.trunc_dist',
     'base_conv3': 'model.base_conv3',
@@ -28,7 +30,6 @@ model_map = {
     'base_regre_hg': 'model.base_hourglass',
     'localizer3': 'model.localizer3',
     'localizer2': 'model.localizer2',
-    'dense_regre': 'model.dense_regre',
 }
 
 
@@ -109,13 +110,13 @@ class args_holder:
             '--bn_decay', type=float, default=0.9997,
             help='decay rate during batch normalization [default: 0.9997]')
         self.parser.add_argument(
-            '--regu_scale', type=float, default=0.0001,
-            help='regularization scale [default: 0.0001]')
+            '--regu_scale', type=float, default=0.01,
+            help='regularization scale [default: 0.01]')
         self.parser.add_argument(
             '--learning_rate', type=float, default=0.001,
             help='Initial learning rate [default: 0.001]')
         self.parser.add_argument(
-            '--decay_step', type=int, default=2e6,
+            '--decay_step', type=int, default=1e6,
             # twice of 1M (1e6) dataset, will be divided by batch size below
             help='Decay step for lr decay [default: 2e6]')
         self.parser.add_argument(

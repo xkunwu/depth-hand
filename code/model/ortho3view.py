@@ -32,7 +32,7 @@ class ortho3view(base_regre):
         self.batch_data['batch_frame'] = \
             self.store_handle['ortho3'][self.batch_beg:batch_end, ...]
         self.batch_data['batch_poses'] = \
-            self.store_handle['pose_c'][self.batch_beg:batch_end, ...]
+            self.store_handle['pose_c1'][self.batch_beg:batch_end, ...]
         self.batch_data['batch_index'] = \
             self.store_handle['index'][self.batch_beg:batch_end, ...]
         self.batch_data['batch_resce'] = \
@@ -47,7 +47,7 @@ class ortho3view(base_regre):
             'index': self.train_file,
             'poses': self.train_file,
             'resce': self.train_file,
-            'pose_c': os.path.join(self.prepare_dir, 'pose_c'),
+            'pose_c1': os.path.join(self.prepare_dir, 'pose_c1'),
             'ortho3': os.path.join(
                 self.prepare_dir, 'ortho3_{}'.format(self.crop_size)),
         }
@@ -55,7 +55,7 @@ class ortho3view(base_regre):
             'index': [],
             'poses': [],
             'resce': [],
-            'pose_c': ['poses', 'resce'],
+            'pose_c1': ['poses', 'resce'],
             'ortho3': ['index', 'resce'],
         }
 
@@ -66,13 +66,13 @@ class ortho3view(base_regre):
         # frame_id = 0  # frame_id = img_id - 1
         img_id = index_h5[frame_id, ...]
         frame_h5 = self.store_handle['ortho3'][frame_id, ...]
-        poses_h5 = self.store_handle['pose_c'][frame_id, ...].reshape(-1, 3)
+        poses_h5 = self.store_handle['pose_c1'][frame_id, ...].reshape(-1, 3)
         resce_h5 = self.store_handle['resce'][frame_id, ...]
 
         print('[{}] drawing image #{:d} ...'.format(self.name_desc, img_id))
         from colour import Color
         colors = [Color('orange').rgb, Color('red').rgb, Color('lime').rgb]
-        mpplot.subplots(nrows=2, ncols=3, figsize=(3 * 5, 2 * 5))
+        fig, _ = mpplot.subplots(nrows=2, ncols=3, figsize=(3 * 5, 2 * 5))
 
         resce3 = resce_h5[0:4]
         cube = iso_cube()
@@ -82,7 +82,8 @@ class ortho3view(base_regre):
             ax = mpplot.subplot(2, 3, spi + 4)
             img = frame_h5[..., spi]
             ax.imshow(img, cmap=mpplot.cm.bone_r)
-            pose3d = cube.trans_scale_to(poses_h5)
+            pose3d = poses_h5
+            # pose3d = cube.trans_scale_to(poses_h5)
             pose2d, _ = cube.project_ortho(pose3d, roll=spi, sort=False)
             pose2d *= self.crop_size
             args.data_draw.draw_pose2d(

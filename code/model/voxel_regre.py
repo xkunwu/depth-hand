@@ -19,7 +19,7 @@ class voxel_regre(voxel_offset):
 
     def __init__(self, args):
         super(voxel_regre, self).__init__(args)
-        self.crop_size = 32
+        self.crop_size = 64
         self.hmap_size = 16
         self.map_scale = self.crop_size / self.hmap_size
 
@@ -38,7 +38,7 @@ class voxel_regre(voxel_offset):
             self.store_handle['pcnt3'][self.batch_beg:batch_end, ...],
             axis=-1)
         self.batch_data['batch_poses'] = \
-            self.store_handle['pose_c'][self.batch_beg:batch_end, ...]
+            self.store_handle['pose_c1'][self.batch_beg:batch_end, ...]
         # self.batch_data['batch_poses'] = \
         #     self.store_handle['pose_c1'][self.batch_beg:batch_end, ...]
         self.batch_data['batch_vxudir'] = \
@@ -63,7 +63,7 @@ class voxel_regre(voxel_offset):
                 self.prepare_dir, 'pcnt3_{}'.format(self.crop_size)),
             'vxudir': os.path.join(
                 self.prepare_dir, 'vxudir_{}'.format(self.hmap_size)),
-            'pose_c': os.path.join(self.prepare_dir, 'pose_c'),
+            'pose_c1': os.path.join(self.prepare_dir, 'pose_c1'),
             # 'pose_c1': os.path.join(self.prepare_dir, 'pose_c1'),
         }
         self.store_precon = {
@@ -72,15 +72,15 @@ class voxel_regre(voxel_offset):
             'resce': [],
             'pcnt3': ['index', 'resce'],
             'vxudir': ['pcnt3', 'poses', 'resce'],
-            'pose_c': ['poses', 'resce'],
+            'pose_c1': ['poses', 'resce'],
             # 'pose_c1': ['poses', 'resce'],
         }
 
     def yanker(self, pose_local, resce, caminfo):
         cube = iso_cube()
         cube.load(resce)
-        return cube.transform_add_center(pose_local)
-        # return cube.transform_expand_move(pose_local)
+        # return cube.transform_add_center(pose_local)
+        return cube.transform_expand_move(pose_local)
 
     def evaluate_batch(self, pred_val):
         batch_index = self.batch_data['batch_index']
@@ -154,16 +154,15 @@ class voxel_regre(voxel_offset):
                     activation_fn=tf.nn.relu,
                     normalizer_fn=slim.batch_norm):
                 with tf.variable_scope('stage64'):
-                    # sc = 'stage64'
-                    # net = slim.conv3d(input_tensor, 8, 3)
-                    # net = inresnet3d.conv_maxpool(net, scope=sc)
-                    # self.end_point_list.append(sc)
-                    # if add_and_check_final(sc, net):
-                    #     return net, end_points
+                    sc = 'stage64'
+                    net = slim.conv3d(input_tensor, 8, 3)
+                    net = inresnet3d.conv_maxpool(net, scope=sc)
+                    self.end_point_list.append(sc)
+                    if add_and_check_final(sc, net):
+                        return net, end_points
                     sc = 'stage32'
-                    net = slim.conv3d(input_tensor, 16, 3)
                     # net = inresnet3d.resnet_k(
-                    #     net, scope='stage32_residual')
+                    #     net, scope='stage32_res')
                     net = inresnet3d.conv_maxpool(net, scope=sc)
                     net = slim.conv3d(
                         net, num_feature, 1, scope='stage32_out')
@@ -248,12 +247,12 @@ class voxel_regre(voxel_offset):
             if not name.startswith('hourglass_'):
                 continue
             # loss_udir += tf.nn.l2_loss(net - vxudir)
-            loss_udir += tf.reduce_sum(
+            loss_udir += tf.reduce_mean(
                 self.smooth_l1(tf.abs(net - vxudir)))
             vxunit_pred = tf.reshape(
                 net[..., num_j:],
                 (-1, 3))
-            loss_unit += tf.reduce_sum(
+            loss_unit += tf.reduce_mean(
                 self.smooth_l1(tf.abs(
                     1 - tf.reduce_sum(vxunit_pred ** 2, axis=-1))))
         loss_reg = tf.add_n(tf.get_collection(

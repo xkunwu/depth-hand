@@ -493,7 +493,7 @@ class voxel_detect(base_conv3):
             losses_vxhit = [
                 tf.nn.sparse_softmax_cross_entropy_with_logits(
                     labels=e, logits=p) for e, p in zip(echt_l, pred_l)]
-            loss_ce += tf.reduce_sum(tf.add_n(losses_vxhit))
+            loss_ce += tf.reduce_mean(tf.add_n(losses_vxhit))
         loss_reg = tf.add_n(tf.get_collection(
             tf.GraphKeys.REGULARIZATION_LOSSES))
         return loss_l2, loss_reg

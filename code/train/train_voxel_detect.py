@@ -35,8 +35,8 @@ class train_voxel_detect(train_abc):
                 'network structure:\n{}'.format(shapestr))
             loss_ce, loss_reg = self.args.model_inst.get_loss(
                 pred_op, poses_op, end_points)
-            loss_op = 1e-2 * loss_ce + 1e-1 * loss_reg
-            test_op = 1e-2 * loss_ce
+            test_op = loss_ce
+            loss_op = test_op + loss_reg
             tf.summary.scalar('loss', loss_op)
             tf.summary.scalar('loss_ce', loss_ce)
             tf.summary.scalar('loss_reg', loss_reg)
@@ -190,8 +190,8 @@ class train_voxel_detect(train_abc):
                 self.args.bn_decay, self.args.regu_scale)
             loss_ce, loss_reg = self.args.model_inst.get_loss(
                 pred_op, poses_op, end_points)
-            loss_op = 1e-2 * loss_ce + 1e-1 * loss_reg
-            test_op = 1e-2 * loss_ce
+            test_op = loss_ce
+            loss_op = test_op + loss_reg
             tf.summary.scalar('loss', loss_op)
             tf.summary.scalar('loss_ce', loss_ce)
             tf.summary.scalar('loss_reg', loss_reg)

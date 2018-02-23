@@ -118,7 +118,7 @@ def test_dataops(args):
 
 
 if __name__ == "__main__":
-    # python -m train.evaluate --max_epoch=1 --batch_size=10 --bn_decay=0.94 --show_draw=True --model_name=base_clean
+    # python -m train.evaluate --max_epoch=1 --batch_size=8 --bn_decay=0.9 --show_draw=True --model_name=base_clean
     # import pdb; pdb.set_trace()
 
     from args_holder import args_holder
@@ -128,41 +128,42 @@ if __name__ == "__main__":
     with_eval = True
     # with_eval = False
 
-    # # mpl = import_module('matplotlib')
-    # # mpl.use('Agg')
-    # with args_holder() as argsholder:
-    #     argsholder.parse_args()
-    #     args = argsholder.args
-    #     argsholder.create_instance()
-    #     # import shutil
-    #     # shutil.rmtree(args.out_dir)
-    #     # os.makedirs(args.out_dir)
-    #
-    #     test_dataops(args)
-    #
-    #     run_one(args, with_train, with_eval)
-    #     argsholder.append_log()
-    #
-    #     # draw_compare(args)
-    # import sys
-    # sys.exit()
+    # mpl = import_module('matplotlib')
+    # mpl.use('Agg')
+    with args_holder() as argsholder:
+        argsholder.parse_args()
+        args = argsholder.args
+        argsholder.create_instance()
+        # import shutil
+        # shutil.rmtree(args.out_dir)
+        # os.makedirs(args.out_dir)
+
+        test_dataops(args)
+
+        run_one(args, with_train, with_eval)
+        argsholder.append_log()
+
+        # draw_compare(args)
+    import sys
+    sys.exit()
 
     mpl = import_module('matplotlib')
     mpl.use('Agg')
     methlist = [
+        # 'super_edt3',
         # 'super_ov3edt2',
         # 'super_edt2',
-        # 'super_edt3',
         # 'super_dist3',
         # 'voxel_regre',
         # 'voxel_offset',
+        'super_vxhit',
         # 'voxel_detect',
-        'super_dist2',
-        'super_udir2',
-        'dense_regre',
+        # 'super_dist2',
+        # 'super_udir2',
+        # 'dense_regre',
         # 'direc_tsdf',
         # 'trunc_dist',
-        # 'base_conv3',
+        'base_conv3',
         # 'base_conv3_inres',
         # 'ortho3view',
         # 'base_regre',
@@ -189,6 +190,7 @@ if __name__ == "__main__":
         argsholder.create_instance()
         args = argsholder.args
         draw_compare(args)
+        argsholder.append_log()
         # args.model_inst.detect_write_images()
     copyfile(
         os.path.join(args.log_dir, 'univue.log'),

@@ -41,7 +41,7 @@ class super_udir2(base_regre):
             self.store_handle['clean'][self.batch_beg:batch_end, ...],
             axis=-1)
         self.batch_data['batch_poses'] = \
-            self.store_handle['pose_c'][self.batch_beg:batch_end, ...]
+            self.store_handle['pose_c1'][self.batch_beg:batch_end, ...]
         self.batch_data['batch_udir2'] = \
             self.store_handle['udir2'][self.batch_beg:batch_end, ...]
         self.batch_data['batch_index'] = \
@@ -60,7 +60,7 @@ class super_udir2(base_regre):
             'index': self.train_file,
             'poses': self.train_file,
             'resce': self.train_file,
-            'pose_c': os.path.join(self.prepare_dir, 'pose_c'),
+            'pose_c1': os.path.join(self.prepare_dir, 'pose_c1'),
             'clean': os.path.join(
                 self.prepare_dir, 'clean_{}'.format(self.crop_size)),
             'udir2': os.path.join(
@@ -70,7 +70,7 @@ class super_udir2(base_regre):
             'index': [],
             'poses': [],
             'resce': [],
-            'pose_c': ['poses', 'resce'],
+            'pose_c1': ['poses', 'resce'],
             'clean': ['index', 'resce'],
             'udir2': ['clean', 'poses', 'resce'],
         }
@@ -78,8 +78,8 @@ class super_udir2(base_regre):
     def yanker(self, pose_local, resce, caminfo):
         cube = iso_cube()
         cube.load(resce)
-        return cube.transform_add_center(pose_local)
-        # return cube.transform_expand_move(pose_local)
+        # return cube.transform_add_center(pose_local)
+        return cube.transform_expand_move(pose_local)
 
     def yanker_hmap(self, resce, olmap, uomap, depth, caminfo):
         cube = iso_cube()
@@ -363,12 +363,12 @@ class super_udir2(base_regre):
             if not name.startswith('hourglass_'):
                 continue
             # loss_udir += tf.nn.l2_loss(net - vxudir)
-            loss_udir += tf.reduce_sum(
+            loss_udir += tf.reduce_mean(
                 self.smooth_l1(tf.abs(net - udir2)))
             uomap_pred = tf.reshape(
                 net[..., num_j:],
                 (-1, 3))
-            loss_unit += tf.reduce_sum(
+            loss_unit += tf.reduce_mean(
                 self.smooth_l1(tf.abs(
                     1 - tf.reduce_sum(uomap_pred ** 2, axis=-1))))
         loss_reg = tf.add_n(tf.get_collection(

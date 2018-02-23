@@ -188,6 +188,14 @@ class iso_cube:
     def transform_expand_move(self, points3):
         return (points3 * self.sidelen + self.cen)
 
+    # def transform_corner_shrink(self, points3):
+    #     return (self.transform_center_shrink(points3) + 1) / 2
+    #
+    # def transform_corner_expand(self, points3):
+    #     return self.transform_expand_move(
+    #         points3 * 2 - 1
+    #     )
+
     def trans_scale_to(self, points3, sizel=1.):
         # return np.dot(points3 - self.cen, self.evecs) * sizel / self.sidelen
         return points3 * sizel / self.sidelen

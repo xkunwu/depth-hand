@@ -2,8 +2,6 @@ import os
 from importlib import import_module
 import numpy as np
 import tensorflow as tf
-import progressbar
-import h5py
 from .base_conv3 import base_conv3
 from utils.iso_boxes import iso_cube
 from utils.regu_grid import regu_grid
@@ -24,9 +22,9 @@ class voxel_detect(base_conv3):
             'batch_vxhit'
         )
         # self.num_appen = 4
-        self.crop_size = 32
+        self.crop_size = 64
         self.hmap_size = 32
-        self.map_scale = 1
+        self.map_scale = self.crop_size / self.hmap_size
 
     def fetch_batch(self, fetch_size=None):
         if fetch_size is None:
@@ -94,7 +92,7 @@ class voxel_detect(base_conv3):
     #             '\t' + '\t'.join("%.4f" % x for x in pose_raw.flatten()) +
     #             '\n')
 
-    def yanker(self, pose_lab, resce, caminfo):
+    def yanker_hmap(self, pose_lab, resce, caminfo):
         cube = iso_cube()
         cube.load(resce)
         return self.data_module.ops.vxlab_to_raw(
@@ -107,7 +105,7 @@ class voxel_detect(base_conv3):
         num_elem = batch_index.shape[0]
         poses_out = np.empty((num_elem, self.join_num * 3))
         for ei, resce, pose_lab in zip(range(num_elem), batch_resce, batch_poses):
-            pose_raw = self.yanker(pose_lab, resce, self.caminfo)
+            pose_raw = self.yanker_hmap(pose_lab, resce, self.caminfo)
             poses_out[ei] = pose_raw.reshape(1, -1)
         self.eval_pred.append(poses_out)
 
@@ -218,7 +216,7 @@ class voxel_detect(base_conv3):
         # ax.set_aspect('equal', adjustable='box')
         ax.set_zlabel('depth (mm)', labelpad=15)
 
-        pose_yank = self.yanker(pose_lab_h5, resce3, self.caminfo)
+        pose_yank = self.yanker_hmap(pose_lab_h5, resce3, self.caminfo)
         diff = np.abs(pose_raw - pose_yank)
         print(diff)
         print(np.min(diff, axis=0), np.max(diff, axis=0))
@@ -283,7 +281,7 @@ class voxel_detect(base_conv3):
     def get_model(
             self, input_tensor, is_training,
             bn_decay, regu_scale,
-            hg_repeat=1, scope=None):
+            hg_repeat=2, scope=None):
         """ input_tensor: BxHxWxDxC
             out_dim: BxHxWxDxJ, where J is number of joints
         """
@@ -341,16 +339,15 @@ class voxel_detect(base_conv3):
                     activation_fn=tf.nn.relu,
                     normalizer_fn=slim.batch_norm):
                 with tf.variable_scope('stage64'):
-                    # sc = 'stage64'
-                    # net = slim.conv3d(input_tensor, 8, 3)
-                    # net = inresnet3d.conv_maxpool(net, scope=sc)
-                    # self.end_point_list.append(sc)
-                    # if add_and_check_final(sc, net):
-                    #     return net, end_points
-                    sc = 'stage32_image'
-                    net = slim.conv3d(input_tensor, 16, 3)
+                    sc = 'stage64'
+                    net = slim.conv3d(input_tensor, 8, 3)
+                    net = inresnet3d.conv_maxpool(net, scope=sc)
+                    self.end_point_list.append(sc)
+                    if add_and_check_final(sc, net):
+                        return net, end_points
+                    sc = 'stage32'
                     net = inresnet3d.resnet_k(
-                        net, scope='stage32_residual')
+                        net, scope='stage32_res')
                     net = slim.conv3d(
                         net, num_feature, 1, scope='stage32_out')
                     self.end_point_list.append(sc)
@@ -359,10 +356,10 @@ class voxel_detect(base_conv3):
                 for hg in range(hg_repeat):  # 32x32x32
                     sc = 'hourglass_{}'.format(hg)
                     with tf.variable_scope(sc):
-                        branch0 = inresnet3d.hourglass3d(
-                            net, 2, scope=sc + '_hg')
+                        # branch0 = inresnet3d.hourglass3d(
+                        #     net, 2, scope=sc + '_hg')
                         branch0 = inresnet3d.resnet_k(
-                            branch0, scope='_res')
+                            net, scope='_res')
                         branch_det = slim.conv3d(
                             branch0, num_joint, 1,
                             # normalizer_fn=None, activation_fn=tf.nn.softmax)
@@ -405,7 +402,7 @@ class voxel_detect(base_conv3):
             losses_vxhit = [
                 tf.nn.sparse_softmax_cross_entropy_with_logits(
                     labels=e, logits=p) for e, p in zip(echt_l, pred_l)]
-            loss_ce += tf.reduce_sum(tf.add_n(losses_vxhit))
+            loss_ce += tf.reduce_mean(tf.add_n(losses_vxhit))
         # for name, net in end_points.items():
         #     if not name.startswith('hourglass_'):
         #         continue

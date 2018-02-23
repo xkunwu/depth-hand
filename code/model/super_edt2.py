@@ -38,7 +38,7 @@ class super_edt2(base_regre):
             self.store_handle['clean'][self.batch_beg:batch_end, ...],
             axis=-1)
         self.batch_data['batch_poses'] = \
-            self.store_handle['pose_c'][self.batch_beg:batch_end, ...]
+            self.store_handle['pose_c1'][self.batch_beg:batch_end, ...]
         self.batch_data['batch_edt2'] = \
             self.store_handle['edt2'][self.batch_beg:batch_end, ...]
         self.batch_data['batch_index'] = \
@@ -57,7 +57,7 @@ class super_edt2(base_regre):
             'index': self.train_file,
             'poses': self.train_file,
             'resce': self.train_file,
-            'pose_c': os.path.join(self.prepare_dir, 'pose_c'),
+            'pose_c1': os.path.join(self.prepare_dir, 'pose_c1'),
             'clean': os.path.join(
                 self.prepare_dir, 'clean_{}'.format(self.crop_size)),
             'edt2': os.path.join(
@@ -67,7 +67,7 @@ class super_edt2(base_regre):
             'index': [],
             'poses': [],
             'resce': [],
-            'pose_c': ['poses', 'resce'],
+            'pose_c1': ['poses', 'resce'],
             'clean': ['index', 'resce'],
             'edt2': ['clean', 'poses', 'resce'],
         }
@@ -75,8 +75,8 @@ class super_edt2(base_regre):
     def yanker(self, pose_local, resce, caminfo):
         cube = iso_cube()
         cube.load(resce)
-        return cube.transform_add_center(pose_local)
-        # return cube.transform_expand_move(pose_local)
+        # return cube.transform_add_center(pose_local)
+        return cube.transform_expand_move(pose_local)
 
     def evaluate_batch(self, pred_val):
         batch_index = self.batch_data['batch_index']
@@ -98,7 +98,7 @@ class super_edt2(base_regre):
         # frame_id = 886  # frame_id = img_id - 1
         img_id = index_h5[frame_id, ...]
         frame_h5 = self.store_handle['clean'][frame_id, ...]
-        poses_h5 = self.store_handle['pose_c'][frame_id, ...].reshape(-1, 3)
+        poses_h5 = self.store_handle['pose_c1'][frame_id, ...].reshape(-1, 3)
         resce_h5 = self.store_handle['resce'][frame_id, ...]
         edt2_h5 = self.store_handle['edt2'][frame_id, ...]
 
@@ -119,7 +119,8 @@ class super_edt2(base_regre):
         #     fig, ax, frame_h5, poses_h5, resce_h5,
         #     args.data_draw.draw_pose2d, thedata)
         ax.imshow(frame_h5, cmap=mpplot.cm.bone_r)
-        pose3d = cube.trans_scale_to(poses_h5)
+        pose3d = poses_h5
+        # pose3d = cube.trans_scale_to(poses_h5)
         pose2d, _ = cube.project_ortho(pose3d, roll=0, sort=False)
         pose2d *= self.crop_size
         args.data_draw.draw_pose2d(
@@ -323,7 +324,7 @@ class super_edt2(base_regre):
             if not name.startswith('hourglass_'):
                 continue
             # loss_edt += tf.nn.l2_loss(net - edt2)
-            loss_edt += tf.reduce_sum(
+            loss_edt += tf.reduce_mean(
                 self.smooth_l1(tf.abs(net - edt2)))
         loss_reg = tf.add_n(tf.get_collection(
             tf.GraphKeys.REGULARIZATION_LOSSES))

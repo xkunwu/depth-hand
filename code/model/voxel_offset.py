@@ -21,7 +21,7 @@ class voxel_offset(base_conv3):
             import_module('model.batch_allot'),
             'batch_vxudir'
         )
-        self.crop_size = 32
+        self.crop_size = 64
         self.hmap_size = 16
         self.map_scale = self.crop_size / self.hmap_size
 
@@ -223,7 +223,7 @@ class voxel_offset(base_conv3):
         self.end_point_list = []
         final_endpoint = 'hourglass_{}'.format(hg_repeat - 1)
         num_joint = self.join_num
-        num_feature = 96
+        num_feature = 128
 
         def add_and_check_final(name, net):
             end_points[name] = net
@@ -272,14 +272,13 @@ class voxel_offset(base_conv3):
                     activation_fn=tf.nn.relu,
                     normalizer_fn=slim.batch_norm):
                 with tf.variable_scope('stage64'):
-                    # sc = 'stage64'
-                    # net = slim.conv3d(input_tensor, 16, 3)
-                    # net = inresnet3d.conv_maxpool(net, scope=sc)
-                    # self.end_point_list.append(sc)
-                    # if add_and_check_final(sc, net):
-                    #     return net, end_points
+                    sc = 'stage64'
+                    net = slim.conv3d(input_tensor, 8, 3)
+                    net = inresnet3d.conv_maxpool(net, scope=sc)
+                    self.end_point_list.append(sc)
+                    if add_and_check_final(sc, net):
+                        return net, end_points
                     sc = 'stage32'
-                    net = slim.conv3d(input_tensor, 16, 3)
                     # net = inresnet3d.resnet_k(
                     #     net, scope='stage32_res')
                     net = inresnet3d.conv_maxpool(net, scope=sc)
@@ -353,12 +352,12 @@ class voxel_offset(base_conv3):
             if not name.startswith('hourglass_'):
                 continue
             # loss_udir += tf.nn.l2_loss(net - vxudir)
-            loss_udir += tf.reduce_sum(
+            loss_udir += tf.reduce_mean(
                 self.smooth_l1(tf.abs(net - echt)))
             vxunit_pred = tf.reshape(
                 net[..., num_j:],
                 (-1, 3))
-            loss_unit += tf.reduce_sum(
+            loss_unit += tf.reduce_mean(
                 self.smooth_l1(tf.abs(
                     1 - tf.reduce_sum(vxunit_pred ** 2, axis=-1))))
         loss_reg = tf.add_n(tf.get_collection(
