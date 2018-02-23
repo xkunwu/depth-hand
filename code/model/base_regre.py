@@ -84,7 +84,7 @@ class base_regre(object):
             self.store_handle['crop2'][self.batch_beg:batch_end, ...],
             axis=-1)
         self.batch_data['batch_poses'] = \
-            self.store_handle['pose_c1'][self.batch_beg:batch_end, ...]
+            self.store_handle['pose_c'][self.batch_beg:batch_end, ...]
         self.batch_data['batch_index'] = \
             self.store_handle['index'][self.batch_beg:batch_end, ...]
         self.batch_data['batch_resce'] = \
@@ -214,8 +214,8 @@ class base_regre(object):
     def yanker(self, pose_local, resce, caminfo):
         cube = iso_cube()
         cube.load(resce)
-        # return cube.transform_add_center(pose_local)
-        return cube.transform_expand_move(pose_local)
+        return cube.transform_add_center(pose_local)
+        # return cube.transform_expand_move(pose_local)
 
     def prepare_data(self, thedata, args,
                      filepack, prepare_h5file):
@@ -356,7 +356,7 @@ class base_regre(object):
             'index': self.train_file,
             'poses': self.train_file,
             'resce': self.train_file,
-            'pose_c1': os.path.join(self.prepare_dir, 'pose_c1'),
+            'pose_c': os.path.join(self.prepare_dir, 'pose_c'),
             'crop2': os.path.join(
                 self.prepare_dir, 'crop2_{}'.format(self.crop_size)),
         }
@@ -364,7 +364,7 @@ class base_regre(object):
             'index': [],
             'poses': [],
             'resce': [],
-            'pose_c1': ['poses', 'resce'],
+            'pose_c': ['poses', 'resce'],
             'crop2': ['index', 'resce'],
         }
 
@@ -393,7 +393,7 @@ class base_regre(object):
         # frame_id = 0  # frame_id = img_id - 1
         img_id = index_h5[frame_id, ...]
         frame_h5 = self.store_handle['crop2'][frame_id, ...]
-        poses_h5 = self.store_handle['pose_c1'][frame_id, ...].reshape(-1, 3)
+        poses_h5 = self.store_handle['pose_c'][frame_id, ...].reshape(-1, 3)
         resce_h5 = self.store_handle['resce'][frame_id, ...]
 
         print('[{}] drawing image #{:d} ...'.format(self.name_desc, img_id))
@@ -411,8 +411,8 @@ class base_regre(object):
         ax = mpplot.subplot(1, 2, 2)
         mpplot.gca().set_title('test storage read')
         ax.imshow(frame_h5, cmap=mpplot.cm.bone_r)
-        pose3d = poses_h5
-        # pose3d = cube.trans_scale_to(poses_h5)
+        # pose3d = poses_h5
+        pose3d = cube.trans_scale_to(poses_h5)
         pose2d, _ = cube.project_ortho(pose3d, roll=0, sort=False)
         pose2d *= self.crop_size
         args.data_draw.draw_pose2d(

@@ -39,7 +39,7 @@ class super_vxhit(voxel_detect):
             self.store_handle['vxhit'][self.batch_beg:batch_end, ...],
             axis=-1)
         self.batch_data['batch_poses'] = \
-            self.store_handle['pose_c1'][self.batch_beg:batch_end, ...]
+            self.store_handle['pose_c'][self.batch_beg:batch_end, ...]
         self.batch_data['batch_vxhit'] = self.store_handle['pose_lab'][
             self.batch_beg:batch_end, ..., :self.join_num]
         self.batch_data['batch_index'] = \
@@ -62,7 +62,7 @@ class super_vxhit(voxel_detect):
                 self.prepare_dir, 'pose_lab_{}'.format(self.hmap_size)),
             'vxhit': os.path.join(
                 self.prepare_dir, 'vxhit_{}'.format(self.crop_size)),
-            'pose_c1': os.path.join(self.prepare_dir, 'pose_c1'),
+            'pose_c': os.path.join(self.prepare_dir, 'pose_c'),
         }
         self.store_precon = {
             'index': [],
@@ -70,14 +70,14 @@ class super_vxhit(voxel_detect):
             'resce': [],
             'pose_lab': ['poses', 'resce'],
             'vxhit': ['index', 'resce'],
-            'pose_c1': ['poses', 'resce'],
+            'pose_c': ['poses', 'resce'],
         }
 
     def yanker(self, pose_local, resce, caminfo):
         cube = iso_cube()
         cube.load(resce)
-        # return cube.transform_add_center(pose_local)
-        return cube.transform_expand_move(pose_local)
+        return cube.transform_add_center(pose_local)
+        # return cube.transform_expand_move(pose_local)
 
     def evaluate_batch(self, pred_val):
         batch_index = self.batch_data['batch_index']

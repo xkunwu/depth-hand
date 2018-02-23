@@ -37,7 +37,7 @@ class super_ov3edt2(super_edt2):
         self.batch_data['batch_frame'] = \
             self.store_handle['ortho3'][self.batch_beg:batch_end, ...]
         self.batch_data['batch_poses'] = \
-            self.store_handle['pose_c1'][self.batch_beg:batch_end, ...]
+            self.store_handle['pose_c'][self.batch_beg:batch_end, ...]
         self.batch_data['batch_edt2'] = \
             self.store_handle['ov3edt2'][self.batch_beg:batch_end, ...]
         self.batch_data['batch_index'] = \
@@ -56,7 +56,7 @@ class super_ov3edt2(super_edt2):
             'index': self.train_file,
             'poses': self.train_file,
             'resce': self.train_file,
-            'pose_c1': os.path.join(self.prepare_dir, 'pose_c1'),
+            'pose_c': os.path.join(self.prepare_dir, 'pose_c'),
             'ortho3': os.path.join(
                 self.prepare_dir, 'ortho3_{}'.format(self.crop_size)),
             'ov3edt2': os.path.join(
@@ -66,7 +66,7 @@ class super_ov3edt2(super_edt2):
             'index': [],
             'poses': [],
             'resce': [],
-            'pose_c1': ['poses', 'resce'],
+            'pose_c': ['poses', 'resce'],
             'ortho3': ['index', 'resce'],
             'ov3edt2': ['ortho3', 'poses', 'resce'],
         }
@@ -74,8 +74,8 @@ class super_ov3edt2(super_edt2):
     def yanker(self, pose_local, resce, caminfo):
         cube = iso_cube()
         cube.load(resce)
-        # return cube.transform_add_center(pose_local)
-        return cube.transform_expand_move(pose_local)
+        return cube.transform_add_center(pose_local)
+        # return cube.transform_expand_move(pose_local)
 
     def evaluate_batch(self, pred_val):
         batch_index = self.batch_data['batch_index']
@@ -98,7 +98,7 @@ class super_ov3edt2(super_edt2):
         # frame_id = 218  # palm
         img_id = index_h5[frame_id, ...]
         frame_h5 = self.store_handle['ortho3'][frame_id, ...]
-        poses_h5 = self.store_handle['pose_c1'][frame_id, ...].reshape(-1, 3)
+        poses_h5 = self.store_handle['pose_c'][frame_id, ...].reshape(-1, 3)
         resce_h5 = self.store_handle['resce'][frame_id, ...]
         ov3edt2_h5 = self.store_handle['ov3edt2'][frame_id, ...]
 
@@ -133,8 +133,8 @@ class super_ov3edt2(super_edt2):
             ax = mpplot.subplot(3, 4, spi + 2)
             img = frame_h5[..., spi]
             ax.imshow(img, cmap=mpplot.cm.bone_r)
-            pose3d = poses_h5
-            # pose3d = cube.trans_scale_to(poses_h5)
+            # pose3d = poses_h5
+            pose3d = cube.trans_scale_to(poses_h5)
             pose2d, _ = cube.project_ortho(pose3d, roll=spi, sort=False)
             pose2d *= self.crop_size
             args.data_draw.draw_pose2d(
@@ -275,8 +275,8 @@ class super_ov3edt2(super_edt2):
                         return net, end_points
                 with tf.variable_scope('stage16'):
                     sc = 'stage16'
-                    # net = incept_resnet.conv_maxpool(net, scope=sc)
-                    net = slim.max_pool2d(net, 3, scope=sc)
+                    net = incept_resnet.conv_maxpool(net, scope=sc)
+                    # net = slim.max_pool2d(net, 3, scope=sc)
                     self.end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points

@@ -36,7 +36,7 @@ class base_conv3(base_regre):
             self.store_handle['pcnt3'][self.batch_beg:batch_end, ...],
             axis=-1)
         self.batch_data['batch_poses'] = \
-            self.store_handle['pose_c1'][self.batch_beg:batch_end, ...]
+            self.store_handle['pose_c'][self.batch_beg:batch_end, ...]
         self.batch_data['batch_index'] = \
             self.store_handle['index'][self.batch_beg:batch_end, ...]
         self.batch_data['batch_resce'] = \
@@ -51,7 +51,7 @@ class base_conv3(base_regre):
             'index': self.train_file,
             'poses': self.train_file,
             'resce': self.train_file,
-            'pose_c1': os.path.join(self.prepare_dir, 'pose_c1'),
+            'pose_c': os.path.join(self.prepare_dir, 'pose_c'),
             'pcnt3': os.path.join(
                 self.prepare_dir, 'pcnt3_{}'.format(self.crop_size)),
         }
@@ -59,7 +59,7 @@ class base_conv3(base_regre):
             'index': [],
             'poses': [],
             'resce': [],
-            'pose_c1': ['poses', 'resce'],
+            'pose_c': ['poses', 'resce'],
             'pcnt3': ['index', 'resce'],
         }
 
@@ -97,7 +97,7 @@ class base_conv3(base_regre):
         # frame_id = 0  # frame_id = img_id - 1
         img_id = index_h5[frame_id, ...]
         frame_h5 = self.store_handle['pcnt3'][frame_id, ...]
-        poses_h5 = self.store_handle['pose_c1'][frame_id, ...].reshape(-1, 3)
+        poses_h5 = self.store_handle['pose_c'][frame_id, ...].reshape(-1, 3)
         resce_h5 = self.store_handle['resce'][frame_id, ...]
 
         print('[{}] drawing image #{:d} ...'.format(self.name_desc, img_id))

@@ -40,7 +40,7 @@ class super_edt3(base_conv3):
             self.store_handle['pcnt3'][self.batch_beg:batch_end, ...],
             axis=-1)
         self.batch_data['batch_poses'] = \
-            self.store_handle['pose_c1'][self.batch_beg:batch_end, ...]
+            self.store_handle['pose_c'][self.batch_beg:batch_end, ...]
         self.batch_data['batch_vxedt'] = \
             self.store_handle['vxedt'][self.batch_beg:batch_end, ...]
         self.batch_data['batch_index'] = \
@@ -59,7 +59,7 @@ class super_edt3(base_conv3):
             'index': self.train_file,
             'poses': self.train_file,
             'resce': self.train_file,
-            'pose_c1': os.path.join(self.prepare_dir, 'pose_c1'),
+            'pose_c': os.path.join(self.prepare_dir, 'pose_c'),
             # 'vxhit': os.path.join(
             #     self.prepare_dir, 'vxhit_{}'.format(self.crop_size)),
             'pcnt3': os.path.join(
@@ -71,7 +71,7 @@ class super_edt3(base_conv3):
             'index': [],
             'poses': [],
             'resce': [],
-            'pose_c1': ['poses', 'resce'],
+            'pose_c': ['poses', 'resce'],
             # 'vxhit': ['index', 'resce'],
             'pcnt3': ['index', 'resce'],
             'vxedt': ['pcnt3', 'poses', 'resce'],
@@ -80,8 +80,8 @@ class super_edt3(base_conv3):
     def yanker(self, pose_local, resce, caminfo):
         cube = iso_cube()
         cube.load(resce)
-        # return cube.transform_add_center(pose_local)
-        return cube.transform_expand_move(pose_local)
+        return cube.transform_add_center(pose_local)
+        # return cube.transform_expand_move(pose_local)
 
     def evaluate_batch(self, pred_val):
         batch_index = self.batch_data['batch_index']

@@ -38,9 +38,9 @@ class voxel_regre(voxel_offset):
             self.store_handle['pcnt3'][self.batch_beg:batch_end, ...],
             axis=-1)
         self.batch_data['batch_poses'] = \
-            self.store_handle['pose_c1'][self.batch_beg:batch_end, ...]
+            self.store_handle['pose_c'][self.batch_beg:batch_end, ...]
         # self.batch_data['batch_poses'] = \
-        #     self.store_handle['pose_c1'][self.batch_beg:batch_end, ...]
+        #     self.store_handle['pose_c'][self.batch_beg:batch_end, ...]
         self.batch_data['batch_vxudir'] = \
             self.store_handle['vxudir'][self.batch_beg:batch_end, ...]
         self.batch_data['batch_index'] = \
@@ -63,7 +63,7 @@ class voxel_regre(voxel_offset):
                 self.prepare_dir, 'pcnt3_{}'.format(self.crop_size)),
             'vxudir': os.path.join(
                 self.prepare_dir, 'vxudir_{}'.format(self.hmap_size)),
-            'pose_c1': os.path.join(self.prepare_dir, 'pose_c1'),
+            'pose_c': os.path.join(self.prepare_dir, 'pose_c'),
         }
         self.store_precon = {
             'index': [],
@@ -71,14 +71,14 @@ class voxel_regre(voxel_offset):
             'resce': [],
             'pcnt3': ['index', 'resce'],
             'vxudir': ['pcnt3', 'poses', 'resce'],
-            'pose_c1': ['poses', 'resce'],
+            'pose_c': ['poses', 'resce'],
         }
 
     def yanker(self, pose_local, resce, caminfo):
         cube = iso_cube()
         cube.load(resce)
-        # return cube.transform_add_center(pose_local)
-        return cube.transform_expand_move(pose_local)
+        return cube.transform_add_center(pose_local)
+        # return cube.transform_expand_move(pose_local)
 
     def evaluate_batch(self, pred_val):
         batch_index = self.batch_data['batch_index']

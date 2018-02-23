@@ -41,7 +41,7 @@ class super_dist2(base_regre):
             self.store_handle['clean'][self.batch_beg:batch_end, ...],
             axis=-1)
         self.batch_data['batch_poses'] = \
-            self.store_handle['pose_c1'][self.batch_beg:batch_end, ...]
+            self.store_handle['pose_c'][self.batch_beg:batch_end, ...]
         self.batch_data['batch_udir2'] = \
             self.store_handle['udir2'][
                 self.batch_beg:batch_end, ..., :self.join_num]
@@ -61,7 +61,7 @@ class super_dist2(base_regre):
             'index': self.train_file,
             'poses': self.train_file,
             'resce': self.train_file,
-            'pose_c1': os.path.join(self.prepare_dir, 'pose_c1'),
+            'pose_c': os.path.join(self.prepare_dir, 'pose_c'),
             'clean': os.path.join(
                 self.prepare_dir, 'clean_{}'.format(self.crop_size)),
             'udir2': os.path.join(
@@ -71,7 +71,7 @@ class super_dist2(base_regre):
             'index': [],
             'poses': [],
             'resce': [],
-            'pose_c1': ['poses', 'resce'],
+            'pose_c': ['poses', 'resce'],
             'clean': ['index', 'resce'],
             'udir2': ['clean', 'poses', 'resce'],
         }
@@ -79,8 +79,8 @@ class super_dist2(base_regre):
     def yanker(self, pose_local, resce, caminfo):
         cube = iso_cube()
         cube.load(resce)
-        # return cube.transform_add_center(pose_local)
-        return cube.transform_expand_move(pose_local)
+        return cube.transform_add_center(pose_local)
+        # return cube.transform_expand_move(pose_local)
 
     def yanker_hmap(self, resce, olmap, uomap, depth, caminfo):
         cube = iso_cube()
