@@ -128,31 +128,33 @@ if __name__ == "__main__":
     with_eval = True
     # with_eval = False
 
-    # # mpl = import_module('matplotlib')
-    # # mpl.use('Agg')
-    # with args_holder() as argsholder:
-    #     argsholder.parse_args()
-    #     args = argsholder.args
-    #     argsholder.create_instance()
-    #     # import shutil
-    #     # shutil.rmtree(args.out_dir)
-    #     # os.makedirs(args.out_dir)
-    #
-    #     test_dataops(args)
-    #
-    #     run_one(args, with_train, with_eval)
-    #     argsholder.append_log()
-    #
-    #     # draw_compare(args)
-    # import sys
-    # sys.exit()
+    # mpl = import_module('matplotlib')
+    # mpl.use('Agg')
+    with args_holder() as argsholder:
+        argsholder.parse_args()
+        args = argsholder.args
+        argsholder.create_instance()
+        # import shutil
+        # shutil.rmtree(args.out_dir)
+        # os.makedirs(args.out_dir)
+
+        test_dataops(args)
+
+        run_one(args, with_train, with_eval)
+        argsholder.append_log()
+
+        # draw_compare(args)
+    import sys
+    sys.exit()
 
     mpl = import_module('matplotlib')
     mpl.use('Agg')
     methlist = [
         # 'super_edt3',
-        'super_ov3edt2',
-        # 'super_edt2m',
+        # 'super_ov3edt2m',
+        # 'super_ov3dist2',
+        # 'super_ov3edt2',
+        'super_edt2m',
         # 'super_edt2',
         # 'super_dist3',
         # 'voxel_regre',

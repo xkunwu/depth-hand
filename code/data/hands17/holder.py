@@ -367,5 +367,6 @@ class hands17holder:
             'edt2': datapro.prow_edt2,
             'ov3edt2': datapro.prow_ov3edt2,
             'edt2m': datapro.prow_edt2m,
-            # 'ov3edt2m': datapro.prow_ov3edt2m,
+            'ov3dist2': datapro.prow_ov3dist2,
+            'ov3edt2m': datapro.prow_ov3edt2m,
         }

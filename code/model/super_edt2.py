@@ -178,7 +178,7 @@ class super_edt2(base_regre):
         final_endpoint = 'stage_out'
         num_joint = self.join_num
         # num_out_map = num_joint * 5  # hmap2, olmap, uomap
-        num_feature = 128
+        num_feature = 32
 
         def add_and_check_final(name, net):
             end_points[name] = net
@@ -270,15 +270,15 @@ class super_edt2(base_regre):
                         net = net + branch0 + branch1
                 with tf.variable_scope('stage32'):
                     sc = 'stage32_post'
-                    # net = incept_resnet.conv_maxpool(net, scope=sc)
-                    net = slim.max_pool2d(net, 3, scope=sc)
+                    net = incept_resnet.conv_maxpool(net, scope=sc)
+                    # net = slim.max_pool2d(net, 3, scope=sc)
                     self.end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points
                 with tf.variable_scope('stage16'):
                     sc = 'stage16'
-                    # net = incept_resnet.conv_maxpool(net, scope=sc)
-                    net = slim.max_pool2d(net, 3, scope=sc)
+                    net = incept_resnet.conv_maxpool(net, scope=sc)
+                    # net = slim.max_pool2d(net, 3, scope=sc)
                     self.end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points

@@ -206,57 +206,6 @@ class batch_edt2(batch_clean):
         return h5file['edt2m'], batch_data
 
 
-class batch_ov3edt2(batch_clean):
-    def __init__(self, model_inst, store_size=-1):
-        super(batch_ov3edt2, self).__init__(model_inst, store_size)
-        self.create_fn['ov3edt2'] = self.create_ov3edt2
-        self.create_fn['ov3edt2m'] = self.create_ov3edt2m
-
-    def create_ov3edt2(self, filepack, h5file_name, num_line):
-        hmap_size = self.model_inst.hmap_size
-        out_dim = self.model_inst.join_num * 3
-        h5file = filepack.write_h5(h5file_name)
-        h5file.create_dataset(
-            'ov3edt2',
-            (num_line,
-                hmap_size, hmap_size,
-                out_dim),
-            chunks=(1,
-                    hmap_size, hmap_size,
-                    out_dim),
-            compression='lzf',
-            dtype='f4')
-        batch_data = np.empty(
-            shape=(
-                self.store_size,
-                hmap_size, hmap_size,
-                out_dim),
-            dtype='f4')
-        return h5file['ov3edt2'], batch_data
-
-    def create_ov3edt2m(self, filepack, h5file_name, num_line):
-        hmap_size = self.model_inst.hmap_size
-        out_dim = self.model_inst.join_num * 3
-        h5file = filepack.write_h5(h5file_name)
-        h5file.create_dataset(
-            'ov3edt2m',
-            (num_line,
-                hmap_size, hmap_size,
-                out_dim),
-            chunks=(1,
-                    hmap_size, hmap_size,
-                    out_dim),
-            compression='lzf',
-            dtype='f4')
-        batch_data = np.empty(
-            shape=(
-                self.store_size,
-                hmap_size, hmap_size,
-                out_dim),
-            dtype='f4')
-        return h5file['ov3edt2m'], batch_data
-
-
 class batch_ortho3(batch_clean):
     def __init__(self, model_inst, store_size=-1):
         super(batch_ortho3, self).__init__(model_inst, store_size)
@@ -504,6 +453,80 @@ class batch_vxudir(batch_vxhit):
                 out_dim),
             dtype='f4')
         return h5file['vxudir'], batch_data
+
+
+class batch_ov3edt2(batch_vxudir):
+    def __init__(self, model_inst, store_size=-1):
+        super(batch_ov3edt2, self).__init__(model_inst, store_size)
+        self.create_fn['ov3edt2'] = self.create_ov3edt2
+        self.create_fn['ov3dist2'] = self.create_ov3dist2
+        self.create_fn['ov3edt2m'] = self.create_ov3edt2m
+
+    def create_ov3edt2(self, filepack, h5file_name, num_line):
+        hmap_size = self.model_inst.hmap_size
+        out_dim = self.model_inst.join_num * 3
+        h5file = filepack.write_h5(h5file_name)
+        h5file.create_dataset(
+            'ov3edt2',
+            (num_line,
+                hmap_size, hmap_size,
+                out_dim),
+            chunks=(1,
+                    hmap_size, hmap_size,
+                    out_dim),
+            compression='lzf',
+            dtype='f4')
+        batch_data = np.empty(
+            shape=(
+                self.store_size,
+                hmap_size, hmap_size,
+                out_dim),
+            dtype='f4')
+        return h5file['ov3edt2'], batch_data
+
+    def create_ov3dist2(self, filepack, h5file_name, num_line):
+        hmap_size = self.model_inst.hmap_size
+        out_dim = self.model_inst.join_num * 3
+        h5file = filepack.write_h5(h5file_name)
+        h5file.create_dataset(
+            'ov3dist2',
+            (num_line,
+                hmap_size, hmap_size,
+                out_dim),
+            chunks=(1,
+                    hmap_size, hmap_size,
+                    out_dim),
+            compression='lzf',
+            dtype='f4')
+        batch_data = np.empty(
+            shape=(
+                self.store_size,
+                hmap_size, hmap_size,
+                out_dim),
+            dtype='f4')
+        return h5file['ov3dist2'], batch_data
+
+    def create_ov3edt2m(self, filepack, h5file_name, num_line):
+        hmap_size = self.model_inst.hmap_size
+        out_dim = self.model_inst.join_num * 3
+        h5file = filepack.write_h5(h5file_name)
+        h5file.create_dataset(
+            'ov3edt2m',
+            (num_line,
+                hmap_size, hmap_size,
+                out_dim),
+            chunks=(1,
+                    hmap_size, hmap_size,
+                    out_dim),
+            compression='lzf',
+            dtype='f4')
+        batch_data = np.empty(
+            shape=(
+                self.store_size,
+                hmap_size, hmap_size,
+                out_dim),
+            dtype='f4')
+        return h5file['ov3edt2m'], batch_data
 
 
 class batch_hmap2(batch_clean):

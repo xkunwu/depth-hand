@@ -6,11 +6,24 @@ from utils.iso_boxes import iso_cube
 from utils.regu_grid import latice_image
 
 
-def prow_edt2m(args, thedata, batch_data):
-    bi, edt2, udir2 = \
+def prow_ov3edt2m(args, thedata, batch_data):
+    bi, ov3edt2, ov3dist2 = \
         args[0], args[1], args[2]
-    edt2m = np.multiply(edt2, udir2[..., :thedata.join_num])
-    batch_data[bi, ...] = edt2m
+    ov3edt2m = np.multiply(ov3edt2, ov3dist2)
+    batch_data[bi, ...] = ov3edt2m
+
+
+def prow_ov3dist2(args, thedata, batch_data):
+    bi, vxudir = \
+        args[0], args[1]
+    olmap = vxudir[..., :thedata.join_num]
+    hmap_size = thedata.hmap_size
+    num_j = thedata.join_num
+    ov3dist2 = np.empty((hmap_size, hmap_size, num_j * 3))
+    ov3dist2[..., :num_j] = np.swapaxes(np.max(olmap, axis=2), 0, 1)
+    ov3dist2[..., num_j:(2 * num_j)] = np.max(olmap, axis=1)
+    ov3dist2[..., (2 * num_j):] = np.swapaxes(np.max(olmap, axis=0), 0, 1)
+    batch_data[bi, ...] = ov3dist2
 
 
 def prow_ov3edt2(args, thedata, batch_data):
@@ -21,6 +34,13 @@ def prow_ov3edt2(args, thedata, batch_data):
     ov3edt2 = dataops.prop_ov3edt2(
         ortho3, poses.reshape(-1, 3), cube, thedata)
     batch_data[bi, ...] = ov3edt2
+
+
+def prow_edt2m(args, thedata, batch_data):
+    bi, edt2, udir2 = \
+        args[0], args[1], args[2]
+    edt2m = np.multiply(edt2, udir2[..., :thedata.join_num])
+    batch_data[bi, ...] = edt2m
 
 
 def prow_edt2(args, thedata, batch_data):

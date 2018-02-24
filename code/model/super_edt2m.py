@@ -76,6 +76,7 @@ class super_edt2m(super_edt2):
         # frame_id = 30
         # frame_id = 848
         # frame_id = 239
+        frame_id = 26
         img_id = index_h5[frame_id, ...]
         frame_h5 = self.store_handle['clean'][frame_id, ...]
         poses_h5 = self.store_handle['pose_c'][frame_id, ...].reshape(-1, 3)

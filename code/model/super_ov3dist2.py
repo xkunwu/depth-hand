@@ -1,27 +1,14 @@
 import os
-from importlib import import_module
 import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as mpplot
-from model.super_edt2 import super_edt2
+from model.super_ov3edt2 import super_ov3edt2
 from utils.iso_boxes import iso_cube
 
 
-class super_ov3edt2(super_edt2):
-    @staticmethod
-    def get_trainer(args, new_log):
-        from train.train_super_edt2 import train_super_edt2
-        return train_super_edt2(args, new_log)
-
+class super_ov3dist2(super_ov3edt2):
     def __init__(self, args):
-        super(super_ov3edt2, self).__init__(args)
-        self.batch_allot = getattr(
-            import_module('model.batch_allot'),
-            'batch_ov3edt2'
-        )
-        self.crop_size = 128
-        self.hmap_size = 32
-        self.map_scale = self.crop_size / self.hmap_size
+        super(super_ov3dist2, self).__init__(args)
 
     def fetch_batch(self, fetch_size=None):
         if fetch_size is None:
@@ -39,7 +26,7 @@ class super_ov3edt2(super_edt2):
         self.batch_data['batch_poses'] = \
             self.store_handle['pose_c'][self.batch_beg:batch_end, ...]
         self.batch_data['batch_edt2'] = \
-            self.store_handle['ov3edt2'][self.batch_beg:batch_end, ...]
+            self.store_handle['ov3dist2'][self.batch_beg:batch_end, ...]
         self.batch_data['batch_index'] = \
             self.store_handle['index'][self.batch_beg:batch_end, ...]
         self.batch_data['batch_resce'] = \
@@ -49,7 +36,7 @@ class super_ov3edt2(super_edt2):
 
     def receive_data(self, thedata, args):
         """ Receive parameters specific to the data """
-        super(super_ov3edt2, self).receive_data(thedata, args)
+        super(super_ov3dist2, self).receive_data(thedata, args)
         thedata.hmap_size = self.hmap_size
         self.out_dim = self.join_num * 3
         self.store_name = {
@@ -59,8 +46,12 @@ class super_ov3edt2(super_edt2):
             'pose_c': os.path.join(self.prepare_dir, 'pose_c'),
             'ortho3': os.path.join(
                 self.prepare_dir, 'ortho3_{}'.format(self.crop_size)),
-            'ov3edt2': os.path.join(
-                self.prepare_dir, 'ov3edt2_{}'.format(self.hmap_size)),
+            'pcnt3': os.path.join(
+                self.prepare_dir, 'pcnt3_{}'.format(self.hmap_size)),
+            'vxudir': os.path.join(
+                self.prepare_dir, 'vxudir_{}'.format(self.hmap_size)),
+            'ov3dist2': os.path.join(
+                self.prepare_dir, 'ov3dist2_{}'.format(self.hmap_size)),
         }
         self.store_precon = {
             'index': [],
@@ -68,7 +59,9 @@ class super_ov3edt2(super_edt2):
             'resce': [],
             'pose_c': ['poses', 'resce'],
             'ortho3': ['index', 'resce'],
-            'ov3edt2': ['ortho3', 'poses', 'resce'],
+            'pcnt3': ['index', 'resce'],
+            'vxudir': ['pcnt3', 'poses', 'resce'],
+            'ov3dist2': ['vxudir'],
         }
 
     def yanker(self, pose_local, resce, caminfo):
@@ -102,7 +95,7 @@ class super_ov3edt2(super_edt2):
         frame_h5 = self.store_handle['ortho3'][frame_id, ...]
         poses_h5 = self.store_handle['pose_c'][frame_id, ...].reshape(-1, 3)
         resce_h5 = self.store_handle['resce'][frame_id, ...]
-        ov3edt2_h5 = self.store_handle['ov3edt2'][frame_id, ...]
+        ov3edt2_h5 = self.store_handle['ov3dist2'][frame_id, ...]
 
         print('[{}] drawing image #{:d} ...'.format(self.name_desc, img_id))
         print(np.min(frame_h5), np.max(frame_h5))
@@ -291,20 +284,3 @@ class super_ov3edt2(super_edt2):
                     if add_and_check_final(sc, net):
                         return net, end_points
         raise ValueError('final_endpoint (%s) not recognized', final_endpoint)
-
-    def placeholder_inputs(self, batch_size=None):
-        frames_tf = tf.placeholder(
-            tf.float32, shape=(
-                batch_size,
-                self.crop_size, self.crop_size,
-                3))
-        poses_tf = tf.placeholder(
-            tf.float32, shape=(
-                batch_size,
-                self.out_dim))
-        ov3edt2_tf = tf.placeholder(
-            tf.float32, shape=(
-                batch_size,
-                self.hmap_size, self.hmap_size,
-                self.join_num * 3))
-        return frames_tf, poses_tf, ov3edt2_tf
