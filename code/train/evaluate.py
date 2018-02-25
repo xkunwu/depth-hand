@@ -56,17 +56,17 @@ def draw_compare(args, predict_dir=None):
     errors = np.stack(error_l, axis=0)
     print('drawing figures ...')
     fig = mpplot.figure(figsize=(2 * 5, 1 * 5))
-    dataeval.draw_error_percentage_curve(
-        errors, methods, mpplot.gca())
-    fig.tight_layout()
-    mpplot.savefig(os.path.join(predict_dir, 'error_rate.png'))
-    mpplot.close(fig)
-    # mpplot.gcf().clear()
-    fig = mpplot.figure(figsize=(2 * 5, 1 * 5))
     err_mean = dataeval.draw_error_per_joint(
         errors, methods, mpplot.gca(), args.data_inst.join_name)
     fig.tight_layout()
     mpplot.savefig(os.path.join(predict_dir, 'error_bar.png'))
+    mpplot.gcf().clear()
+    dataeval.draw_error_percentage_curve(
+        errors, methods, mpplot.gca())
+    fig.tight_layout()
+    mpplot.savefig(os.path.join(predict_dir, 'error_rate.png'))
+    if args.show_draw:
+        mpplot.show()
     mpplot.close(fig)
 
     maxmean = np.max(np.mean(errors, axis=1), axis=1)
@@ -81,40 +81,6 @@ def draw_compare(args, predict_dir=None):
         restr += ' {}({:.2f})'.format(methods[ii], err_mean[ii])
     args.logger.info(restr)
     print('figures saved: error summary')
-
-
-def test_dataops(args):
-    data_inst = args.data_inst
-
-    args.model_inst.draw_random(data_inst, args)
-
-    # datadraw = import_module(
-    #     'data.' + args.data_name + '.draw')
-    # datadraw.draw_raw3d_random(
-    #     data_inst,
-    #     data_inst.training_images,
-    #     data_inst.training_annot_cleaned
-    # )
-    # sys.exit()
-
-    # mpplot.gcf().clear()
-    # fig_size = (2 * 5, 5)
-    # mpplot.subplots(nrows=1, ncols=2, figsize=fig_size)
-    # mpplot.subplot(1, 2, 1)
-    # datadraw.draw_pose_raw_random(
-    #     data_inst,
-    #     data_inst.training_images,
-    #     data_inst.training_annot_cleaned,
-    #     218  # palm
-    # )
-    # mpplot.subplot(1, 2, 2)
-    # datadraw.draw_pose_raw_random(
-    #     data_inst,
-    #     data_inst.training_cropped,
-    #     data_inst.training_annot_cropped,
-    #     218  # palm
-    # )
-    # mpplot.show()
 
 
 if __name__ == "__main__":
@@ -138,12 +104,10 @@ if __name__ == "__main__":
         # shutil.rmtree(args.out_dir)
         # os.makedirs(args.out_dir)
 
-        test_dataops(args)
-
-        run_one(args, with_train, with_eval)
-        argsholder.append_log()
-
-        # draw_compare(args)
+        # run_one(args, with_train, with_eval)
+        # argsholder.append_log()
+    
+        draw_compare(args)
     import sys
     sys.exit()
 
@@ -154,7 +118,7 @@ if __name__ == "__main__":
         # 'super_ov3edt2m',
         # 'super_ov3dist2',
         # 'super_ov3edt2',
-        'super_edt2m',
+        # 'super_edt2m',
         # 'super_edt2',
         # 'super_dist3',
         # 'voxel_regre',
@@ -183,7 +147,6 @@ if __name__ == "__main__":
             args = argsholder.args
             args.model_name = meth
             argsholder.create_instance()
-            test_dataops(args)
             run_one(args, with_train, with_eval)
             # run_one(args, True, True)
             # run_one(args, False, False)

@@ -84,6 +84,10 @@ class train_abc():
                 str(timedelta(seconds=time_all_e)), epoch,
                 str(timedelta(seconds=(time_all_e / epoch)))))
 
+    def _pre_train(self):
+        self.args.model_inst.check_dir(self.args.data_inst, self.args)
+        self.args.model_inst.draw_random(self.args.data_inst, self.args)
+
     def train(self):
         self.logger.info('######## Training ########')
         tf.reset_default_graph()
@@ -375,6 +379,7 @@ class train_abc():
     def __init__(self, args, new_log=True):
         self.args = args
         self.logger = logging.getLogger('train')
+        self._pre_train()
 
 
 if __name__ == "__main__":

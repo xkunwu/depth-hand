@@ -544,10 +544,18 @@ def prop_edt2(image_crop, pose_raw, cube, caminfo, roll=0):
     for pose in pose2d:
         val = edt[pose[0], pose[1]]
         if 0 > val:
-            phi = np.ma.masked_array(
-                # distance_transform_edt(0 < edt - val) + istep,
-                edt - val + istep,
-                (val > edt))
+            ring = np.ones_like(image_hmap)
+            ring[pose[0], pose[1]] = 0
+            ring = - distance_transform_edt(ring)
+            ring = np.ma.masked_array(
+                ring, np.logical_and((val > ring), mask))
+            ring = np.max(ring) - ring
+            ring[~mask] = 0
+            phi = image_hmap + ring + 1
+            # phi = np.ma.masked_array(
+            #     # distance_transform_edt(0 < edt - val) + istep,
+            #     edt - val + istep,
+            #     (val > edt))
         else:
             phi = masked_edt.copy()
         phi[pose[0], pose[1]] = 0.

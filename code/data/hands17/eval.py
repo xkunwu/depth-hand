@@ -35,7 +35,7 @@ def compare_error(thedata, fname_echt, fname_pred):
 def draw_mean_error_distribution(errors, ax):
     """ errors: FxJ """
     err_mean = np.mean(errors, axis=1)
-    mpplot.hist(
+    ax.hist(
         err_mean, 100,
         weights=np.ones_like(err_mean) * 100. / err_mean.size)
     ax.set_ylabel('Percentage (%)')
@@ -43,7 +43,6 @@ def draw_mean_error_distribution(errors, ax):
     # ax.set_ylim([0, 100])
     ax.set_xlabel('Mean error of single frame (mm)')
     # ax.set_xlim(left=0)
-    mpplot.tight_layout()
 
 
 def draw_error_percentage_curve(errors, methods, ax):
@@ -52,21 +51,31 @@ def draw_error_percentage_curve(errors, methods, ax):
     num_v = err_max.shape[1]
     num_m = err_max.shape[0]
     if len(methods) != num_m:
-        print('ERROR - dimension not matching!')
+        print('ERROR - method dimension not matching!')
         return
-    percent = np.arange(num_v + 1) * 100 / num_v
+    percent = np.arange(num_v + 1) * 100 / num_v  # 0 .. num_v
     err_max = np.concatenate((
         np.zeros(shape=(num_m, 1)),
         np.sort(err_max, 1)),
         axis=1
     )
+    err_max_draw = 100
     for err in err_max:
-        mpplot.plot(
-            err, percent,
-            '-',
+        err_cut = err[err_max_draw > err]
+        nc = len(err_cut)
+        percent_cut = percent[:nc]
+        if err_max_draw < nc:
+            step = int(nc / err_max_draw)
+            err_cut = err_cut[::step]
+            percent_cut = percent_cut[::step]
+        ax.plot(
+            # err, percent,
+            err_cut, percent_cut,
+            # xx, yy,
+            # 'o',
             linewidth=2.0
         )
-    # mpplot.plot(
+    # ax.plot(
     #     err_max, np.tile(percent, (num_m, 1)),
     #     '-',
     #     linewidth=2.0
@@ -75,10 +84,8 @@ def draw_error_percentage_curve(errors, methods, ax):
     ax.set_ylim([0, 100])
     ax.set_xlabel('Maximal error of single joint (mm)')
     ax.set_xlim(left=0)
-    ax.set_xlim(right=100)
-    mpplot.legend(methods, loc='lower right')
-    mpplot.tight_layout()
-    # ax.set_xlim(right=50)
+    ax.set_xlim(right=err_max_draw)
+    ax.legend(methods, loc='lower right')
 
 
 def draw_error_per_joint(errors, methods, ax, join_name=None, draw_std=False):
@@ -117,13 +124,13 @@ def draw_error_per_joint(errors, methods, ax, join_name=None, draw_std=False):
     jloc = jid * (num_m + 2) * wb
     for ei, err in enumerate(err_mean):
         if draw_std:
-            mpplot.bar(
+            ax.bar(
                 jloc + wb * ei - wsl, err, width=wb, align='center',
                 yerr=err_m2m,
                 error_kw=dict(ecolor='gray', lw=1, capsize=3, capthick=2)
             )
         else:
-            mpplot.bar(
+            ax.bar(
                 jloc + wb * ei - wsl, err, width=wb, align='center'
             )
     ylim_top = max(np.max(err_mean[:, 0:7]), np.max(err_mean))
@@ -131,9 +138,8 @@ def draw_error_per_joint(errors, methods, ax, join_name=None, draw_std=False):
     ax.set_ylim(0, ylim_top + float(num_m) * ylim_top * 0.1)
     ax.set_xlim(jloc[0] - wsl - 0.5, jloc[-1] + wsl + 0.5)
     mpplot.xticks(jloc, jtick, rotation='vertical')
-    mpplot.margins(0.1)
-    mpplot.tight_layout()
-    mpplot.legend(methods, loc='upper left')
+    ax.margins(0.1)
+    ax.legend(methods, loc='upper left')
     return err_mean[:, -1]
 
 
@@ -155,6 +161,7 @@ def evaluate_poses(thedata, model_name, predict_dir, predict_file):
     fig = mpplot.figure(figsize=(2 * 5, 1 * 5))
     draw_mean_error_distribution(
         errors, mpplot.gca())
+    fig.tight_layout()
     fname = '{}_error_dist.png'.format(model_name)
     mpplot.savefig(os.path.join(predict_dir, fname))
     mpplot.close(fig)
@@ -163,6 +170,7 @@ def evaluate_poses(thedata, model_name, predict_dir, predict_file):
     fig = mpplot.figure(figsize=(2 * 5, 1 * 5))
     draw_error_percentage_curve(
         errors, [model_name], mpplot.gca())
+    fig.tight_layout()
     fname = '{}_error_rate.png'.format(model_name)
     mpplot.savefig(os.path.join(predict_dir, fname))
     mpplot.close(fig)
@@ -170,6 +178,7 @@ def evaluate_poses(thedata, model_name, predict_dir, predict_file):
     fig = mpplot.figure(figsize=(2 * 5, 1 * 5))
     err_mean = draw_error_per_joint(
         errors, [model_name], mpplot.gca(), thedata.join_name)
+    fig.tight_layout()
     fname = '{}_error_bar.png'.format(model_name)
     mpplot.savefig(os.path.join(predict_dir, fname))
     mpplot.close(fig)
@@ -193,7 +202,5 @@ def evaluate_poses(thedata, model_name, predict_dir, predict_file):
 
 
 def evaluate_hands(thedata, model_name, predict_dir, predict_file):
-    print('evaluating {} ...'.format(model_name))
-
     # from sklearn.metrics import precision_recall_curve
     pass

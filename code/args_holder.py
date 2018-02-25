@@ -316,7 +316,6 @@ class args_holder:
 
         # bind data instance to model instance
         self.args.model_inst.receive_data(self.args.data_inst, self.args)
-        self.args.model_inst.check_dir(self.args.data_inst, self.args)
 
         self.write_args(self.args)
 

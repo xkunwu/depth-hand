@@ -94,6 +94,7 @@ class base_regre(object):
 
     def start_evaluate(self):
         self.batch_beg = self.args.data_inst.train_test_split
+        # self.split_end = self.args.data_inst.num_training + 1
         self.split_end = self.args.data_inst.num_training
         self.store_size = self.split_end - self.batch_beg
         self.eval_pred = []
