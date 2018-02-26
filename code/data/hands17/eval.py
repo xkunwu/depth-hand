@@ -8,28 +8,50 @@ from . import io as dataio
 # from . import draw as datadraw
 
 
-def compare_error(thedata, fname_echt, fname_pred):
+# def compare_error(thedata, fname_echt, fname_pred):
+#     """ NOTE: the number of predictions might be smaller
+#         return: FxJ, l2 error matrix
+#     """
+#     error_l = []
+#     with open(fname_echt, 'r') as file_s, \
+#             open(fname_pred, 'r') as file_t:
+#         sour_lines = [x.strip() for x in file_s.readlines()]
+#         targ_lines = [x.strip() for x in file_t.readlines()]
+#         for li, line_t in enumerate(targ_lines):
+#             name_s, pose_s = dataio.parse_line_annot(sour_lines[li])
+#             name_t, pose_t = dataio.parse_line_annot(line_t)
+#             if name_s != name_t:
+#                 print('ERROR - different names: {} - {}'.format(
+#                     name_s, name_t))
+#                 return
+#             p3d_s = dataops.d2z_to_raw(pose_s, thedata)
+#             p3d_t = dataops.d2z_to_raw(pose_t, thedata)
+#             error_l.append(np.sqrt(
+#                 np.sum((p3d_s - p3d_t) ** 2, axis=1)
+#             ))
+#     # return np.expand_dims(np.stack(error_l, axis=0), axis=0)
+#     return np.stack(error_l, axis=0)
+
+
+def compare_error_h5(thedata, fname_echt, fname_pred):
     """ NOTE: the number of predictions might be smaller
         return: FxJ, l2 error matrix
     """
-    error_l = []
-    with open(fname_echt, 'r') as file_s, \
-            open(fname_pred, 'r') as file_t:
-        sour_lines = [x.strip() for x in file_s.readlines()]
-        targ_lines = [x.strip() for x in file_t.readlines()]
-        for li, line_t in enumerate(targ_lines):
-            name_s, pose_s = dataio.parse_line_annot(sour_lines[li])
-            name_t, pose_t = dataio.parse_line_annot(line_t)
-            if name_s != name_t:
-                print('different names: {} - {}'.format(name_s, name_t))
-                return
-            p3d_s = dataops.d2z_to_raw(pose_s, thedata)
-            p3d_t = dataops.d2z_to_raw(pose_t, thedata)
-            error_l.append(np.sqrt(
-                np.sum((p3d_s - p3d_t) ** 2, axis=1)
-            ))
-    # return np.expand_dims(np.stack(error_l, axis=0), axis=0)
-    return np.stack(error_l, axis=0)
+    import h5py
+    with h5py.File(fname_echt, 'r') as file_s, \
+            h5py.File(fname_pred, 'r') as file_t:
+        num_line = file_t['index'].shape[0]
+        if 0 != np.sum(file_s['index'][:num_line] - file_t['index'][()]):
+            print('ERROR - different names index!')
+            return
+        poses_s = file_s['poses'][:num_line, ...].reshape(-1, 3)
+        poses_t = file_t['poses'][()].reshape(-1, 3)
+        p3d_s = dataops.d2z_to_raw(poses_s, thedata)
+        p3d_t = dataops.d2z_to_raw(poses_t, thedata)
+        error = np.sqrt(
+            np.sum((p3d_s - p3d_t) ** 2, axis=1)
+        )
+        return error.reshape(-1, thedata.join_num)
 
 
 def draw_mean_error_distribution(errors, ax):
@@ -45,7 +67,7 @@ def draw_mean_error_distribution(errors, ax):
     # ax.set_xlim(left=0)
 
 
-def draw_error_percentage_curve(errors, methods, ax):
+def draw_error_percentage_curve(errors, methods, ax, legend=None):
     """ errors: MxFxJ """
     err_max = np.max(errors, axis=-1)
     num_v = err_max.shape[1]
@@ -86,9 +108,15 @@ def draw_error_percentage_curve(errors, methods, ax):
     ax.set_xlim(left=0)
     ax.set_xlim(right=err_max_draw)
     ax.legend(methods, loc='lower right')
+    if legend is None:
+        ax.legend(methods, loc='lower right')
+    else:
+        ax.legend(legend, loc='lower right')
 
 
-def draw_error_per_joint(errors, methods, ax, join_name=None, draw_std=False):
+def draw_error_per_joint(
+    errors, methods, ax,
+        join_name=None, legend=None, draw_std=False):
     """ errors: MxFxJ """
     err_mean = np.mean(errors, axis=1)
     err_max = np.max(errors, axis=1)
@@ -139,7 +167,10 @@ def draw_error_per_joint(errors, methods, ax, join_name=None, draw_std=False):
     ax.set_xlim(jloc[0] - wsl - 0.5, jloc[-1] + wsl + 0.5)
     mpplot.xticks(jloc, jtick, rotation='vertical')
     ax.margins(0.1)
-    ax.legend(methods, loc='upper left')
+    if legend is None:
+        ax.legend(methods, loc='upper left')
+    else:
+        ax.legend(legend, loc='upper left')
     return err_mean[:, -1]
 
 
@@ -152,7 +183,7 @@ def evaluate_detection(thedata, model_name, predict_dir, predict_file):
 def evaluate_poses(thedata, model_name, predict_dir, predict_file):
     print('evaluating {} ...'.format(model_name))
 
-    errors = compare_error(
+    errors = compare_error_h5(
         thedata,
         thedata.training_annot_test,
         predict_file

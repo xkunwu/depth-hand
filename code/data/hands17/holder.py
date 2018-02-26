@@ -307,17 +307,16 @@ class hands17holder:
         #         split_num))
         test_file = self.training_annot_test
         if not os.path.exists(test_file):
-            # shutil.copy2(self.training_annot_test, self.predict_dir)
             with h5py.File(self.training_annot_cleaned, 'r') as h5file:
                 index = h5file['index'][self.train_test_split:, ...]
                 poses = h5file['poses'][self.train_test_split:, ...]
-                with h5py.File(test_file + '.h5', 'w') as writer:
+                with h5py.File(test_file, 'w') as writer:
                     dataio.write_h5(writer, index, poses)
-                with open(test_file, 'w') as writer:
-                    dataio.write_txt(writer, index, poses)
-        # with h5py.File(test_file, 'r') as reader:
-        #     with open(test_file + '_1.txt', 'w') as writer:
-        #         dataio.h5_to_txt(reader, writer)
+                # with h5py.File(test_file + '.h5', 'w') as writer:
+                #     dataio.write_h5(writer, index, poses)
+                # with open(test_file, 'w') as writer:
+                #     dataio.write_txt(writer, index, poses)
+        # dataio.h5_to_txt(test_file, test_file + '_1.txt')
 
         return update_log
 

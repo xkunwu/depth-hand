@@ -4,11 +4,11 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.contrib import slim
 import matplotlib.pyplot as mpplot
-from model.base_regre import base_regre
+from model.base_clean import base_clean
 from utils.iso_boxes import iso_cube
 
 
-class ortho3view(base_regre):
+class ortho3view(base_clean):
     def __init__(self, args):
         super(ortho3view, self).__init__(args)
         # self.num_channel = 3
@@ -47,6 +47,8 @@ class ortho3view(base_regre):
             'index': self.train_file,
             'poses': self.train_file,
             'resce': self.train_file,
+            'clean': os.path.join(
+                self.prepare_dir, 'clean_{}'.format(self.crop_size)),
             'pose_c': os.path.join(self.prepare_dir, 'pose_c'),
             'ortho3': os.path.join(
                 self.prepare_dir, 'ortho3_{}'.format(self.crop_size)),
@@ -55,9 +57,11 @@ class ortho3view(base_regre):
             'index': [],
             'poses': [],
             'resce': [],
+            'clean': ['index', 'resce'],
             'pose_c': ['poses', 'resce'],
             'ortho3': ['index', 'resce'],
         }
+        self.frame_type = 'clean'
 
     def draw_random(self, thedata, args):
         index_h5 = self.store_handle['index']

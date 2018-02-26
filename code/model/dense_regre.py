@@ -4,12 +4,11 @@ import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as mpplot
 from cv2 import resize as cv2resize
-from model.base_regre import base_regre
+from model.base_clean import base_clean
 from utils.iso_boxes import iso_cube
-from utils.image_ops import draw_hmap2, draw_olmap, draw_uomap
 
 
-class dense_regre(base_regre):
+class dense_regre(base_clean):
     @staticmethod
     def get_trainer(args, new_log):
         from train.train_dense_regre import train_dense_regre
@@ -77,6 +76,7 @@ class dense_regre(base_regre):
             'hmap2': ['poses', 'resce'],
             'udir2': ['clean', 'poses', 'resce'],
         }
+        self.frame_type = 'clean'
 
     def yanker_hmap(self, resce, hmap2, olmap, uomap, depth, caminfo):
         cube = iso_cube()
@@ -161,6 +161,7 @@ class dense_regre(base_regre):
         store_size = index_h5.shape[0]
         frame_id = np.random.choice(store_size)
         # frame_id = 0  # frame_id = img_id - 1
+        frame_id = 239
         img_id = index_h5[frame_id, ...]
         frame_h5 = self.store_handle['clean'][frame_id, ...]
         poses_h5 = self.store_handle['poses'][frame_id, ...].reshape(-1, 3)
@@ -191,18 +192,22 @@ class dense_regre(base_regre):
         uomap = uomap_h5[..., 3 * joint_id:3 * (joint_id + 1)]
         depth_crop = cv2resize(frame_h5, (sizel, sizel))
 
-        ax = mpplot.subplot(2, 3, 2)
-        ax.imshow(depth_crop, cmap=mpplot.cm.bone_r)
-        pose3d = cube.transform_center_shrink(poses_h5)
-        pose2d, _ = cube.project_ortho(pose3d, roll=0, sort=False)
-        pose2d *= sizel
-        args.data_draw.draw_pose2d(
-            ax, thedata,
-            pose2d,
-        )
+        # ax = mpplot.subplot(2, 3, 2)
+        # ax.imshow(depth_crop, cmap=mpplot.cm.bone_r)
+        # pose3d = cube.transform_center_shrink(poses_h5)
+        # pose2d, _ = cube.project_ortho(pose3d, roll=0, sort=False)
+        # pose2d *= sizel
+        # args.data_draw.draw_pose2d(
+        #     ax, thedata,
+        #     pose2d,
+        # )
+
+        from utils.image_ops import draw_hmap2, draw_olmap, draw_uomap, draw_udir2
+        ax = mpplot.subplot(2, 3, 3)
+        draw_hmap2(fig, ax, frame_h5, hmap2)
 
         ax = mpplot.subplot(2, 3, 4)
-        draw_hmap2(fig, ax, frame_h5, hmap2)
+        draw_udir2(fig, ax, olmap, uomap)
 
         ax = mpplot.subplot(2, 3, 5)
         draw_uomap(fig, ax, frame_h5, uomap)
@@ -210,7 +215,7 @@ class dense_regre(base_regre):
         ax = mpplot.subplot(2, 3, 6)
         draw_olmap(fig, ax, frame_h5, olmap)
 
-        ax = mpplot.subplot(2, 3, 3)
+        ax = mpplot.subplot(2, 3, 2)
         pose_out = self.yanker_hmap(
             resce_h5, hmap2_h5, olmap_h5, uomap_h5,
             frame_h5, self.caminfo)

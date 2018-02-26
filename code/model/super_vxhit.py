@@ -58,6 +58,8 @@ class super_vxhit(voxel_detect):
             'index': self.train_file,
             'poses': self.train_file,
             'resce': self.train_file,
+            'clean': os.path.join(
+                self.prepare_dir, 'clean_{}'.format(self.crop_size)),
             'pose_lab': os.path.join(
                 self.prepare_dir, 'pose_lab_{}'.format(self.hmap_size)),
             'vxhit': os.path.join(
@@ -68,10 +70,12 @@ class super_vxhit(voxel_detect):
             'index': [],
             'poses': [],
             'resce': [],
+            'clean': ['index', 'resce'],
             'pose_lab': ['poses', 'resce'],
             'vxhit': ['index', 'resce'],
             'pose_c': ['poses', 'resce'],
         }
+        self.frame_type = 'clean'
 
     def yanker(self, pose_local, resce, caminfo):
         cube = iso_cube()

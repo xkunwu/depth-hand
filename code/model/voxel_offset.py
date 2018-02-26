@@ -21,7 +21,8 @@ class voxel_offset(base_conv3):
             import_module('model.batch_allot'),
             'batch_vxudir'
         )
-        self.crop_size = 64
+        # self.crop_size = 64
+        self.crop_size = 32
         self.hmap_size = 16
         self.map_scale = self.crop_size / self.hmap_size
 
@@ -57,6 +58,8 @@ class voxel_offset(base_conv3):
             'index': self.train_file,
             'poses': self.train_file,
             'resce': self.train_file,
+            'clean': os.path.join(
+                self.prepare_dir, 'clean_{}'.format(self.crop_size)),
             'pcnt3': os.path.join(
                 self.prepare_dir, 'pcnt3_{}'.format(self.crop_size)),
             # 'vxoff': os.path.join(
@@ -68,10 +71,12 @@ class voxel_offset(base_conv3):
             'index': [],
             'poses': [],
             'resce': [],
+            'clean': ['index', 'resce'],
             'pcnt3': ['index', 'resce'],
             # 'vxoff': ['pcnt3', 'poses', 'resce'],
             'vxudir': ['pcnt3', 'poses', 'resce'],
         }
+        self.frame_type = 'clean'
 
     def yanker_hmap(self, resce, vxhit, vxudir, caminfo):
         cube = iso_cube()
@@ -103,6 +108,7 @@ class voxel_offset(base_conv3):
         store_size = index_h5.shape[0]
         frame_id = np.random.choice(store_size)
         # frame_id = 0  # frame_id = img_id - 1
+        frame_id = 239
         img_id = index_h5[frame_id, ...]
         frame_h5 = self.store_handle['pcnt3'][frame_id, ...]
         poses_h5 = self.store_handle['poses'][frame_id, ...].reshape(-1, 3)

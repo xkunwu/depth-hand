@@ -6,7 +6,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.contrib import slim
 import h5py
-from model.base_regre import base_regre
+from model.base_clean import base_clean
 import matplotlib.pyplot as mpplot
 from colour import Color
 from utils.iso_boxes import iso_rect
@@ -58,7 +58,7 @@ from utils.iso_boxes import iso_cube
 #     return centre, index, confidence
 
 
-class localizer2(base_regre):
+class localizer2(base_clean):
     """ this is the 2D version of attention model """
     def __init__(self, args):
         super(localizer2, self).__init__(args)

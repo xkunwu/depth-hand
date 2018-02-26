@@ -1,6 +1,7 @@
 import numpy as np
 from skimage import io as skimio
 import re
+import h5py
 
 
 def read_image(image_name):
@@ -49,8 +50,24 @@ def write_txt(writer, index, poses):
             '\n')
 
 
-def h5_to_txt(reader, writer):
-    write_txt(writer, reader['index'][:, 0], reader['poses'])
+def h5_to_txt(h5_name, txt_name):
+    with h5py.File(h5_name, 'r') as reader, \
+            open(txt_name, 'w') as writer:
+        write_txt(writer, reader['index'], reader['poses'])
+
+
+def txt_to_h5(txt_name, h5_name):
+    with open(txt_name, 'r') as reader, \
+            h5py.File(h5_name, 'w') as writer:
+        lines = [x.strip() for x in reader.readlines()]
+        # num_line = len(lines)
+        index = []
+        poses = []
+        for line in lines:
+            name, pose = parse_line_annot(line)
+            index.append(imagename2index(name))
+            poses.append(pose.flatten())
+        write_h5(writer, np.array(index), np.vstack(poses))
 
 
 def parse_line_annot(line):

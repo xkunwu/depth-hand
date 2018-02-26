@@ -43,6 +43,8 @@ class super_ov3dist2(super_ov3edt2):
             'index': self.train_file,
             'poses': self.train_file,
             'resce': self.train_file,
+            'clean': os.path.join(
+                self.prepare_dir, 'clean_{}'.format(self.crop_size)),
             'pose_c': os.path.join(self.prepare_dir, 'pose_c'),
             'ortho3': os.path.join(
                 self.prepare_dir, 'ortho3_{}'.format(self.crop_size)),
@@ -57,12 +59,14 @@ class super_ov3dist2(super_ov3edt2):
             'index': [],
             'poses': [],
             'resce': [],
+            'clean': ['index', 'resce'],
             'pose_c': ['poses', 'resce'],
             'ortho3': ['index', 'resce'],
             'pcnt3': ['index', 'resce'],
             'vxudir': ['pcnt3', 'poses', 'resce'],
             'ov3dist2': ['vxudir'],
         }
+        self.frame_type = 'clean'
 
     def yanker(self, pose_local, resce, caminfo):
         cube = iso_cube()

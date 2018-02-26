@@ -2,9 +2,9 @@ import os
 from importlib import import_module
 import numpy as np
 from .base_regre import base_regre
-# from utils.coder import file_pack
+import h5py
+import matplotlib.pyplot as mpplot
 from utils.iso_boxes import iso_cube
-import tfplot
 
 
 # def draw_pose_pred(
@@ -83,6 +83,7 @@ class base_clean(base_regre):
             'pose_c': ['poses', 'resce'],
             'clean': ['index', 'resce'],
         }
+        self.frame_type = 'clean'
 
     def draw_random(self, thedata, args):
         import matplotlib.pyplot as mpplot

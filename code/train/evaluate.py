@@ -6,6 +6,37 @@ import numpy as np
 import re
 
 
+model_ref = {
+    'super_edt3': 'EDT3',
+    'super_ov3edt2m': 'Multi-view 2D supervision w/ surface distance (improved)',
+    'super_ov3dist2': 'Multi-view 2D supervision w/ distance',
+    'super_ov3edt2': 'Multi-view 2D supervision w/ surface distance',
+    'super_edt2m': '2D supervision w/ surface distance (improved)',
+    'super_edt2': '2D supervision w/ surface distance',
+    'super_dist3': '3D supervision w/ distance',
+    'voxel_regre': '3D supervision w/ offset',
+    'voxel_offset': '3D version of Wan et. al. (Arxiv\'17)',
+    'super_vxhit': '3D supervision w/ detection',
+    'voxel_detect': 'Moon et. al. (Arxiv\'17)',
+    'super_dist2': '2D supervision w/ distance',
+    'super_udir2': '2D supervision w/ offset',
+    'dense_regre': 'Wan et. al. (Arxiv\'17)',
+    'direc_tsdf': 'Ge et. al. (CVPR\'17)',
+    'trunc_dist': '3D truncated distance',
+    'base_conv3': '3D baseline',
+    'base_conv3_inres': '3D baseline w/ inception-resnet',
+    'ortho3view': 'Ge et. al. (CVPR\'16)',
+    'base_clean': 'Baseline',
+    'base_regre': 'Baseline-background',
+    'base_clean_inres': 'Baseline w/ inception-resnet',
+    'base_regre_inres': 'Baseline-background w/ inception-resnet',
+    'base_clean_hg': 'Baseline w/ hourglass',
+    'base_regre_hg': 'Baseline-background w/ hourglass',
+    'localizer3': '3D localizer',
+    'localizer2': '2D localizer',
+}
+
+
 def run_one(args, with_train=False, with_eval=False):
     predict_file = args.model_inst.predict_file
     trainer = args.model_inst.get_trainer(args, new_log=False)
@@ -15,6 +46,16 @@ def run_one(args, with_train=False, with_eval=False):
     if with_eval or (not os.path.exists(predict_file)):
         trainer.evaluate()
     # trainer.evaluate()
+
+
+def convert_legacy_txt(predictions):
+    dataio = import_module(
+        'data.' + args.data_name + '.io')
+    for predict in predictions:
+        txt_back = predict + '.txt'
+        os.rename(predict, txt_back)
+        dataio.txt_to_h5(txt_back, predict)
+        # dataio.h5_to_txt(predict + '.h5', predict + '_1.txt')
 
 
 def draw_compare(args, predict_dir=None):
@@ -30,6 +71,7 @@ def draw_compare(args, predict_dir=None):
         if m:
             predictions.append(os.path.join(predict_dir, file))
             methods.append(m.group(1))
+    # convert_legacy_txt(predictions)  # convert legacy txt files
     num_method = len(methods)
     print('{:d} methods collected for comparison ...'.format(num_method))
     annot_test = args.data_inst.training_annot_test
@@ -43,7 +85,7 @@ def draw_compare(args, predict_dir=None):
     ).start()
     mi = 0
     for predict in predictions:
-        error = dataeval.compare_error(
+        error = dataeval.compare_error_h5(
             args.data_inst,
             annot_test,
             predict
@@ -54,15 +96,21 @@ def draw_compare(args, predict_dir=None):
         timerbar.update(mi)
     timerbar.finish()
     errors = np.stack(error_l, axis=0)
+    args.logger.info('{:d} methods, {:d} test frames'.format(
+        errors.shape[0], errors.shape[1]
+    ))
     print('drawing figures ...')
     fig = mpplot.figure(figsize=(2 * 5, 1 * 5))
     err_mean = dataeval.draw_error_per_joint(
-        errors, methods, mpplot.gca(), args.data_inst.join_name)
+        errors, methods, mpplot.gca(),
+        args.data_inst.join_name,
+        [model_ref[m] for m in methods])
     fig.tight_layout()
     mpplot.savefig(os.path.join(predict_dir, 'error_bar.png'))
     mpplot.gcf().clear()
     dataeval.draw_error_percentage_curve(
-        errors, methods, mpplot.gca())
+        errors, methods, mpplot.gca(),
+        [model_ref[m] for m in methods])
     fig.tight_layout()
     mpplot.savefig(os.path.join(predict_dir, 'error_rate.png'))
     if args.show_draw:
@@ -89,27 +137,27 @@ if __name__ == "__main__":
 
     from args_holder import args_holder
     # import tfplot
-    with_train = True
-    # with_train = False
+    # with_train = True
+    with_train = False
     with_eval = True
     # with_eval = False
 
-    # mpl = import_module('matplotlib')
-    # mpl.use('Agg')
-    with args_holder() as argsholder:
-        argsholder.parse_args()
-        args = argsholder.args
-        argsholder.create_instance()
-        # import shutil
-        # shutil.rmtree(args.out_dir)
-        # os.makedirs(args.out_dir)
-
-        # run_one(args, with_train, with_eval)
-        # argsholder.append_log()
-    
-        draw_compare(args)
-    import sys
-    sys.exit()
+    # # mpl = import_module('matplotlib')
+    # # mpl.use('Agg')
+    # with args_holder() as argsholder:
+    #     argsholder.parse_args()
+    #     args = argsholder.args
+    #     argsholder.create_instance()
+    #     # import shutil
+    #     # shutil.rmtree(args.out_dir)
+    #     # os.makedirs(args.out_dir)
+    #
+    #     run_one(args, with_train, with_eval)
+    #     argsholder.append_log()
+    #
+    #     # draw_compare(args)
+    # import sys
+    # sys.exit()
 
     mpl = import_module('matplotlib')
     mpl.use('Agg')
@@ -155,9 +203,10 @@ if __name__ == "__main__":
         argsholder.parse_args()
         argsholder.create_instance()
         args = argsholder.args
-        draw_compare(args)
-        argsholder.append_log()
-        # args.model_inst.detect_write_images()
+        # draw_compare(args)
+        # argsholder.append_log()
+        args.model_inst.check_dir(args.data_inst, args)
+        args.model_inst.detect_write_images()
     copyfile(
         os.path.join(args.log_dir, 'univue.log'),
         os.path.join(args.predict_dir, 'univue.log')

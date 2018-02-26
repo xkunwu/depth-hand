@@ -61,6 +61,8 @@ class voxel_detect(base_conv3):
             'index': self.train_file,
             'poses': self.train_file,
             'resce': self.train_file,
+            'clean': os.path.join(
+                self.prepare_dir, 'clean_{}'.format(self.crop_size)),
             # 'pose_hit': os.path.join(
             #     self.prepare_dir, 'pose_hit_{}'.format(self.hmap_size)),
             'pose_lab': os.path.join(
@@ -72,10 +74,12 @@ class voxel_detect(base_conv3):
             'index': [],
             'poses': [],
             'resce': [],
+            'clean': ['index', 'resce'],
             # 'pose_hit': ['poses', 'resce'],
             'pose_lab': ['poses', 'resce'],
             'vxhit': ['index', 'resce'],
         }
+        self.frame_type = 'clean'
 
     # def write_pred(self, fanno, caminfo,
     #                batch_index, batch_resce, pred):
@@ -118,6 +122,7 @@ class voxel_detect(base_conv3):
         store_size = index_h5.shape[0]
         frame_id = np.random.choice(store_size)
         # frame_id = 0  # frame_id = img_id - 1
+        frame_id = 239
         img_id = index_h5[frame_id, ...]
         frame_h5 = self.store_handle['vxhit'][frame_id, ...]
         poses_h5 = self.store_handle['poses'][frame_id, ...].reshape(-1, 3)
@@ -137,6 +142,9 @@ class voxel_detect(base_conv3):
         from colour import Color
         colors = [Color('orange').rgb, Color('red').rgb, Color('lime').rgb]
         fig, _ = mpplot.subplots(nrows=2, ncols=4, figsize=(4 * 5, 2 * 5))
+        voxize_crop = self.crop_size
+        voxize_hmap = self.hmap_size
+        scale = self.map_scale
 
         ax = mpplot.subplot(2, 4, 3, projection='3d')
         points3 = args.data_ops.img_to_raw(img, self.caminfo)
@@ -220,8 +228,6 @@ class voxel_detect(base_conv3):
         diff = np.abs(pose_raw - pose_yank)
         print(diff)
         print(np.min(diff, axis=0), np.max(diff, axis=0))
-        voxize_crop = self.crop_size
-        voxize_hmap = self.hmap_size
         grid = regu_grid()
         grid.from_cube(cube, voxize_crop)
         vxcnt_crop = frame_h5
@@ -269,12 +275,26 @@ class voxel_detect(base_conv3):
         #     # print(frame_h5[12:20, 12:20, 16])
         #     mlab.outline()
 
+        # if not self.args.show_draw:
+        #     mlab.options.offscreen = True
+        # else:
+        #     from utils.image_ops import draw_dist3
+        #     vxmap = np.zeros(voxize_hmap * voxize_hmap * voxize_hmap)
+        #     vxmap[pose_lab_h5[-1].astype(int)] = 1
+        #     vxmap = vxmap.reshape((voxize_hmap, voxize_hmap, voxize_hmap))
+        #     draw_dist3(vxmap, voxize_crop, scale)
+        #     mlab.draw()
+        #     mlab.savefig(os.path.join(
+        #         args.predict_dir,
+        #         'draw3d_{}_{}.png'.format(self.name_desc, img_id)))
+        #
         fig.tight_layout()
         mpplot.savefig(os.path.join(
             args.predict_dir,
             'draw_{}_{}.png'.format(self.name_desc, img_id)))
         if self.args.show_draw:
             mpplot.show()
+            # mlab.close(all=True)
         print('[{}] drawing image #{:d} - done.'.format(
             self.name_desc, img_id))
 

@@ -259,6 +259,27 @@ def draw_hmap2(fig, ax, image_crop, hmap2):
     fig.colorbar(img_h2, cax=cax)
 
 
+def draw_udir2(fig, ax, olmap, uomap):
+    hmap_size = uomap.shape[0]
+    map_scale = 2
+    crop_size = hmap_size * map_scale
+    xx, yy = np.meshgrid(
+        np.arange(0, crop_size, map_scale),
+        np.arange(0, crop_size, map_scale))
+    ax.quiver(
+        xx, yy,
+        np.squeeze(uomap[..., 0]),
+        -np.squeeze(uomap[..., 1]),
+        color='r', width=0.004, scale=30)
+    img_crop = np.zeros((crop_size, crop_size))
+    img_crop[::map_scale, ::map_scale] = olmap
+    img_h3 = ax.imshow(
+        img_crop, cmap=transparent_cmap(mpplot.cm.jet))
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    fig.colorbar(img_h3, cax=cax)
+
+
 def draw_olmap(fig, ax, image_crop, olmap):
     crop_size = image_crop.shape[0]
     hmap_size = olmap.shape[0]

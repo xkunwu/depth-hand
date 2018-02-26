@@ -46,6 +46,8 @@ class trunc_dist(base_conv3):
             'index': self.train_file,
             'poses': self.train_file,
             'resce': self.train_file,
+            'clean': os.path.join(
+                self.prepare_dir, 'clean_{}'.format(self.crop_size)),
             'pose_c': os.path.join(self.prepare_dir, 'pose_c'),
             'pcnt3': os.path.join(
                 self.prepare_dir, 'pcnt3_{}'.format(self.crop_size)),
@@ -56,10 +58,12 @@ class trunc_dist(base_conv3):
             'index': [],
             'poses': [],
             'resce': [],
+            'clean': ['index', 'resce'],
             'pose_c': ['poses', 'resce'],
             'pcnt3': ['index', 'resce'],
             'truncd': ['pcnt3'],
         }
+        self.frame_type = 'clean'
 
     def draw_random(self, thedata, args):
         import matplotlib.pyplot as mpplot

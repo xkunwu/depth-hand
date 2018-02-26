@@ -10,10 +10,10 @@ from utils.regu_grid import regu_grid
 class super_edt3(base_conv3):
     """ 3d offset detection based method
     """
-    @staticmethod
-    def get_trainer(args, new_log):
-        from train.train_super_edt3 import train_super_edt3
-        return train_super_edt3(args, new_log)
+    # @staticmethod
+    # def get_trainer(args, new_log):
+    #     from train.train_super_edt3 import train_super_edt3
+    #     return train_super_edt3(args, new_log)
 
     def __init__(self, args):
         super(super_edt3, self).__init__(args)
@@ -59,6 +59,8 @@ class super_edt3(base_conv3):
             'index': self.train_file,
             'poses': self.train_file,
             'resce': self.train_file,
+            'clean': os.path.join(
+                self.prepare_dir, 'clean_{}'.format(self.crop_size)),
             'pose_c': os.path.join(self.prepare_dir, 'pose_c'),
             # 'vxhit': os.path.join(
             #     self.prepare_dir, 'vxhit_{}'.format(self.crop_size)),
@@ -71,11 +73,13 @@ class super_edt3(base_conv3):
             'index': [],
             'poses': [],
             'resce': [],
+            'clean': ['index', 'resce'],
             'pose_c': ['poses', 'resce'],
             # 'vxhit': ['index', 'resce'],
             'pcnt3': ['index', 'resce'],
             'vxedt': ['pcnt3', 'poses', 'resce'],
         }
+        self.frame_type = 'clean'
 
     def yanker(self, pose_local, resce, caminfo):
         cube = iso_cube()
@@ -104,6 +108,7 @@ class super_edt3(base_conv3):
         store_size = index_h5.shape[0]
         frame_id = np.random.choice(store_size)
         # frame_id = 0  # frame_id = img_id - 1
+        frame_id = 239
         img_id = index_h5[frame_id, ...]
         frame_h5 = self.store_handle['pcnt3'][frame_id, ...]
         poses_h5 = self.store_handle['poses'][frame_id, ...].reshape(-1, 3)

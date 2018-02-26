@@ -3,12 +3,12 @@ from importlib import import_module
 import numpy as np
 import tensorflow as tf
 from tensorflow.contrib import slim
-from model.base_regre import base_regre
+from model.base_clean import base_clean
 from utils.iso_boxes import iso_cube
 from utils.regu_grid import regu_grid
 
 
-class base_conv3(base_regre):
+class base_conv3(base_clean):
     """ This class holds baseline training approach using 3d CNN.
     """
     def __init__(self, args):
@@ -51,6 +51,8 @@ class base_conv3(base_regre):
             'index': self.train_file,
             'poses': self.train_file,
             'resce': self.train_file,
+            'clean': os.path.join(
+                self.prepare_dir, 'clean_{}'.format(self.crop_size)),
             'pose_c': os.path.join(self.prepare_dir, 'pose_c'),
             'pcnt3': os.path.join(
                 self.prepare_dir, 'pcnt3_{}'.format(self.crop_size)),
@@ -59,9 +61,11 @@ class base_conv3(base_regre):
             'index': [],
             'poses': [],
             'resce': [],
+            'clean': ['index', 'resce'],
             'pose_c': ['poses', 'resce'],
             'pcnt3': ['index', 'resce'],
         }
+        self.frame_type = 'clean'
 
     def draw_random(self, thedata, args):
         import matplotlib.pyplot as mpplot

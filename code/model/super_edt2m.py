@@ -65,6 +65,7 @@ class super_edt2m(super_edt2):
             'udir2': ['clean', 'poses', 'resce'],
             'edt2m': ['edt2', 'udir2'],
         }
+        self.frame_type = 'clean'
 
     def draw_random(self, thedata, args):
         index_h5 = self.store_handle['index']
@@ -76,7 +77,7 @@ class super_edt2m(super_edt2):
         # frame_id = 30
         # frame_id = 848
         # frame_id = 239
-        frame_id = 26
+        # frame_id = 26
         img_id = index_h5[frame_id, ...]
         frame_h5 = self.store_handle['clean'][frame_id, ...]
         poses_h5 = self.store_handle['pose_c'][frame_id, ...].reshape(-1, 3)

@@ -59,6 +59,8 @@ class super_dist3(base_conv3):
             'index': self.train_file,
             'poses': self.train_file,
             'resce': self.train_file,
+            'clean': os.path.join(
+                self.prepare_dir, 'clean_{}'.format(self.crop_size)),
             'pcnt3': os.path.join(
                 self.prepare_dir, 'pcnt3_{}'.format(self.crop_size)),
             'vxudir': os.path.join(
@@ -69,10 +71,12 @@ class super_dist3(base_conv3):
             'index': [],
             'poses': [],
             'resce': [],
+            'clean': ['index', 'resce'],
             'pcnt3': ['index', 'resce'],
             'vxudir': ['pcnt3', 'poses', 'resce'],
             'pose_c': ['poses', 'resce'],
         }
+        self.frame_type = 'clean'
 
     def yanker(self, pose_local, resce, caminfo):
         cube = iso_cube()

@@ -3,11 +3,11 @@ from importlib import import_module
 import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as mpplot
-from model.base_regre import base_regre
+from model.base_clean import base_clean
 from utils.iso_boxes import iso_cube
 
 
-class super_edt2(base_regre):
+class super_edt2(base_clean):
     @staticmethod
     def get_trainer(args, new_log):
         from train.train_super_edt2 import train_super_edt2
@@ -71,6 +71,7 @@ class super_edt2(base_regre):
             'clean': ['index', 'resce'],
             'edt2': ['clean', 'poses', 'resce'],
         }
+        self.frame_type = 'clean'
 
     def yanker(self, pose_local, resce, caminfo):
         cube = iso_cube()
