@@ -253,7 +253,9 @@ def draw_hmap2(fig, ax, image_crop, hmap2):
     image_hmap = image_crop[::map_scale, ::map_scale]
     ax.imshow(image_hmap, cmap=mpplot.cm.bone_r)
     img_h2 = ax.imshow(
-        hmap2, cmap=transparent_cmap(mpplot.cm.jet))
+        hmap2,
+        # cmap=transparent_cmap(mpplot.cm.jet))
+        cmap=mpplot.cm.jet)
     divider = make_axes_locatable(ax)
     cax = divider.append_axes("right", size="5%", pad=0.05)
     fig.colorbar(img_h2, cax=cax)

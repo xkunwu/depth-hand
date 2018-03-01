@@ -8,30 +8,31 @@ import re
 
 model_ref = {
     'super_edt3': 'EDT3',
-    'super_ov3edt2m': 'Multi-view 2D supervision w/ surface distance (improved)',
-    'super_ov3dist2': 'Multi-view 2D supervision w/ distance',
-    'super_ov3edt2': 'Multi-view 2D supervision w/ surface distance',
-    'super_edt2m': '2D supervision w/ surface distance (improved)',
-    'super_edt2': '2D supervision w/ surface distance',
-    'super_dist3': '3D supervision w/ distance',
-    'voxel_regre': '3D supervision w/ offset',
-    'voxel_offset': '3D version of Wan et. al. (Arxiv\'17)',
-    'super_vxhit': '3D supervision w/ detection',
+    'super_ov3edt2m': 'Multi-view CR w/ surface distance (improved)',
+    'super_ov3dist2': 'Multi-view CR w/ Euclidean distance',
+    'super_ov3edt2': 'Multi-view CR w/ surface distance',
+    'super_edt2m': 'CR w/ surface distance (improved)',
+    'super_edt2': 'CR w/ surface distance',
+    'super_dist3': 'CR w/ Euclidean distance',
+    'voxel_regre': 'CR w/ offset',
+    'voxel_offset': '3D offset regression',
+    'super_vxhit': 'CR w/ detection',
     'voxel_detect': 'Moon et. al. (Arxiv\'17)',
-    'super_dist2': '2D supervision w/ distance',
-    'super_udir2': '2D supervision w/ offset',
-    'dense_regre': 'Wan et. al. (Arxiv\'17)',
+    'super_dist2': 'CR w/ Euclidean distance',
+    'super_udir2': 'CR w/ offset',
+    # 'dense_regre': 'Wan et. al. (Arxiv\'17)',
+    'dense_regre': '2D offset regression',
     'direc_tsdf': 'Ge et. al. (CVPR\'17)',
-    'trunc_dist': '3D truncated distance',
-    'base_conv3': '3D baseline',
-    'base_conv3_inres': '3D baseline w/ inception-resnet',
+    'trunc_dist': '3D truncated Euclidean distance',
+    'base_conv3': '3D Coordinate Regression (CR)',
+    'base_conv3_inres': '3D CR w/ inception-resnet',
     'ortho3view': 'Ge et. al. (CVPR\'16)',
-    'base_clean': 'Baseline',
-    'base_regre': 'Baseline-background',
-    'base_clean_inres': 'Baseline w/ inception-resnet',
-    'base_regre_inres': 'Baseline-background w/ inception-resnet',
-    'base_clean_hg': 'Baseline w/ hourglass',
-    'base_regre_hg': 'Baseline-background w/ hourglass',
+    'base_clean': '2D Coordinate Regression (CR)',
+    'base_regre': 'CR-background',
+    'base_clean_inres': 'CR w/ inception-resnet',
+    'base_regre_inres': 'CR-background w/ inception-resnet',
+    'base_clean_hg': 'CR w/ hourglass',
+    'base_regre_hg': 'CR-background w/ hourglass',
     'localizer3': '3D localizer',
     'localizer2': '2D localizer',
 }
@@ -72,6 +73,7 @@ def draw_compare(args, predict_dir=None):
             predictions.append(os.path.join(predict_dir, file))
             methods.append(m.group(1))
     # convert_legacy_txt(predictions)  # convert legacy txt files
+    # return
     num_method = len(methods)
     print('{:d} methods collected for comparison ...'.format(num_method))
     annot_test = args.data_inst.training_annot_test
@@ -101,14 +103,14 @@ def draw_compare(args, predict_dir=None):
     ))
     print('drawing figures ...')
     fig = mpplot.figure(figsize=(2 * 5, 1 * 5))
-    err_mean = dataeval.draw_error_per_joint(
+    meanmean = dataeval.draw_error_per_joint(
         errors, methods, mpplot.gca(),
         args.data_inst.join_name,
         [model_ref[m] for m in methods])
     fig.tight_layout()
     mpplot.savefig(os.path.join(predict_dir, 'error_bar.png'))
     mpplot.gcf().clear()
-    dataeval.draw_error_percentage_curve(
+    maxmean = dataeval.draw_error_percentage_curve(
         errors, methods, mpplot.gca(),
         [model_ref[m] for m in methods])
     fig.tight_layout()
@@ -117,16 +119,16 @@ def draw_compare(args, predict_dir=None):
         mpplot.show()
     mpplot.close(fig)
 
-    maxmean = np.max(np.mean(errors, axis=1), axis=1)
+    # maxmean = np.max(np.mean(errors, axis=1), axis=1)
     idx = np.argsort(maxmean)
     restr = 'maximal per-joint mean error summary:'
     for ii in idx:
         restr += ' {}({:.2f})'.format(methods[ii], maxmean[ii])
     args.logger.info(restr)
-    idx = np.argsort(err_mean)
+    idx = np.argsort(meanmean)
     restr = 'mean error summary:'
     for ii in idx:
-        restr += ' {}({:.2f})'.format(methods[ii], err_mean[ii])
+        restr += ' {}({:.2f})'.format(methods[ii], meanmean[ii])
     args.logger.info(restr)
     print('figures saved: error summary')
 
@@ -137,8 +139,8 @@ if __name__ == "__main__":
 
     from args_holder import args_holder
     # import tfplot
-    # with_train = True
-    with_train = False
+    with_train = True
+    # with_train = False
     with_eval = True
     # with_eval = False
 
@@ -203,10 +205,10 @@ if __name__ == "__main__":
         argsholder.parse_args()
         argsholder.create_instance()
         args = argsholder.args
-        # draw_compare(args)
+        draw_compare(args)
         # argsholder.append_log()
-        args.model_inst.check_dir(args.data_inst, args)
-        args.model_inst.detect_write_images()
+        # args.model_inst.check_dir(args.data_inst, args)
+        # args.model_inst.detect_write_images()
     copyfile(
         os.path.join(args.log_dir, 'univue.log'),
         os.path.join(args.predict_dir, 'univue.log')

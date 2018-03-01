@@ -67,7 +67,7 @@ def draw_mean_error_distribution(errors, ax):
     # ax.set_xlim(left=0)
 
 
-def draw_error_percentage_curve(errors, methods, ax, legend=None):
+def draw_error_percentage_curve(errors, methods, ax, labels=None):
     """ errors: MxFxJ """
     err_max = np.max(errors, axis=-1)
     num_v = err_max.shape[1]
@@ -75,14 +75,17 @@ def draw_error_percentage_curve(errors, methods, ax, legend=None):
     if len(methods) != num_m:
         print('ERROR - method dimension not matching!')
         return
+    if labels is None:
+        labels = methods
     percent = np.arange(num_v + 1) * 100 / num_v  # 0 .. num_v
     err_max = np.concatenate((
         np.zeros(shape=(num_m, 1)),
         np.sort(err_max, 1)),
         axis=1
     )
+    maxmean = np.max(np.mean(errors, axis=1), axis=1)
     err_max_draw = 100
-    for err in err_max:
+    for err, label in zip(err_max, labels):
         err_cut = err[err_max_draw > err]
         nc = len(err_cut)
         percent_cut = percent[:nc]
@@ -93,9 +96,8 @@ def draw_error_percentage_curve(errors, methods, ax, legend=None):
         ax.plot(
             # err, percent,
             err_cut, percent_cut,
-            # xx, yy,
-            # 'o',
-            linewidth=2.0
+            linewidth=2.0,
+            label=label
         )
     # ax.plot(
     #     err_max, np.tile(percent, (num_m, 1)),
@@ -107,16 +109,18 @@ def draw_error_percentage_curve(errors, methods, ax, legend=None):
     ax.set_xlabel('Maximal error of single joint (mm)')
     ax.set_xlim(left=0)
     ax.set_xlim(right=err_max_draw)
-    ax.legend(methods, loc='lower right')
-    if legend is None:
-        ax.legend(methods, loc='lower right')
-    else:
-        ax.legend(legend, loc='lower right')
+    # ax.legend(labels, loc='lower right')
+    handles, _ = ax.get_legend_handles_labels()
+    _, handles, labels = zip(*sorted(
+        zip(maxmean, handles, labels),
+        key=lambda t: t[0]))
+    ax.legend(handles, labels, loc='lower right')
+    return maxmean
 
 
 def draw_error_per_joint(
     errors, methods, ax,
-        join_name=None, legend=None, draw_std=False):
+        join_name=None, labels=None, draw_std=False):
     """ errors: MxFxJ """
     err_mean = np.mean(errors, axis=1)
     err_max = np.max(errors, axis=1)
@@ -126,6 +130,8 @@ def draw_error_per_joint(
     if len(methods) != num_m:
         print('ERROR - dimension not matching!')
         return
+    if labels is None:
+        labels = methods
     err_mean = np.append(
         err_mean,
         np.mean(err_mean, axis=1).reshape(-1, 1), axis=1)
@@ -155,11 +161,13 @@ def draw_error_per_joint(
             ax.bar(
                 jloc + wb * ei - wsl, err, width=wb, align='center',
                 yerr=err_m2m,
-                error_kw=dict(ecolor='gray', lw=1, capsize=3, capthick=2)
+                error_kw=dict(ecolor='gray', lw=1, capsize=3, capthick=2),
+                label=labels[ei]
             )
         else:
             ax.bar(
-                jloc + wb * ei - wsl, err, width=wb, align='center'
+                jloc + wb * ei - wsl, err, width=wb, align='center',
+                label=labels[ei]
             )
     ylim_top = max(np.max(err_mean[:, 0:7]), np.max(err_mean))
     ax.set_ylabel('Mean error (mm)')
@@ -167,11 +175,14 @@ def draw_error_per_joint(
     ax.set_xlim(jloc[0] - wsl - 0.5, jloc[-1] + wsl + 0.5)
     mpplot.xticks(jloc, jtick, rotation='vertical')
     ax.margins(0.1)
-    if legend is None:
-        ax.legend(methods, loc='upper left')
-    else:
-        ax.legend(legend, loc='upper left')
-    return err_mean[:, -1]
+    # ax.legend(labels, loc='upper left')
+    meanmean = err_mean[:, -1]
+    handles, _ = ax.get_legend_handles_labels()
+    _, handles, labels = zip(*sorted(
+        zip(meanmean, handles, labels),
+        key=lambda t: t[0]))
+    ax.legend(handles, labels, loc='upper left')
+    return meanmean
 
 
 def evaluate_detection(thedata, model_name, predict_dir, predict_file):

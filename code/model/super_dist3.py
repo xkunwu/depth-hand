@@ -22,7 +22,7 @@ class super_dist3(base_conv3):
             'batch_vxudir'
         )
         self.crop_size = 64
-        self.hmap_size = 16
+        self.hmap_size = 32
         self.map_scale = self.crop_size / self.hmap_size
 
     def fetch_batch(self, fetch_size=None):
@@ -231,7 +231,7 @@ class super_dist3(base_conv3):
         self.end_point_list = []
         final_endpoint = 'stage_out'
         num_joint = self.join_num
-        num_feature = 64
+        num_feature = 32
 
         def add_and_check_final(name, net):
             end_points[name] = net
@@ -289,7 +289,7 @@ class super_dist3(base_conv3):
                     sc = 'stage32'
                     # net = inresnet3d.resnet_k(
                     #     net, scope='stage32_res')
-                    net = inresnet3d.conv_maxpool(net, scope=sc)
+                    # net = inresnet3d.conv_maxpool(net, scope=sc)
                     net = slim.conv3d(
                         net, num_feature, 1, scope='stage32_out')
                     self.end_point_list.append(sc)
@@ -312,6 +312,12 @@ class super_dist3(base_conv3):
                         branch1 = slim.conv3d(
                             net_maps, num_feature, 1)
                         net = net + branch0 + branch1
+                with tf.variable_scope('stage32'):
+                    sc = 'stage32_post'
+                    net = inresnet3d.conv_maxpool(net, scope=sc)
+                    self.end_point_list.append(sc)
+                    if add_and_check_final(sc, net):
+                        return net, end_points
                 with tf.variable_scope('stage16'):
                     sc = 'stage16'
                     net = inresnet3d.conv_maxpool(net, scope=sc)

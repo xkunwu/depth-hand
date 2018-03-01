@@ -170,7 +170,12 @@ class base_regre(object):
         poses_h5 = self.store_handle['poses']
         resce_h5 = self.store_handle['resce']
         with h5py.File(annot_pred, 'r') as pred_h5:
-            img_id = 4
+            if 1000 < batch_beg:
+                # img_id = 77554
+                # img_id = 62550
+                img_id = 82581
+            else:
+                img_id = 4
             ax = mpplot.subplot(2, 2, 1)
             frame = frame_h5[(batch_beg + img_id), ...]
             poses = poses_h5[(batch_beg + img_id), ...].reshape(-1, 3)
