@@ -6,14 +6,14 @@ from utils.iso_boxes import iso_cube
 from utils.regu_grid import latice_image
 
 
-def prow_edt2m(args, thedata, batch_data):
+def prow_edt2m(args, thedata, mode, batch_data):
     bi, edt2, udir2 = \
         args[0], args[1], args[2]
     edt2m = np.multiply(edt2, udir2[..., :thedata.join_num])
     batch_data[bi, ...] = edt2m
 
 
-def prow_edt2(args, thedata, batch_data):
+def prow_edt2(args, thedata, mode, batch_data):
     bi, clean, poses, resce = \
         args[0], args[1], args[2], args[3]
     cube = iso_cube()
@@ -23,7 +23,7 @@ def prow_edt2(args, thedata, batch_data):
     batch_data[bi, ...] = edt2
 
 
-def prow_udir2(args, thedata, batch_data):
+def prow_udir2(args, thedata, mode, batch_data):
     bi, clean, poses, resce, = \
         args[0], args[1], args[2], args[3]
     cube = iso_cube()
@@ -33,19 +33,18 @@ def prow_udir2(args, thedata, batch_data):
     batch_data[bi, ...] = udir2
 
 
-def prow_ortho3(args, thedata, batch_data):
+def prow_ortho3(args, thedata, mode, batch_data):
     bi, index, resce = \
         args[0], args[1], args[2]
     img_name = dataio.index2imagename(index)
-    img = dataio.read_image(os.path.join(
-        thedata.training_images, img_name))
+    img = dataio.read_image(thedata.images_join(mode, img_name))
     cube = iso_cube()
     cube.load(resce)
     img_ortho3 = dataops.to_ortho3(img, cube, thedata)
     batch_data[bi, ...] = img_ortho3
 
 
-def prow_pose_c(args, thedata, batch_data):
+def prow_pose_c(args, thedata, mode, batch_data):
     bi, poses, resce, = \
         args[0], args[1], args[2]
     cube = iso_cube()
@@ -55,31 +54,29 @@ def prow_pose_c(args, thedata, batch_data):
     batch_data[bi, ...] = pose_c.flatten()
 
 
-def prow_crop2(args, thedata, batch_data):
+def prow_crop2(args, thedata, mode, batch_data):
     bi, index, resce = \
         args[0], args[1], args[2]
     img_name = dataio.index2imagename(index)
-    img = dataio.read_image(os.path.join(
-        thedata.training_images, img_name))
+    img = dataio.read_image(thedata.images_join(mode, img_name))
     cube = iso_cube()
     cube.load(resce)
     img_crop2 = dataops.to_crop2(img, cube, thedata)
     batch_data[bi, ...] = img_crop2
 
 
-def prow_clean(args, thedata, batch_data):
+def prow_clean(args, thedata, mode, batch_data):
     bi, index, resce = \
         args[0], args[1], args[2]
     img_name = dataio.index2imagename(index)
-    img = dataio.read_image(os.path.join(
-        thedata.training_images, img_name))
+    img = dataio.read_image(thedata.images_join(mode, img_name))
     cube = iso_cube()
     cube.load(resce)
     img_clean = dataops.to_clean(img, cube, thedata)
     batch_data[bi, ...] = img_clean
 
 
-def prow_index(args, thedata, batch_data):
+def prow_index(args, thedata, mode, batch_data):
     bi, index, poses = \
         args[0], args[1], args[2]
     pose_raw = poses.reshape(-1, 3)
@@ -98,23 +95,23 @@ def prow_index(args, thedata, batch_data):
 
 
 def test_puttensor(
-        args, put_worker, thedata, batch_data):
+        args, put_worker, thedata, mode, batch_data):
     from itertools import izip
     import copy
     test_copy = copy.deepcopy(batch_data)
     for args in izip(*args):
         put_worker(
-            args, thedata, batch_data)
+            args, thedata, mode, batch_data)
     print('this is TEST only!!! DO NOT forget to write using mp version')
     return test_copy
 
 
-def puttensor_mt(args, put_worker, thedata, batch_data):
+def puttensor_mt(args, put_worker, thedata, mode, batch_data):
     # from timeit import default_timer as timer
     # from datetime import timedelta
     # time_s = timer()
     # test_copy = test_puttensor(
-    #     args, put_worker, thedata, batch_data)
+    #     args, put_worker, thedata, mode, batch_data)
     # time_e = str(timedelta(seconds=timer() - time_s))
     # print('single tread time: {}'.format(time_e))
     # return
@@ -124,7 +121,7 @@ def puttensor_mt(args, put_worker, thedata, batch_data):
     # time_s = timer()
     thread_pool = ThreadPool()
     thread_pool.map(
-        partial(put_worker, thedata=thedata, batch_data=batch_data),
+        partial(put_worker, thedata=thedata, mode=mode, batch_data=batch_data),
         zip(*args))
     thread_pool.close()  # that's it for this batch
     thread_pool.join()  # serilization point

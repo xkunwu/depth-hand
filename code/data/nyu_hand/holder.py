@@ -70,20 +70,21 @@ class nyu_handholder:
     bbox_color = Color('orange')
 
     def _prepare_data_full_path(
-        self, target, precon_list, store_name, path_pre_fn,
+        self, target, precon_list, store_name,
+            path_pre_fn, mode,
             filepack, batchallot):
         precon_h5 = {}
         num_line = 0
         for precon in precon_list:
             precon_h5[precon] = filepack.push_h5(
-                path_pre_fn(store_name[precon]))
+                path_pre_fn(mode, store_name[precon]))
             num_line = precon_h5[precon][precon].shape[0]
         store_size = batchallot.store_size
         print(
             'preparing data ({}): {:d} lines with store size {:d} ...'.format(
-                path_pre_fn(store_name[target]), num_line, store_size))
+                path_pre_fn(mode, store_name[target]), num_line, store_size))
         target_h5, batch_data = batchallot.create_fn[target](
-            filepack, path_pre_fn(store_name[target]), num_line
+            filepack, path_pre_fn(mode, store_name[target]), num_line
         )
         timerbar = progressbar.ProgressBar(
             maxval=num_line,
@@ -104,8 +105,8 @@ class nyu_handholder:
                 args.append(precon_h5[precon][precon][
                     write_beg:write_end, ...])
             datapro.puttensor_mt(
-                args,
-                self.store_prow[target], self, batch_data
+                args, self.store_prow[target],
+                self, mode, batch_data
             )
             target_h5[write_beg:write_end, ...] = \
                 batch_data[0:proc_size, ...]
@@ -122,29 +123,33 @@ class nyu_handholder:
         for precon in precon_list:
             self.prepare_data_recur(
                 precon, store_name, filepack, batchallot)
-        path_train = self.prepared_train_join(store_name[target])
+        path_train = self.prepared_join('train', store_name[target])
         if not os.path.exists(path_train):
             self._prepare_data_full_path(
                 target, precon_list, store_name,
-                self.prepared_train_join,
+                self.prepared_join, 'train',
                 filepack, batchallot
             )
-        path_test = self.prepared_test_join(store_name[target])
+        path_test = self.prepared_join('test', store_name[target])
         if not os.path.exists(path_test):
             self._prepare_data_full_path(
                 target, precon_list, store_name,
-                self.prepared_test_join,
+                self.prepared_join, 'test',
                 filepack, batchallot
             )
 
     def _remove_out_frame_mat(
-            self, mat_name, h5_name, filepack, num_line=None):
+        self, mat_name, h5_name, mode, filepack,
+            shuffle=False, num_line=None):
         mat_reader = scipy.io.loadmat(mat_name)
         mat_xyz = mat_reader['joint_xyz']
         # mat_xyz_shape = mat_xyz.shape
         # mat_xyz = mat_xyz.transpose().reshape(mat_xyz_shape)
         if num_line is None:
             num_line = mat_xyz.shape[1]
+        shuffleid = np.arange(num_line)
+        if shuffle:
+            np.random.shuffle(shuffleid)
         print(mat_xyz.flags)
         print(mat_xyz.shape)
         poses_sel = mat_xyz[0, ...]
@@ -160,6 +165,8 @@ class nyu_handholder:
         poses_sel = poses_sel[:, ::-1, :]
         poses_sel = poses_sel.flatten(order='A')
         poses_sel = poses_sel.reshape(-1, self.join_num * 3)
+        if shuffle:
+            poses_sel = poses_sel[shuffleid, ...]
         print(poses_sel.flags)
         print(poses_sel.shape)
         # import matplotlib.pyplot as mpplot
@@ -191,14 +198,15 @@ class nyu_handholder:
             proc_size = read_end - read_beg
             if 0 >= proc_size:
                 break
-            index = (write_beg + 1) + np.arange(proc_size)
+            # index = (write_beg + 1) + np.arange(proc_size)
+            index = shuffleid[read_beg:read_end] + 1
             poses = poses_sel[read_beg:read_end, :]
             args = [np.arange(proc_size), index, poses]
             batch_data['valid'] = np.full(
                 (store_size,), False)
             datapro.puttensor_mt(
-                args,
-                datapro.prow_index, self, batch_data
+                args, datapro.prow_index,
+                self, mode, batch_data
             )
             valid = batch_data['valid']
             valid_num = np.sum(valid)
@@ -225,6 +233,8 @@ class nyu_handholder:
                 timerbar.update(li)
         timerbar.finish()
         batchallot.resize(h5file, write_beg)
+        # if shuffle:
+        #     batchallot.shuffle(h5file)
         return write_beg, pose_limit
 
     # def _merge_annotation(self):
@@ -242,21 +252,26 @@ class nyu_handholder:
 
     def remove_out_frame_annot(self):
         annot_origin_train = os.path.join(
-            self.data_dir, 'train/joint_data.mat')
+            self.data_dir, 'train', 'joint_data.mat')
         annot_origin_test = os.path.join(
-            self.data_dir, 'train/joint_data.mat')
+            self.data_dir, 'test', 'joint_data.mat')
+        annotation_train = self.prepared_join('train', self.annotation)
+        annotation_test = self.prepared_join('test', self.annotation)
         self.num_training = int(0)
         pose_limit = np.array([
             [np.inf, np.inf, np.inf],
             [-np.inf, -np.inf, -np.inf],
         ])
+        num_eval = self.args.num_eval
         with file_pack() as filepack:
-            # self.num_evaluate, lim = self._remove_out_frame_mat(
-            #     annot_origin_test, self.annotation_test,
-            #     filepack)
-            self.num_evaluate, lim = self._remove_out_frame_mat(
-                annot_origin_test, self.annotation_test,
-                filepack, 100)
+            if num_eval is None:
+                self.num_training, lim = self._remove_out_frame_mat(
+                    annot_origin_train, annotation_train, 'train',
+                    filepack, shuffle=True)
+            else:
+                self.num_training, lim = self._remove_out_frame_mat(
+                    annot_origin_train, annotation_train, 'train',
+                    filepack, shuffle=True, num_line=(num_eval * 10))
             pose_limit[0, :] = np.minimum(
                 pose_limit[0, :],
                 lim[0, :])
@@ -264,12 +279,14 @@ class nyu_handholder:
                 pose_limit[1, :],
                 lim[1, :])
         with file_pack() as filepack:
-            # self.num_training, lim = self._remove_out_frame_mat(
-            #     annot_origin_train, self.annotation_train,
-            #     filepack)
-            self.num_training, lim = self._remove_out_frame_mat(
-                annot_origin_train, self.annotation_train,
-                filepack, 900)
+            if num_eval is None:
+                self.num_evaluate, lim = self._remove_out_frame_mat(
+                    annot_origin_test, annotation_test, 'test',
+                    filepack)
+            else:
+                self.num_evaluate, lim = self._remove_out_frame_mat(
+                    annot_origin_test, annotation_test, 'test',
+                    filepack, num_line=num_eval)
             pose_limit[0, :] = np.minimum(
                 pose_limit[0, :],
                 lim[0, :])
@@ -282,9 +299,11 @@ class nyu_handholder:
 
     def init_data(self):
         update_log = False
+        annotation_train = self.prepared_join('train', self.annotation)
+        annotation_test = self.prepared_join('test', self.annotation)
         if (
-                (not os.path.exists(self.annotation_train)) or
-                (not os.path.exists(self.annotation_test))):
+                (not os.path.exists(annotation_train)) or
+                (not os.path.exists(annotation_test))):
             from timeit import default_timer as timer
             from datetime import timedelta
             time_s = timer()
@@ -298,12 +317,12 @@ class nyu_handholder:
             )
             update_log = True
             dataio.h5_to_txt(
-                self.annotation_test,
-                self.annotation_test + '.txt')
+                annotation_test,
+                annotation_test + '.txt')
         else:
-            with h5py.File(self.annotation_train, 'r') as h5file:
+            with h5py.File(annotation_train, 'r') as h5file:
                 self.num_training = h5file['index'].shape[0]
-            with h5py.File(self.annotation_test, 'r') as h5file:
+            with h5py.File(annotation_test, 'r') as h5file:
                 self.num_evaluate = h5file['index'].shape[0]
             self.num_annotation = self.num_training + self.num_evaluate
 
@@ -320,39 +339,14 @@ class nyu_handholder:
 
         return update_log
 
-    def annotation_train_join(self, filename):
-        return os.path.join(
-            self.out_dir,
-            'prepared',
-            'train',
-            filename
-        )
+    def images_join(self, mode, filename):
+        return os.path.join(self.data_dir, mode, filename)
 
-    def annotation_test_join(self, filename):
-        return os.path.join(
-            self.out_dir,
-            'prepared',
-            'test',
-            filename
-        )
-
-    def prepared_train_join(self, filename):
-        return os.path.join(
-            self.out_dir,
-            'prepared',
-            'train',
-            filename
-        )
-
-    def prepared_test_join(self, filename):
-        return os.path.join(
-            self.out_dir,
-            'prepared',
-            'test',
-            filename
-        )
+    def prepared_join(self, mode, filename):
+        return os.path.join(self.out_dir, 'prepared', mode, filename)
 
     def __init__(self, args):
+        self.args = args
         self.data_dir = args.data_dir
         self.out_dir = args.out_dir
         self.logger = args.logger
@@ -360,19 +354,19 @@ class nyu_handholder:
         # self.anchor_num = args.anchor_num
         self.crop_range = args.crop_range
         # self.z_range[1] = self.crop_range * 2. + self.z_range[0]
-        self.training_images = os.path.join(self.data_dir, 'train')
-        self.test_images = os.path.join(self.data_dir, 'test')
+        # self.training_images = os.path.join(self.data_dir, 'train')
+        # self.test_images = os.path.join(self.data_dir, 'test')
         self.annotation = 'annotation'
-        self.annotation_train = self.annotation_train_join(
-            self.annotation)
-        self.annotation_test = self.annotation_test_join(
-            self.annotation)
-        self.prepared_train = self.prepared_train_join('')
-        if not os.path.exists(self.prepared_train):
-            os.makedirs(self.prepared_train)
-        self.prepared_test = self.prepared_test_join('')
-        if not os.path.exists(self.prepared_test):
-            os.makedirs(self.prepared_test)
+        # self.annotation_train = self.annotation_train_join(
+        #     self.annotation)
+        # self.annotation_test = self.annotation_test_join(
+        #     self.annotation)
+        prepared_train = self.prepared_join('train', '')
+        if not os.path.exists(prepared_train):
+            os.makedirs(prepared_train)
+        prepared_test = self.prepared_join('test', '')
+        if not os.path.exists(prepared_test):
+            os.makedirs(prepared_test)
         self.store_precon = {
             'index': [],
             'poses': [],

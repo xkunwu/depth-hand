@@ -56,6 +56,9 @@ class args_holder:
         self.parser.add_argument(
             '--data_name', default='hands17',
             help='name of data set and its dir [default: hands17]')
+        self.parser.add_argument(
+            '--num_eval', type=int, default=None,
+            help='number of evaluations [default: None]')
         # self.parser.add_argument(
         #     '--out_root', default=os.path.join(proj_root, 'output'),
         #     help='Output dir [default: output]')
@@ -80,7 +83,7 @@ class args_holder:
         # [base_regre, base_clean, ortho3view, base_conv3, trunc_dist]
         self.parser.add_argument(
             # '--model_name', default='ortho3view',
-            '--model_name', default='base_regre',
+            '--model_name', default='base_clean',
             help='Model name [default: base_clean], from \
             [base_regre, base_clean, ortho3view, base_conv3, trunc_dist]')
         self.parser.add_argument(
@@ -120,7 +123,7 @@ class args_holder:
             '--learning_rate', type=float, default=0.001,
             help='Initial learning rate [default: 0.001]')
         self.parser.add_argument(
-            '--decay_step', type=int, default=1e6,
+            '--decay_step', type=int, default=1000000,
             # twice of 1M (1e6) dataset, will be divided by batch size below
             help='Decay step for lr decay [default: 2e6]')
         self.parser.add_argument(

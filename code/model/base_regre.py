@@ -67,10 +67,14 @@ class base_regre(object):
         # self.split_end = split_beg  # + self.store_size
         self.batch_beg = 0
         self.split_end = self.args.data_inst.train_valid_split
+        print('{:d} images to be trained ...'.format(
+            self.split_end - self.batch_beg))
 
     def start_epoch_valid(self):
         self.batch_beg = self.args.data_inst.train_valid_split
         self.split_end = self.args.data_inst.num_training
+        print('{:d} images to be validated ...'.format(
+            self.split_end - self.batch_beg))
 
     def fetch_batch(self, mode='train', fetch_size=None):
         if fetch_size is None:
@@ -116,9 +120,9 @@ class base_regre(object):
             poses_out[ei] = pose_raw.flatten()
         self.eval_pred.append(poses_out)
 
-    # def draw_image_pose(self, ax, line, image_dir, caminfo):
+    # def draw_image_pose(self, ax, line, images_train, caminfo):
     #     img_name, pose = self.data_module.io.parse_line_annot(line)
-    #     img_path = os.path.join(image_dir, img_name)
+    #     img_path = os.path.join(images_train, img_name)
     #     img = self.data_module.io.read_image(img_path)
     #     cube = iso_cube(
     #         (np.max(pose, axis=0) + np.min(pose, axis=0)) / 2,
@@ -138,23 +142,23 @@ class base_regre(object):
     #     ax.axis('off')
     #     return img_name
     #
-    # def draw_prediction_poses(self, image_dir, annot_echt, annot_pred, caminfo):
+    # def draw_prediction_poses(self, images_train, annot_echt, annot_pred, caminfo):
     #     import linecache
     #     img_id = 4
     #     line_echt = linecache.getline(annot_echt, img_id)
     #     line_pred = linecache.getline(annot_pred, img_id)
     #     ax = mpplot.subplot(2, 2, 1)
-    #     img_name = self.draw_image_pose(ax, line_echt, image_dir, caminfo)
+    #     img_name = self.draw_image_pose(ax, line_echt, images_train, caminfo)
     #     ax = mpplot.subplot(2, 2, 2)
-    #     img_name = self.draw_image_pose(ax, line_pred, image_dir, caminfo)
+    #     img_name = self.draw_image_pose(ax, line_pred, images_train, caminfo)
     #     print('draw predition #{:d}: {}'.format(img_id, img_name))
     #     img_id = np.random.randint(1, high=sum(1 for _ in open(annot_pred, 'r')))
     #     line_echt = linecache.getline(annot_echt, img_id)
     #     line_pred = linecache.getline(annot_pred, img_id)
     #     ax = mpplot.subplot(2, 2, 3)
-    #     img_name = self.draw_image_pose(ax, line_echt, image_dir, caminfo)
+    #     img_name = self.draw_image_pose(ax, line_echt, images_train, caminfo)
     #     ax = mpplot.subplot(2, 2, 4)
-    #     img_name = self.draw_image_pose(ax, line_pred, image_dir, caminfo)
+    #     img_name = self.draw_image_pose(ax, line_pred, images_train, caminfo)
     #     print('draw predition #{:d}: {}'.format(img_id, img_name))
     #     return img_id
     def draw_image_pose(self, ax, frame, poses, resce, caminfo):
@@ -423,11 +427,11 @@ class base_regre(object):
             'test': {},
         }
         for name, store in self.store_name.items():
-            h5name = thedata.prepared_train_join(store)
+            h5name = thedata.prepared_join('train', store)
             h5file = args.filepack.push_h5(h5name)
             self.store_handle['train'][name] = h5file[name]
         for name, store in self.store_name.items():
-            h5name = thedata.prepared_test_join(store)
+            h5name = thedata.prepared_join('test', store)
             h5file = args.filepack.push_h5(h5name)
             self.store_handle['test'][name] = h5file[name]
 
@@ -435,13 +439,15 @@ class base_regre(object):
         """ Receive parameters specific to the data """
         self.logger = args.logger
         self.data_module = args.data_module
+        self.data_inst = thedata
         self.join_num = thedata.join_num
         self.out_dim = self.join_num * 3
-        self.image_dir = thedata.training_images
+        # self.images_train = thedata.training_images
+        # self.images_test = thedata.test_images
         self.caminfo = thedata
         self.region_size = thedata.region_size
-        self.train_file = thedata.annotation_train
-        self.test_file = thedata.annotation_test
+        # self.train_file = thedata.annotation_train
+        # self.test_file = thedata.annotation_test
         self.store_name = {
             'index': thedata.annotation,
             'poses': thedata.annotation,
@@ -485,7 +491,9 @@ class base_regre(object):
             np.fabs(pcnt_echt - pcnt_pred)))
 
     def draw_random(self, thedata, args):
-        store_handle = self.store_handle['train']
+        mode = 'train'
+        # mode = 'test'
+        store_handle = self.store_handle[mode]
         index_h5 = store_handle['index']
         store_size = index_h5.shape[0]
         frame_id = np.random.choice(store_size)
@@ -523,7 +531,7 @@ class base_regre(object):
         ax = mpplot.subplot(1, 2, 1)
         mpplot.gca().set_title('test image - {:d}'.format(img_id))
         img_name = args.data_io.index2imagename(img_id)
-        img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
+        img = args.data_io.read_image(self.data_inst.images_join(mode, img_name))
         ax.imshow(img, cmap=mpplot.cm.bone_r)
         pose2d = args.data_ops.raw_to_2d(pose_raw_h5, thedata)
         ax.plot(pose2d[:, 1], pose2d[:, 0], 'o')
@@ -540,7 +548,7 @@ class base_regre(object):
             rect.draw(ax, colors[ii])
 
         # img_name, frame, poses, resce = self.provider_worker(
-        #     annot_line, self.image_dir, thedata)
+        #     annot_line, image_dir, thedata)
         # frame = np.squeeze(frame, axis=-1)
         # if (
         #         (1e-4 < np.linalg.norm(frame_h5 - frame)) or

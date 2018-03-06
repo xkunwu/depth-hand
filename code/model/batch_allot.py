@@ -62,6 +62,15 @@ class batch_index(object):
         h5out['poses'][write_beg:write_end, ...] = h5in['poses'][:]
         h5out['resce'][write_beg:write_end, ...] = h5in['resce'][:]
 
+    # def shuffle(self, h5file):
+    #     num_line = h5file['index'].shape[0]
+    #     shuffleid = np.arange(num_line)
+    #     np.random.shuffle(shuffleid)
+    #     print(shuffleid)
+    #     h5file['index'][:] = h5file['index'][shuffleid, ...]
+    #     h5file['poses'][:] = h5file['poses'][shuffleid, ...]
+    #     h5file['resce'][:] = h5file['resce'][shuffleid, ...]
+
 
 class batch_crop2(object):
     def __init__(self, model_inst, store_size=-1):
