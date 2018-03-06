@@ -113,7 +113,7 @@ class ortho3view(base_clean):
 
         fig.tight_layout()
         mpplot.savefig(os.path.join(
-            args.predict_dir,
+            self.predict_dir,
             'draw_{}_{}.png'.format(self.name_desc, img_id)))
         if self.args.show_draw:
             mpplot.show()

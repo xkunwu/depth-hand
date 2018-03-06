@@ -201,7 +201,7 @@ class super_dist3(base_conv3):
             draw_udir(vxdist, vxunit, voxize_crop, scale)
             mlab.draw()
             mlab.savefig(os.path.join(
-                args.predict_dir,
+                self.predict_dir,
                 'draw3d_{}_{}.png'.format(self.name_desc, img_id)))
             # joint_id = 0
             # vxdist = vxudir_h5[..., joint_id]
@@ -211,7 +211,7 @@ class super_dist3(base_conv3):
 
         fig.tight_layout()
         mpplot.savefig(os.path.join(
-            args.predict_dir,
+            self.predict_dir,
             # 'draw_{}.png'.format(self.name_desc)))
             'draw_{}_{}.png'.format(self.name_desc, img_id)))
         if self.args.show_draw:

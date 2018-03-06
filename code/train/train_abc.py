@@ -343,7 +343,8 @@ class train_abc():
                 ' ', progressbar.ETA()]
         ).start()
         while True:
-            batch_data = self.args.model_inst.fetch_batch(eval_size)
+            batch_data = self.args.model_inst.fetch_batch(
+                'test', eval_size)
             if batch_data is None:
                 break
             feed_dict = {

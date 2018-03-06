@@ -2,8 +2,6 @@ import os
 from importlib import import_module
 import numpy as np
 from .base_regre import base_regre
-import h5py
-import matplotlib.pyplot as mpplot
 from utils.iso_boxes import iso_cube
 
 
@@ -42,7 +40,7 @@ class base_clean(base_regre):
             'batch_clean'
         )
 
-    def fetch_batch(self, fetch_size=None):
+    def fetch_batch(self, mode='train', fetch_size=None):
         if fetch_size is None:
             fetch_size = self.batch_size
         batch_end = self.batch_beg + fetch_size
@@ -53,15 +51,16 @@ class base_clean(base_regre):
         # # print(self.batch_beg, batch_end, self.split_end)
         if batch_end >= self.split_end:
             return None
+        store_handle = self.store_handle[mode]
         self.batch_data['batch_frame'] = np.expand_dims(
-            self.store_handle['clean'][self.batch_beg:batch_end, ...],
+            store_handle['clean'][self.batch_beg:batch_end, ...],
             axis=-1)
         self.batch_data['batch_poses'] = \
-            self.store_handle['pose_c'][self.batch_beg:batch_end, ...]
+            store_handle['pose_c'][self.batch_beg:batch_end, ...]
         self.batch_data['batch_index'] = \
-            self.store_handle['index'][self.batch_beg:batch_end, ...]
+            store_handle['index'][self.batch_beg:batch_end, ...]
         self.batch_data['batch_resce'] = \
-            self.store_handle['resce'][self.batch_beg:batch_end, ...]
+            store_handle['resce'][self.batch_beg:batch_end, ...]
         self.batch_beg = batch_end
         return self.batch_data
 
@@ -69,19 +68,11 @@ class base_clean(base_regre):
         """ Receive parameters specific to the data """
         super(base_clean, self).receive_data(thedata, args)
         self.store_name = {
-            'index': self.train_file,
-            'poses': self.train_file,
-            'resce': self.train_file,
-            'pose_c': os.path.join(self.prepare_dir, 'pose_c'),
-            'clean': os.path.join(
-                self.prepare_dir, 'clean_{}'.format(self.crop_size)),
-        }
-        self.store_precon = {
-            'index': [],
-            'poses': [],
-            'resce': [],
-            'pose_c': ['poses', 'resce'],
-            'clean': ['index', 'resce'],
+            'index': thedata.annotation,
+            'poses': thedata.annotation,
+            'resce': thedata.annotation,
+            'pose_c': 'pose_c',
+            'clean': 'clean_{}'.format(self.crop_size),
         }
         self.frame_type = 'clean'
 
@@ -104,14 +95,16 @@ class base_clean(base_regre):
         # mpplot.show()
         # sys.exit()
 
-        index_h5 = self.store_handle['index']
+        store_handle = self.store_handle['train']
+        index_h5 = store_handle['index']
         store_size = index_h5.shape[0]
         frame_id = np.random.choice(store_size)
         # frame_id = 0  # frame_id = img_id - 1
+        # frame_id = 239
         img_id = index_h5[frame_id, ...]
-        frame_h5 = self.store_handle['clean'][frame_id, ...]
-        poses_h5 = self.store_handle['pose_c'][frame_id, ...].reshape(-1, 3)
-        resce_h5 = self.store_handle['resce'][frame_id, ...]
+        frame_h5 = store_handle['clean'][frame_id, ...]
+        poses_h5 = store_handle['pose_c'][frame_id, ...].reshape(-1, 3)
+        resce_h5 = store_handle['resce'][frame_id, ...]
 
         print('[{}] drawing image #{:d} ...'.format(self.name_desc, img_id))
         print(np.min(frame_h5), np.max(frame_h5))
@@ -157,9 +150,14 @@ class base_clean(base_regre):
 
         fig.tight_layout()
         mpplot.savefig(os.path.join(
-            args.predict_dir,
+            self.predict_dir,
             'draw_{}_{}.png'.format(self.name_desc, img_id)))
         if self.args.show_draw:
             mpplot.show()
         print('[{}] drawing image #{:d} - done.'.format(
             self.name_desc, img_id))
+
+        fig, ax = mpplot.subplots(figsize=(5, 5))
+        ax.imshow(frame_h5, cmap=mpplot.cm.bone_r)
+        fig.tight_layout()
+        mpplot.show()

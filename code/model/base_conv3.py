@@ -99,6 +99,7 @@ class base_conv3(base_clean):
         store_size = index_h5.shape[0]
         frame_id = np.random.choice(store_size)
         # frame_id = 0  # frame_id = img_id - 1
+        frame_id = 239
         img_id = index_h5[frame_id, ...]
         frame_h5 = self.store_handle['pcnt3'][frame_id, ...]
         poses_h5 = self.store_handle['pose_c'][frame_id, ...].reshape(-1, 3)
@@ -202,20 +203,26 @@ class base_conv3(base_clean):
         if not self.args.show_draw:
             mlab.options.offscreen = True
         else:
-            mlab.figure(size=(800, 800))
-            # mlab.contour3d(frame)
-            mlab.pipeline.volume(mlab.pipeline.scalar_field(frame_h5))
-            mlab.pipeline.image_plane_widget(
-                mlab.pipeline.scalar_field(frame_h5),
-                plane_orientation='z_axes',
-                slice_index=self.crop_size / 2)
-            np.set_printoptions(precision=4)
-            # print(frame[12:20, 12:20, 16])
-            mlab.outline()
+            # mlab.figure(size=(800, 800))
+            # # mlab.contour3d(frame)
+            # mlab.pipeline.volume(mlab.pipeline.scalar_field(frame_h5))
+            # mlab.pipeline.image_plane_widget(
+            #     mlab.pipeline.scalar_field(frame_h5),
+            #     plane_orientation='z_axes',
+            #     slice_index=self.crop_size / 2)
+            # np.set_printoptions(precision=4)
+            # # print(frame[12:20, 12:20, 16])
+            # mlab.outline()
+            from utils.image_ops import draw_dist3
+            draw_dist3(vxcnt_crop, voxize_crop, 2)
+            mlab.draw()
+            mlab.savefig(os.path.join(
+                self.predict_dir,
+                'draw3d_{}_{}.png'.format(self.name_desc, img_id)))
 
         fig.tight_layout()
         mpplot.savefig(os.path.join(
-            args.predict_dir,
+            self.predict_dir,
             'draw_{}_{}.png'.format(self.name_desc, img_id)))
         if self.args.show_draw:
             mpplot.show()

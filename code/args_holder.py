@@ -19,6 +19,7 @@ model_map = {
     'voxel_detect': 'model.voxel_detect',
     'super_dist2': 'model.super_dist2',
     'super_udir2': 'model.super_udir2',
+    'super_hmap2': 'model.super_hmap2',
     'dense_regre': 'model.dense_regre',
     'direc_tsdf': 'model.direc_tsdf',
     'trunc_dist': 'model.trunc_dist',
@@ -79,7 +80,7 @@ class args_holder:
         # [base_regre, base_clean, ortho3view, base_conv3, trunc_dist]
         self.parser.add_argument(
             # '--model_name', default='ortho3view',
-            '--model_name', default='base_clean',
+            '--model_name', default='base_regre',
             help='Model name [default: base_clean], from \
             [base_regre, base_clean, ortho3view, base_conv3, trunc_dist]')
         self.parser.add_argument(
@@ -224,18 +225,6 @@ class args_holder:
             self.args.out_root,
             self.args.data_name
         )
-        self.args.prepare_dir = os.path.join(
-            self.args.out_dir,
-            'prepared'
-        )
-        if not os.path.exists(self.args.prepare_dir):
-            os.makedirs(self.args.prepare_dir)
-        self.args.predict_dir = os.path.join(
-            self.args.out_dir,
-            'predict'
-        )
-        if not os.path.exists(self.args.predict_dir):
-            os.makedirs(self.args.predict_dir)
 
     def __enter__(self):
         return self

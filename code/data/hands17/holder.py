@@ -24,13 +24,11 @@ class hands17holder:
     # # dataset info
     # data_dir = ''
     # out_dir = ''
-    # predict_dir = ''
     # training_images = ''
     # frame_images = ''
     # training_annot_origin = ''
-    # training_annot_cleaned = ''
-    # training_annot_train = ''
-    # training_annot_test = ''
+    # annotation_train = ''
+    # annotation_test = ''
     # frame_bbox = ''
     #
     # # num_training = int(957032)
@@ -108,71 +106,73 @@ class hands17holder:
     )
     bbox_color = Color('orange')
 
-    def remove_out_frame_annot(self):
-        self.num_training = int(0)
-        pose_limit = np.array([
-            [np.inf, np.inf, np.inf],
-            [-np.inf, -np.inf, -np.inf],
-        ])
-        with h5py.File(self.training_annot_cleaned, 'w') as h5file, \
-                open(self.training_annot_origin, 'r') as reader:
-            lines = reader.readlines()
-            num_line = len(lines)
-            h5file.create_dataset(
-                'index',
-                (num_line,),
-                maxshape=(num_line,),
-                compression='lzf',
-                dtype='i4'
+    def _prepare_data_full_path(
+        self, target, precon_list, store_name, path_pre_fn,
+            filepack, batchallot):
+        precon_h5 = {}
+        num_line = 0
+        for precon in precon_list:
+            precon_h5[precon] = filepack.push_h5(
+                path_pre_fn(store_name[precon]))
+            num_line = precon_h5[precon][precon].shape[0]
+        store_size = batchallot.store_size
+        print(
+            'preparing data ({}): {:d} lines with store size {:d} ...'.format(
+                path_pre_fn(store_name[target]), num_line, store_size))
+        target_h5, batch_data = batchallot.create_fn[target](
+            filepack, path_pre_fn(store_name[target]), num_line
+        )
+        timerbar = progressbar.ProgressBar(
+            maxval=num_line,
+            widgets=[
+                progressbar.Percentage(),
+                ' ', progressbar.Bar('=', '[', ']'),
+                ' ', progressbar.ETA()]
+        ).start()
+        write_beg = 0
+        li = 0
+        while True:
+            write_end = min(write_beg + store_size, num_line)
+            proc_size = write_end - write_beg
+            if 0 >= proc_size:
+                break
+            args = [range(proc_size)]
+            for precon in precon_list:
+                args.append(precon_h5[precon][precon][
+                    write_beg:write_end, ...])
+            datapro.puttensor_mt(
+                args,
+                self.store_prow[target], self, batch_data
             )
-            h5file.create_dataset(
-                'poses',
-                (num_line, self.join_num * 3),
-                maxshape=(num_line, self.join_num * 3),
-                compression='lzf',
-                dtype='f4')
-            h5file.create_dataset(
-                'resce',
-                (num_line, 4),
-                maxshape=(num_line, 4),
-                compression='lzf',
-                dtype='f4')
-            timerbar = progressbar.ProgressBar(
-                maxval=num_line,
-                widgets=[
-                    progressbar.Percentage(),
-                    ' ', progressbar.Bar('=', '[', ']'),
-                    ' ', progressbar.ETA()]
-            ).start()
-            for li, line in enumerate(lines):
-                img_name, pose_raw = dataio.parse_line_annot(line)
-                pose2d = dataops.raw_to_2d(pose_raw, self)
-                if 0 > np.min(pose2d):
-                    continue
-                if 0 > np.min(self.image_size - pose2d):
-                    continue
-                index = dataio.imagename2index(img_name)
-                cube = iso_cube(
-                    (np.max(pose_raw, axis=0) + np.min(pose_raw, axis=0)) / 2,
-                    self.region_size
-                )
-                h5file['index'][self.num_training] = index
-                h5file['poses'][self.num_training, ...] = pose_raw.flatten()
-                h5file['resce'][self.num_training, ...] = cube.dump()
-                pose_limit[0, :] = np.minimum(
-                    pose_limit[0, :],
-                    np.min(pose_raw, axis=0))
-                pose_limit[1, :] = np.maximum(
-                    pose_limit[1, :],
-                    np.max(pose_raw, axis=0))
-                self.num_training += 1
-                if 0 == (li % 10e2):
-                    timerbar.update(li)
-            timerbar.finish()
-            h5file['index'].resize((self.num_training,))
-            h5file['poses'].resize((self.num_training, self.join_num * 3))
-            h5file['resce'].resize((self.num_training, 4))
-        return pose_limit
+            target_h5[write_beg:write_end, ...] = \
+                batch_data[0:proc_size, ...]
+            write_beg = write_end
+            li += proc_size
+            timerbar.update(li)
+        timerbar.finish()
+
+    def prepare_data_recur(
+            self, target, store_name, filepack, batchallot):
+        precon_list = self.store_precon[target]
+        if not precon_list:
+            return
+        for precon in precon_list:
+            self.prepare_data_recur(
+                precon, store_name, filepack, batchallot)
+        path_train = self.prepared_train_join(store_name[target])
+        if not os.path.exists(path_train):
+            self._prepare_data_full_path(
+                target, precon_list, store_name,
+                self.prepared_train_join,
+                filepack, batchallot
+            )
+        path_test = self.prepared_test_join(store_name[target])
+        if not os.path.exists(path_test):
+            self._prepare_data_full_path(
+                target, precon_list, store_name,
+                self.prepared_test_join,
+                filepack, batchallot
+            )
 
     def remove_out_frame_annot_mt(self):
         from itertools import islice
@@ -190,7 +190,7 @@ class hands17holder:
             batchallot = batch_index(self, num_line)
             store_size = batchallot.store_size
             h5file, batch_data = batchallot.create_index(
-                filepack, self.training_annot_cleaned, num_line)
+                filepack, self.annotation_train, num_line, num_line)
             timerbar = progressbar.ProgressBar(
                 maxval=num_line,
                 widgets=[
@@ -205,7 +205,7 @@ class hands17holder:
                 if not next_n_lines:
                     break
                 proc_size = len(next_n_lines)
-                args = [range(proc_size), next_n_lines]
+                args = [np.arange(proc_size), next_n_lines]
                 batch_data['valid'] = np.full(
                     (store_size,), False)
                 datapro.puttensor_mt(
@@ -215,22 +215,21 @@ class hands17holder:
                 valid = batch_data['valid']
                 valid_num = np.sum(valid)
                 write_end = write_beg + valid_num
-                if write_beg == write_end:
-                    break
-                h5file['index'][write_beg:write_end, ...] = \
-                    batch_data['index'][valid, ...]
-                poses = batch_data['poses'][valid, ...]
-                h5file['poses'][write_beg:write_end, ...] = \
-                    poses
-                h5file['resce'][write_beg:write_end, ...] = \
-                    batch_data['resce'][valid, ...]
-                poses = poses.reshape(-1, 3)
-                pose_limit[0, :] = np.minimum(
-                    pose_limit[0, :],
-                    np.min(poses, axis=0))
-                pose_limit[1, :] = np.maximum(
-                    pose_limit[1, :],
-                    np.max(poses, axis=0))
+                if write_beg < write_end:
+                    h5file['index'][write_beg:write_end, ...] = \
+                        batch_data['index'][valid, ...]
+                    poses = batch_data['poses'][valid, ...]
+                    h5file['poses'][write_beg:write_end, ...] = \
+                        poses
+                    h5file['resce'][write_beg:write_end, ...] = \
+                        batch_data['resce'][valid, ...]
+                    poses = poses.reshape(-1, 3)
+                    pose_limit[0, :] = np.minimum(
+                        pose_limit[0, :],
+                        np.min(poses, axis=0))
+                    pose_limit[1, :] = np.maximum(
+                        pose_limit[1, :],
+                        np.max(poses, axis=0))
                 write_beg = write_end
                 self.num_training += valid_num
                 li += proc_size
@@ -241,14 +240,14 @@ class hands17holder:
         return pose_limit
 
     # def shuffle_split(self):
-    #     with open(self.training_annot_cleaned, 'r') as source:
+    #     with open(self.annotation_train, 'r') as source:
     #         lines = source.readlines()
     #     # import random
     #     # np.random.shuffle(lines)
-    #     with open(self.training_annot_train, 'w') as f:
+    #     with open(self.annotation_train, 'w') as f:
     #         for line in lines[:self.train_test_split]:
     #             f.write(line)
-    #     with open(self.training_annot_test, 'w') as f:
+    #     with open(self.annotation_test, 'w') as f:
     #         for line in lines[self.train_test_split:]:
     #             # name = re.match(r'^(image_D\d+\.png)', line).group(1)
     #             # shutil.move(
@@ -267,7 +266,7 @@ class hands17holder:
 
     def init_data(self):
         update_log = False
-        if (not os.path.exists(self.training_annot_cleaned)):
+        if (not os.path.exists(self.annotation_train)):
             from timeit import default_timer as timer
             from datetime import timedelta
             time_s = timer()
@@ -282,7 +281,7 @@ class hands17holder:
             )
             update_log = True
         else:
-            with h5py.File(self.training_annot_cleaned, 'r') as h5file:
+            with h5py.File(self.annotation_train, 'r') as h5file:
                 self.num_training = h5file['index'].shape[0]
             self.logger.info('collected {:d} images'.format(
                 self.num_training))
@@ -297,55 +296,90 @@ class hands17holder:
         # # 1 out of (10 - 1) portions is picked out for validation
         # self.split_id = -1 % self.split_num
         self.train_valid_split = int(portion * (split_num - 2))
+        self.num_annotation = self.num_training
+        self.num_evaluate = self.num_annotation - self.train_test_split
+        self.num_training = self.train_test_split
+        self.logger.info('collected {:d} images: {:d} training, {:d} validation, {:d} evaluate'.format(
+            self.num_annotation, self.train_valid_split,
+            self.num_training - self.train_valid_split,
+            self.num_evaluate))
 
-        # if ((not os.path.exists(self.training_annot_train)) or
-        #         (not os.path.exists(self.training_annot_test))):
+        # if ((not os.path.exists(self.annotation_train)) or
+        #         (not os.path.exists(self.annotation_test))):
         #     self.shuffle_split()
         #     self.logger.info('splitted data: {} training, {} test ({:d} portions).'.format(
         #         self.train_test_split,
         #         self.num_training - self.train_test_split,
         #         split_num))
-        test_file = self.training_annot_test
+        test_file = self.annotation_test
         if not os.path.exists(test_file):
-            with h5py.File(self.training_annot_cleaned, 'r') as h5file:
+            with h5py.File(self.annotation_train, 'r') as h5file:
                 index = h5file['index'][self.train_test_split:, ...]
                 poses = h5file['poses'][self.train_test_split:, ...]
                 with h5py.File(test_file, 'w') as writer:
                     dataio.write_h5(writer, index, poses)
-                # with h5py.File(test_file + '.h5', 'w') as writer:
-                #     dataio.write_h5(writer, index, poses)
-                # with open(test_file, 'w') as writer:
+                # with open(test_file + '_1.txt', 'w') as writer:
                 #     dataio.write_txt(writer, index, poses)
-        # dataio.h5_to_txt(test_file, test_file + '_1.txt')
+            # dataio.h5_to_txt(test_file, test_file + '.txt')
+            print('split out test annoations.')
 
         return update_log
+
+    def annotation_train_join(self, filename):
+        return os.path.join(
+            self.out_dir,
+            'prepared',
+            filename
+        )
+
+    def annotation_test_join(self, filename):
+        return self.annotation_train_join(filename)
+
+    def prepared_train_join(self, filename):
+        return os.path.join(
+            self.out_dir,
+            'prepared',
+            filename
+        )
+
+    def prepared_test_join(self, filename):
+        return self.prepared_train_join(filename)
 
     def __init__(self, args):
         self.data_dir = args.data_dir
         self.out_dir = args.out_dir
         self.logger = args.logger
-        self.predict_dir = args.predict_dir
         self.crop_size = args.crop_size
         # self.anchor_num = args.anchor_num
         self.crop_range = args.crop_range
         # self.z_range[1] = self.crop_range * 2. + self.z_range[0]
         self.training_images = os.path.join(self.data_dir, 'training/images')
-        self.frame_images = os.path.join(self.data_dir, 'frame/images')
+        self.test_images = os.path.join(self.data_dir, 'training/images')
         self.training_annot_origin = os.path.join(
             self.data_dir, 'training/Training_Annotation.txt')
-        self.training_annot_cleaned = os.path.join(
-            self.out_dir, 'annotation')
-        # self.training_annot_train = os.path.join(
-        #     self.out_dir, 'training_train')
-        self.training_annot_train = self.training_annot_cleaned
-        self.training_annot_test = os.path.join(
-            self.predict_dir, 'training_test')
+        # self.annotation_cleaned = os.path.join(
+        #     self.out_dir, 'annotation')
+        self.annotation = 'annotation'
+        self.annotation_train = self.annotation_train_join(
+            self.annotation)
+        self.annotation_test = self.annotation_test_join(
+            'annotation_test')
+        self.frame_images = os.path.join(self.data_dir, 'frame/images')
         self.frame_bbox = os.path.join(self.data_dir, 'frame/BoundingBox.txt')
-        # self.store_file = {
-        #     'index': self.training_annot_train,
-        #     'poses': self.training_annot_train,
-        #     'resce': self.training_annot_train
-        # }
+        self.prepared_train = self.prepared_train_join('')
+        if not os.path.exists(self.prepared_train):
+            os.makedirs(self.prepared_train)
+        self.prepared_test = self.prepared_train_join('')
+        if not os.path.exists(self.prepared_test):
+            os.makedirs(self.prepared_test)
+        self.store_precon = {
+            'index': [],
+            'poses': [],
+            'resce': [],
+            'pose_c': ['poses', 'resce'],
+            'crop2': ['index', 'resce'],
+            'clean': ['index', 'resce'],
+        }
         self.store_prow = {
             'pose_c': datapro.prow_pose_c,
             'pose_c1': datapro.prow_pose_c1,

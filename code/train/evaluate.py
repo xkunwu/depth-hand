@@ -8,31 +8,32 @@ import re
 
 model_ref = {
     'super_edt3': 'EDT3',
-    'super_ov3edt2m': 'Multi-view CR w/ surface distance (improved)',
-    'super_ov3dist2': 'Multi-view CR w/ Euclidean distance',
-    'super_ov3edt2': 'Multi-view CR w/ surface distance',
-    'super_edt2m': 'CR w/ surface distance (improved)',
-    'super_edt2': 'CR w/ surface distance',
-    'super_dist3': 'CR w/ Euclidean distance',
-    'voxel_regre': 'CR w/ offset',
+    'super_ov3edt2m': 'MV-CR w/ surface distance (improved)',
+    'super_ov3dist2': 'MV-CR w/ Euclidean distance',
+    'super_ov3edt2': 'MV-CR w/ surface distance',
+    'super_edt2m': '2D CR w/ surface distance (improved)',
+    'super_edt2': '2D CR w/ surface distance',
+    'super_dist3': '3D CR w/ Euclidean distance',
+    'voxel_regre': '3D CR w/ offset',
     'voxel_offset': '3D offset regression',
-    'super_vxhit': 'CR w/ detection',
+    'super_vxhit': '3D CR w/ detection',
     'voxel_detect': 'Moon et. al. (Arxiv\'17)',
-    'super_dist2': 'CR w/ Euclidean distance',
-    'super_udir2': 'CR w/ offset',
+    'super_dist2': '2D CR w/ Euclidean distance',
+    'super_udir2': '2D CR w/ offset',
+    'super_hmap2': '2D CR w/ heatmap',
     # 'dense_regre': 'Wan et. al. (Arxiv\'17)',
     'dense_regre': '2D offset regression',
     'direc_tsdf': 'Ge et. al. (CVPR\'17)',
     'trunc_dist': '3D truncated Euclidean distance',
-    'base_conv3': '3D Coordinate Regression (CR)',
+    'base_conv3': '3D CR',
     'base_conv3_inres': '3D CR w/ inception-resnet',
     'ortho3view': 'Ge et. al. (CVPR\'16)',
-    'base_clean': '2D Coordinate Regression (CR)',
-    'base_regre': 'CR-background',
-    'base_clean_inres': 'CR w/ inception-resnet',
-    'base_regre_inres': 'CR-background w/ inception-resnet',
-    'base_clean_hg': 'CR w/ hourglass',
-    'base_regre_hg': 'CR-background w/ hourglass',
+    'base_clean': '2D CR',
+    'base_regre': '2D CR-background',
+    'base_clean_inres': '2D CR w/ inception-resnet',
+    'base_regre_inres': '2D CR-background w/ inception-resnet',
+    'base_clean_hg': '2D CR w/ hourglass',
+    'base_regre_hg': '2D CR-background w/ hourglass',
     'localizer3': '3D localizer',
     'localizer2': '2D localizer',
 }
@@ -64,7 +65,7 @@ def draw_compare(args, predict_dir=None):
     dataeval = import_module(
         'data.' + args.data_name + '.eval')
     if predict_dir is None:
-        predict_dir = args.predict_dir
+        predict_dir = args.model_inst.predict_dir
     predictions = []
     methods = []
     for file in os.listdir(predict_dir):
@@ -76,7 +77,7 @@ def draw_compare(args, predict_dir=None):
     # return
     num_method = len(methods)
     print('{:d} methods collected for comparison ...'.format(num_method))
-    annot_test = args.data_inst.training_annot_test
+    annot_test = args.data_inst.annotation_test
     error_l = []
     timerbar = progressbar.ProgressBar(
         maxval=num_method,
@@ -120,46 +121,63 @@ def draw_compare(args, predict_dir=None):
     mpplot.close(fig)
 
     # maxmean = np.max(np.mean(errors, axis=1), axis=1)
-    idx = np.argsort(maxmean)
-    restr = 'maximal per-joint mean error summary:'
-    for ii in idx:
-        restr += ' {}({:.2f})'.format(methods[ii], maxmean[ii])
-    args.logger.info(restr)
-    idx = np.argsort(meanmean)
+
+    idx_max = np.argsort(maxmean)
+    idx_mean = np.argsort(meanmean)
     restr = 'mean error summary:'
-    for ii in idx:
+    for ii in idx_mean:
         restr += ' {}({:.2f})'.format(methods[ii], meanmean[ii])
     args.logger.info(restr)
+    restr = 'maximal per-joint mean error summary:'
+    for ii in idx_max:
+        restr += ' {}({:.2f})'.format(methods[ii], maxmean[ii])
+    args.logger.info(restr)
+
+    # restr = 'mean error summary:'
+    # for ii in idx_mean:
+    #     restr += ' {} & {:.2f} &'.format(
+    #         model_ref[methods[ii]], meanmean[ii])
+    # print(restr)
+    # restr = 'maximal per-joint mean error summary:'
+    # for ii in idx_max:
+    #     restr += ' {} & {:.2f} &'.format(
+    #         model_ref[methods[ii]], maxmean[ii])
+    # print(restr)
+    restr = 'error summary:'
+    for ii in idx_mean:
+        restr += ' {} & {:.2f} & {:.2f} \\\\'.format(
+            model_ref[methods[ii]], meanmean[ii], maxmean[ii])
+    print(restr)
     print('figures saved: error summary')
 
-
+# python -m train.evaluate --max_epoch=1 --batch_size=5 --bn_decay=0.9 --show_draw=True --model_name=base_regre
+# python -m train.evaluate --out_root=${HOME}/data/univue/palau --max_epoch=1 --batch_size=5 --bn_decay=0.9 --show_draw=True --model_name=base_regre
+# python -m train.evaluate --data_name=nyu_hand --max_epoch=1 --batch_size=5 --bn_decay=0.9 --show_draw=True --model_name=base_regre
+# import pdb; pdb.set_trace()
 if __name__ == "__main__":
-    # python -m train.evaluate --max_epoch=1 --batch_size=5 --bn_decay=0.9 --show_draw=True --model_name=base_clean
-    # import pdb; pdb.set_trace()
-
     from args_holder import args_holder
     # import tfplot
-    with_train = True
-    # with_train = False
+    # with_train = True
+    with_train = False
     with_eval = True
     # with_eval = False
 
-    # # mpl = import_module('matplotlib')
-    # # mpl.use('Agg')
-    # with args_holder() as argsholder:
-    #     argsholder.parse_args()
-    #     args = argsholder.args
-    #     argsholder.create_instance()
-    #     # import shutil
-    #     # shutil.rmtree(args.out_dir)
-    #     # os.makedirs(args.out_dir)
-    #
-    #     run_one(args, with_train, with_eval)
-    #     argsholder.append_log()
-    #
-    #     # draw_compare(args)
-    # import sys
-    # sys.exit()
+    # mpl = import_module('matplotlib')
+    # mpl.use('Agg')
+    with args_holder() as argsholder:
+        argsholder.parse_args()
+        args = argsholder.args
+        argsholder.create_instance()
+        # import shutil
+        # shutil.rmtree(args.out_dir)
+        # os.makedirs(args.out_dir)
+
+        run_one(args, with_train, with_eval)
+        argsholder.append_log()
+
+        # draw_compare(args)
+    import sys
+    sys.exit()
 
     mpl = import_module('matplotlib')
     mpl.use('Agg')
@@ -177,6 +195,7 @@ if __name__ == "__main__":
         # 'voxel_detect',
         # 'super_dist2',
         # 'super_udir2',
+        # 'super_hmap2',
         # 'dense_regre',
         # 'direc_tsdf',
         # 'trunc_dist',
@@ -211,5 +230,5 @@ if __name__ == "__main__":
         # args.model_inst.detect_write_images()
     copyfile(
         os.path.join(args.log_dir, 'univue.log'),
-        os.path.join(args.predict_dir, 'univue.log')
+        os.path.join(args.model_inst.predict_dir, 'univue.log')
     )

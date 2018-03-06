@@ -250,7 +250,7 @@ class localizer2(base_clean):
         colors = [Color('orange').rgb, Color('red').rgb, Color('lime').rgb]
         ax = mpplot.subplot(1, 2, 1)
         annot_line = args.data_io.get_line(
-            thedata.training_annot_cleaned, img_id)
+            thedata.annotation_train, img_id)
         img_name, _ = args.data_io.parse_line_annot(annot_line)
         img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
         ax.imshow(img, cmap=mpplot.cm.bone_r)
@@ -297,7 +297,7 @@ class localizer2(base_clean):
         ax = mpplot.subplot(2, 2, 1)
         mpplot.gca().set_title('test input')
         annot_line = args.data_io.get_line(
-            thedata.training_annot_cleaned, img_id)
+            thedata.annotation_train, img_id)
         img_name, pose_raw = args.data_io.parse_line_annot(annot_line)
         img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
         ax.imshow(img, cmap=mpplot.cm.bone_r)
@@ -379,7 +379,7 @@ class localizer2(base_clean):
 
         fig.tight_layout()
         mpplot.savefig(os.path.join(
-            args.predict_dir,
+            self.predict_dir,
             'draw_{}_{}.png'.format(self.name_desc, img_id)))
         if self.args.show_draw:
             mpplot.show()

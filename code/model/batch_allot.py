@@ -13,7 +13,7 @@ class batch_index(object):
             'index': self.create_index,
         }
 
-    def create_index(self, filepack, h5file_name, num_line):
+    def create_index(self, filepack, h5file_name, num_line, max_shape=None):
         join_num = self.data_inst.join_num
         h5file = filepack.write_h5(h5file_name)
         h5file.create_dataset(
@@ -56,6 +56,11 @@ class batch_index(object):
         h5file['index'].resize((num_line,))
         h5file['poses'].resize((num_line, join_num, 3))
         h5file['resce'].resize((num_line, 4))
+
+    def write(self, h5in, h5out, write_beg, write_end):
+        h5out['index'][write_beg:write_end, ...] = h5in['index'][:]
+        h5out['poses'][write_beg:write_end, ...] = h5in['poses'][:]
+        h5out['resce'][write_beg:write_end, ...] = h5in['resce'][:]
 
 
 class batch_crop2(object):

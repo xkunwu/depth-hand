@@ -8,31 +8,6 @@ from . import io as dataio
 # from . import draw as datadraw
 
 
-# def compare_error(thedata, fname_echt, fname_pred):
-#     """ NOTE: the number of predictions might be smaller
-#         return: FxJ, l2 error matrix
-#     """
-#     error_l = []
-#     with open(fname_echt, 'r') as file_s, \
-#             open(fname_pred, 'r') as file_t:
-#         sour_lines = [x.strip() for x in file_s.readlines()]
-#         targ_lines = [x.strip() for x in file_t.readlines()]
-#         for li, line_t in enumerate(targ_lines):
-#             name_s, pose_s = dataio.parse_line_annot(sour_lines[li])
-#             name_t, pose_t = dataio.parse_line_annot(line_t)
-#             if name_s != name_t:
-#                 print('ERROR - different names: {} - {}'.format(
-#                     name_s, name_t))
-#                 return
-#             p3d_s = dataops.d2z_to_raw(pose_s, thedata)
-#             p3d_t = dataops.d2z_to_raw(pose_t, thedata)
-#             error_l.append(np.sqrt(
-#                 np.sum((p3d_s - p3d_t) ** 2, axis=1)
-#             ))
-#     # return np.expand_dims(np.stack(error_l, axis=0), axis=0)
-#     return np.stack(error_l, axis=0)
-
-
 def compare_error_h5(thedata, fname_echt, fname_pred):
     """ NOTE: the number of predictions might be smaller
         return: FxJ, l2 error matrix

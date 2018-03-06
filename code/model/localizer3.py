@@ -154,7 +154,7 @@ class localizer3(base_conv3):
         cube.load(resce3)
         ax = mpplot.subplot(1, 2, 1, projection='3d')
         annot_line = args.data_io.get_line(
-            thedata.training_annot_cleaned, img_id)
+            thedata.annotation_train, img_id)
         img_name, pose_raw = args.data_io.parse_line_annot(annot_line)
         img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
         points3 = args.data_ops.img_to_raw(img, self.caminfo)
@@ -210,7 +210,7 @@ class localizer3(base_conv3):
         ax = mpplot.subplot(2, 2, 1)
         mpplot.gca().set_title('test input')
         annot_line = args.data_io.get_line(
-            thedata.training_annot_cleaned, img_id)
+            thedata.annotation_train, img_id)
         img_name, pose_raw = args.data_io.parse_line_annot(annot_line)
         img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
         ax.imshow(img, cmap=mpplot.cm.bone_r)
@@ -300,7 +300,7 @@ class localizer3(base_conv3):
 
         fig.tight_layout()
         mpplot.savefig(os.path.join(
-            args.predict_dir,
+            self.predict_dir,
             'draw_{}_{}.png'.format(self.name_desc, img_id)))
         if self.args.show_draw:
             mpplot.show()

@@ -210,7 +210,7 @@ def draw_pose_stream(thedata, gif_file, max_draw=100):
     """ Draw 3D poses and streaming output as GIF file.
     """
     with imageio.get_writer(gif_file, mode='I', duration=0.2) as gif_writer:
-        with open(thedata.training_annot_cleaned, 'r') as fa:
+        with open(thedata.annotation_train, 'r') as fa:
             csv_reader = csv.reader(fa, delimiter='\t')
             for lii, annot_line in enumerate(csv_reader):
                 if lii >= max_draw:

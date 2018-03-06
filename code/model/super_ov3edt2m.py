@@ -99,8 +99,8 @@ class super_ov3edt2m(super_ov3edt2):
         # frame_id = 886  # frame_id = img_id - 1
         # frame_id = 125  # frame_id = img_id - 1
         # frame_id = 218  # palm
-        frame_id = 598
-        frame_id = 239
+        # frame_id = 598
+        # frame_id = 239
         img_id = index_h5[frame_id, ...]
         frame_h5 = self.store_handle['ortho3'][frame_id, ...]
         poses_h5 = self.store_handle['pose_c'][frame_id, ...].reshape(-1, 3)
@@ -162,7 +162,7 @@ class super_ov3edt2m(super_ov3edt2):
 
         fig.tight_layout()
         mpplot.savefig(os.path.join(
-            args.predict_dir,
+            self.predict_dir,
             'draw_{}_{}.png'.format(self.name_desc, img_id)))
         if self.args.show_draw:
             mpplot.show()

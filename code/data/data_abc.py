@@ -16,11 +16,3 @@ with args_holder() as argsholder:
     argsholder.create_instance()
     data_name = ARGS.data_name
     data_inst = ARGS.data_inst
-
-    datadraw = import_module(
-        'data.' + ARGS.data_name + '.draw')
-    datadraw.draw_raw3d_random(
-        data_inst,
-        data_inst.training_images,
-        data_inst.training_annot_cleaned
-    )

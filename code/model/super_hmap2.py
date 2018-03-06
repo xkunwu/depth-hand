@@ -6,20 +6,19 @@ import matplotlib.pyplot as mpplot
 from cv2 import resize as cv2resize
 from model.base_clean import base_clean
 from utils.iso_boxes import iso_cube
-from utils.image_ops import draw_olmap, draw_uomap
 
 
-class super_dist2(base_clean):
+class super_hmap2(base_clean):
     @staticmethod
     def get_trainer(args, new_log):
         from train.train_super_edt2 import train_super_edt2
         return train_super_edt2(args, new_log)
 
     def __init__(self, args):
-        super(super_dist2, self).__init__(args)
+        super(super_hmap2, self).__init__(args)
         self.batch_allot = getattr(
             import_module('model.batch_allot'),
-            'batch_udir2'
+            'batch_hmap2'
         )
         # self.num_appen = 4
         self.crop_size = 128
@@ -42,9 +41,8 @@ class super_dist2(base_clean):
             axis=-1)
         self.batch_data['batch_poses'] = \
             self.store_handle['pose_c'][self.batch_beg:batch_end, ...]
-        self.batch_data['batch_udir2'] = \
-            self.store_handle['udir2'][
-                self.batch_beg:batch_end, ..., :self.join_num]
+        self.batch_data['batch_edt2'] = \
+            self.store_handle['hmap2'][self.batch_beg:batch_end, ...]
         self.batch_data['batch_index'] = \
             self.store_handle['index'][self.batch_beg:batch_end, ...]
         self.batch_data['batch_resce'] = \
@@ -54,7 +52,7 @@ class super_dist2(base_clean):
 
     def receive_data(self, thedata, args):
         """ Receive parameters specific to the data """
-        super(super_dist2, self).receive_data(thedata, args)
+        super(super_hmap2, self).receive_data(thedata, args)
         thedata.hmap_size = self.hmap_size
         self.out_dim = self.join_num * 3
         self.store_name = {
@@ -64,8 +62,8 @@ class super_dist2(base_clean):
             'pose_c': os.path.join(self.prepare_dir, 'pose_c'),
             'clean': os.path.join(
                 self.prepare_dir, 'clean_{}'.format(self.crop_size)),
-            'udir2': os.path.join(
-                self.prepare_dir, 'udir2_{}'.format(self.hmap_size)),
+            'hmap2': os.path.join(
+                self.prepare_dir, 'hmap2_{}'.format(self.hmap_size)),
         }
         self.store_precon = {
             'index': [],
@@ -73,23 +71,9 @@ class super_dist2(base_clean):
             'resce': [],
             'pose_c': ['poses', 'resce'],
             'clean': ['index', 'resce'],
-            'udir2': ['clean', 'poses', 'resce'],
+            'hmap2': ['poses', 'resce'],
         }
         self.frame_type = 'clean'
-
-    def yanker(self, pose_local, resce, caminfo):
-        cube = iso_cube()
-        cube.load(resce)
-        return cube.transform_add_center(pose_local)
-        # return cube.transform_expand_move(pose_local)
-
-    def yanker_hmap(self, resce, olmap, uomap, depth, caminfo):
-        cube = iso_cube()
-        cube.load(resce)
-        # return self.data_module.ops.offset_to_raw(  # often sum weight to 0
-        #     hmap2, olmap, uomap, depth, cube, caminfo)
-        return self.data_module.ops.udir2_to_raw(
-            olmap, uomap, depth, cube, caminfo)
 
     def evaluate_batch(self, pred_val):
         batch_index = self.batch_data['batch_index']
@@ -108,14 +92,12 @@ class super_dist2(base_clean):
         store_size = index_h5.shape[0]
         frame_id = np.random.choice(store_size)
         # frame_id = 0  # frame_id = img_id - 1
-        # frame_id = 218  # palm
-        # frame_id = 239
+        frame_id = 239
         img_id = index_h5[frame_id, ...]
         frame_h5 = self.store_handle['clean'][frame_id, ...]
         poses_h5 = self.store_handle['poses'][frame_id, ...].reshape(-1, 3)
         resce_h5 = self.store_handle['resce'][frame_id, ...]
-        udir2_h5 = self.store_handle['udir2'][frame_id, ...]
-        print(self.store_handle['udir2'])
+        hmap2_h5 = self.store_handle['hmap2'][frame_id, ...]
 
         print('[{}] drawing image #{:d} ...'.format(self.name_desc, img_id))
         print(np.min(frame_h5), np.max(frame_h5))
@@ -129,36 +111,31 @@ class super_dist2(base_clean):
         sizel = np.floor(resce3[0]).astype(int)
         from colour import Color
         colors = [Color('orange').rgb, Color('red').rgb, Color('lime').rgb]
-        fig, _ = mpplot.subplots(nrows=2, ncols=3, figsize=(3 * 5, 2 * 5))
+        fig, _ = mpplot.subplots(nrows=1, ncols=3, figsize=(3 * 5, 1 * 5))
         pose_raw = poses_h5
-        olmap_h5 = udir2_h5[..., :self.join_num]
-        uomap_h5 = udir2_h5[..., self.join_num:]
+        joint_id = self.join_num - 1
+        hmap2 = hmap2_h5[..., joint_id]
         depth_crop = cv2resize(frame_h5, (sizel, sizel))
 
-        ax = mpplot.subplot(2, 3, 4)
-        pose_out = self.yanker_hmap(
-            resce_h5, olmap_h5, uomap_h5,
-            frame_h5, self.caminfo)
-        err_re = np.sum(np.abs(pose_out - pose_raw))
-        if 1e-2 < err_re:
-            print('ERROR: reprojection error: {}'.format(err_re))
-        else:
-            print('reprojection looks good: {}'.format(err_re))
+        ax = mpplot.subplot(1, 3, 2)
         ax.imshow(depth_crop, cmap=mpplot.cm.bone_r)
-        pose3d = cube.transform_center_shrink(pose_out)
+        pose3d = cube.transform_center_shrink(poses_h5)
         pose2d, _ = cube.project_ortho(pose3d, roll=0, sort=False)
-        pose2d *= self.crop_size
+        pose2d *= sizel
         args.data_draw.draw_pose2d(
             ax, thedata,
             pose2d,
         )
 
-        ax = mpplot.subplot(2, 3, 1)
+        from utils.image_ops import draw_hmap2
+        ax = mpplot.subplot(1, 3, 3)
+        draw_hmap2(fig, ax, frame_h5, hmap2)
+
+        ax = mpplot.subplot(1, 3, 1)
         mpplot.gca().set_title('test image - {:d}'.format(img_id))
         img_name = args.data_io.index2imagename(img_id)
         img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
         ax.imshow(img, cmap=mpplot.cm.bone_r)
-        pose_raw = self.yanker(poses_h5, resce_h5, self.caminfo)
         args.data_draw.draw_pose2d(
             ax, thedata,
             args.data_ops.raw_to_2d(pose_raw, thedata)
@@ -168,22 +145,6 @@ class super_dist2(base_clean):
         )
         for ii, rect in enumerate(rects):
             rect.draw(ax, colors[ii])
-
-        joint_id = self.join_num - 1
-        olmap = olmap_h5[..., joint_id]
-        uomap = uomap_h5[..., 3 * joint_id:3 * (joint_id + 1)]
-        ax = mpplot.subplot(2, 3, 2)
-        draw_uomap(fig, ax, frame_h5, uomap)
-        ax = mpplot.subplot(2, 3, 3)
-        draw_olmap(fig, ax, frame_h5, olmap)
-
-        joint_id = self.join_num - 1 - 9
-        olmap = olmap_h5[..., joint_id]
-        uomap = uomap_h5[..., 3 * joint_id:3 * (joint_id + 1)]
-        ax = mpplot.subplot(2, 3, 5)
-        draw_uomap(fig, ax, frame_h5, uomap)
-        ax = mpplot.subplot(2, 3, 6)
-        draw_olmap(fig, ax, frame_h5, olmap)
 
         # hmap2 = self.data_module.ops.raw_to_heatmap2(
         #     pose_raw, cube, self.hmap_size, self.caminfo
@@ -213,7 +174,7 @@ class super_dist2(base_clean):
         final_endpoint = 'stage_out'
         num_joint = self.join_num
         # num_out_map = num_joint * 5  # hmap2, olmap, uomap
-        num_feature = 128
+        num_feature = 32
 
         def add_and_check_final(name, net):
             end_points[name] = net
@@ -293,10 +254,11 @@ class super_dist2(base_clean):
                         #     net, 2, scope=sc + '_hg')
                         branch0 = incept_resnet.resnet_k(
                             net, scope='_res')
-                        net_maps = slim.conv2d(
+                        branch_hm2 = slim.conv2d(
                             branch0, num_joint, 1,
-                            # normalizer_fn=None, activation_fn=tf.nn.relu)
+                            # normalizer_fn=None, activation_fn=tf.nn.softmax)
                             normalizer_fn=None, activation_fn=None)
+                        net_maps = branch_hm2
                         self.end_point_list.append(sc)
                         if add_and_check_final(sc, net_maps):
                             return net_maps, end_points
@@ -305,15 +267,15 @@ class super_dist2(base_clean):
                         net = net + branch0 + branch1
                 with tf.variable_scope('stage32'):
                     sc = 'stage32_post'
-                    # net = incept_resnet.conv_maxpool(net, scope=sc)
-                    net = slim.max_pool2d(net, 3, scope=sc)
+                    net = incept_resnet.conv_maxpool(net, scope=sc)
+                    # net = slim.max_pool2d(net, 3, scope=sc)
                     self.end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points
                 with tf.variable_scope('stage16'):
                     sc = 'stage16'
-                    # net = incept_resnet.conv_maxpool(net, scope=sc)
-                    net = slim.max_pool2d(net, 3, scope=sc)
+                    net = incept_resnet.conv_maxpool(net, scope=sc)
+                    # net = slim.max_pool2d(net, 3, scope=sc)
                     self.end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points
@@ -337,12 +299,12 @@ class super_dist2(base_clean):
             tf.float32, shape=(
                 batch_size,
                 self.out_dim))
-        udir2_tf = tf.placeholder(
+        hmap_tf = tf.placeholder(
             tf.float32, shape=(
                 batch_size,
                 self.hmap_size, self.hmap_size,
                 self.join_num))
-        return frames_tf, poses_tf, udir2_tf
+        return frames_tf, poses_tf, hmap_tf
 
     @staticmethod
     def smooth_l1(xa):
@@ -352,20 +314,23 @@ class super_dist2(base_clean):
             0.5 * (xa ** 2)
         )
 
-    def get_loss(self, pred, echt, udir2, end_points):
+    def get_loss(self, pred, echt, hmap, end_points):
         """ simple sum-of-squares loss
-            pred: BxJ
-            echt: BxJ
-            udir2: BxHxWx(J*4)
+            pred: BxHxWx(J*5)
+            echt: BxHxWx(J*5)
         """
         loss_l2 = tf.nn.l2_loss(pred - echt)
-        loss_udir = 0
+        loss_hmap = 0
         for name, net in end_points.items():
             if not name.startswith('hourglass_'):
                 continue
-            # loss_udir += tf.nn.l2_loss(net - vxudir)
-            loss_udir += tf.reduce_mean(
-                self.smooth_l1(tf.abs(net - udir2)))
+            # loss_hm2 = tf.reduce_mean(
+            #     tf.nn.cross_entropy_with_logits(
+            #         targets=hmap[:, :num_j],
+            #         logits=pred[:, :num_j])
+            # )
+            loss_hmap += tf.reduce_mean(
+                self.smooth_l1(tf.abs(net - hmap)))
         loss_reg = tf.add_n(tf.get_collection(
             tf.GraphKeys.REGULARIZATION_LOSSES))
-        return loss_l2, loss_udir, loss_reg
+        return loss_l2, loss_hmap, loss_reg

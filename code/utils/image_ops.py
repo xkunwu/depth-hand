@@ -18,7 +18,8 @@ def depth_cmap(cmap):
 def transparent_cmap(cmap, tmax=0.99, N=255):
     mycmap = cmap
     mycmap._init()
-    mycmap._lut[:, -1] = np.linspace(0, tmax, N + 4)
+    # mycmap._lut[:, -1] = np.linspace(0, tmax, N + 4)
+    mycmap._lut[:, -1] = np.power(np.linspace(0, tmax, N + 4), 0.5)
     return mycmap
 
 
@@ -254,8 +255,10 @@ def draw_hmap2(fig, ax, image_crop, hmap2):
     ax.imshow(image_hmap, cmap=mpplot.cm.bone_r)
     img_h2 = ax.imshow(
         hmap2,
-        # cmap=transparent_cmap(mpplot.cm.jet))
-        cmap=mpplot.cm.jet)
+        # cmap=mpplot.cm.hot_r)
+        # cmap=transparent_cmap(mpplot.cm.hot_r))
+        # cmap=mpplot.cm.jet)
+        cmap=transparent_cmap(mpplot.cm.jet))
     divider = make_axes_locatable(ax)
     cax = divider.append_axes("right", size="5%", pad=0.05)
     fig.colorbar(img_h2, cax=cax)
