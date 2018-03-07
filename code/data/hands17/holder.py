@@ -365,6 +365,7 @@ class hands17holder:
             'vxhit': ['index', 'resce'],
             'vxudir': ['pcnt3', 'poses', 'resce'],
             'edt2': ['clean', 'poses', 'resce'],
+            'hmap2': ['poses', 'resce'],
             'udir2': ['clean', 'poses', 'resce'],
             'edt2m': ['edt2', 'udir2'],
             'ov3dist2': ['vxudir'],

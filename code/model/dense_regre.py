@@ -21,11 +21,11 @@ class dense_regre(base_clean):
             'batch_udir2'
         )
         # self.num_appen = 4
-        self.crop_size = 64
+        self.crop_size = 128
         self.hmap_size = 32
         self.map_scale = self.crop_size / self.hmap_size
 
-    def fetch_batch(self, fetch_size=None):
+    def fetch_batch(self, mode='train', fetch_size=None):
         if fetch_size is None:
             fetch_size = self.batch_size
         batch_end = self.batch_beg + fetch_size
@@ -36,19 +36,20 @@ class dense_regre(base_clean):
         # # print(self.batch_beg, batch_end, self.split_end)
         if batch_end >= self.split_end:
             return None
+        store_handle = self.store_handle[mode]
         self.batch_data['batch_frame'] = np.expand_dims(
-            self.store_handle['clean'][self.batch_beg:batch_end, ...],
+            store_handle['clean'][self.batch_beg:batch_end, ...],
             axis=-1)
-        hmap2 = self.store_handle['hmap2'][self.batch_beg:batch_end, ...]
-        udir2 = self.store_handle['udir2'][self.batch_beg:batch_end, ...]
+        hmap2 = store_handle['hmap2'][self.batch_beg:batch_end, ...]
+        udir2 = store_handle['udir2'][self.batch_beg:batch_end, ...]
         batch_hmaps = np.empty((fetch_size, self.hmap_size, self.hmap_size, self.join_num * 5))
         batch_hmaps[..., :self.join_num] = hmap2
         batch_hmaps[..., self.join_num:] = udir2
         self.batch_data['batch_poses'] = batch_hmaps
         self.batch_data['batch_index'] = \
-            self.store_handle['index'][self.batch_beg:batch_end, ...]
+            store_handle['index'][self.batch_beg:batch_end, ...]
         self.batch_data['batch_resce'] = \
-            self.store_handle['resce'][self.batch_beg:batch_end, ...]
+            store_handle['resce'][self.batch_beg:batch_end, ...]
         self.batch_beg = batch_end
         return self.batch_data
 
@@ -58,23 +59,12 @@ class dense_regre(base_clean):
         thedata.hmap_size = self.hmap_size
         self.out_dim = self.join_num * 5
         self.store_name = {
-            'index': self.train_file,
-            'poses': self.train_file,
-            'resce': self.train_file,
-            'clean': os.path.join(
-                self.prepare_dir, 'clean_{}'.format(self.crop_size)),
-            'hmap2': os.path.join(
-                self.prepare_dir, 'hmap2_{}'.format(self.hmap_size)),
-            'udir2': os.path.join(
-                self.prepare_dir, 'udir2_{}'.format(self.hmap_size)),
-        }
-        self.store_precon = {
-            'index': [],
-            'poses': [],
-            'resce': [],
-            'clean': ['index', 'resce'],
-            'hmap2': ['poses', 'resce'],
-            'udir2': ['clean', 'poses', 'resce'],
+            'index': thedata.annotation,
+            'poses': thedata.annotation,
+            'resce': thedata.annotation,
+            'clean': 'clean_{}'.format(self.crop_size),
+            'hmap2': 'hmap2_{}'.format(self.hmap_size),
+            'udir2': 'udir2_{}'.format(self.hmap_size),
         }
         self.frame_type = 'clean'
 
@@ -157,18 +147,21 @@ class dense_regre(base_clean):
     #     return self.batch_data
 
     def draw_random(self, thedata, args):
-        index_h5 = self.store_handle['index']
+        # mode = 'train'
+        mode = 'test'
+        store_handle = self.store_handle[mode]
+        index_h5 = store_handle['index']
         store_size = index_h5.shape[0]
         frame_id = np.random.choice(store_size)
         # frame_id = 0  # frame_id = img_id - 1
         frame_id = 239
         img_id = index_h5[frame_id, ...]
-        frame_h5 = self.store_handle['clean'][frame_id, ...]
-        poses_h5 = self.store_handle['poses'][frame_id, ...].reshape(-1, 3)
-        resce_h5 = self.store_handle['resce'][frame_id, ...]
-        hmap2_h5 = self.store_handle['hmap2'][frame_id, ...]
-        udir2_h5 = self.store_handle['udir2'][frame_id, ...]
-        print(self.store_handle['udir2'])
+        frame_h5 = store_handle['clean'][frame_id, ...]
+        poses_h5 = store_handle['poses'][frame_id, ...].reshape(-1, 3)
+        resce_h5 = store_handle['resce'][frame_id, ...]
+        hmap2_h5 = store_handle['hmap2'][frame_id, ...]
+        udir2_h5 = store_handle['udir2'][frame_id, ...]
+        print(store_handle['udir2'])
 
         print('[{}] drawing image #{:d} ...'.format(self.name_desc, img_id))
         print(np.min(frame_h5), np.max(frame_h5))
@@ -179,7 +172,6 @@ class dense_regre(base_clean):
         cube = iso_cube()
         cube.load(resce3)
         cube.show_dims()
-        sizel = np.floor(resce3[0]).astype(int)
         from colour import Color
         colors = [Color('orange').rgb, Color('red').rgb, Color('lime').rgb]
         fig, _ = mpplot.subplots(nrows=2, ncols=3, figsize=(3 * 5, 2 * 5))
@@ -190,7 +182,7 @@ class dense_regre(base_clean):
         hmap2 = hmap2_h5[..., joint_id]
         olmap = olmap_h5[..., joint_id]
         uomap = uomap_h5[..., 3 * joint_id:3 * (joint_id + 1)]
-        depth_crop = cv2resize(frame_h5, (sizel, sizel))
+        depth_crop = frame_h5
 
         # ax = mpplot.subplot(2, 3, 2)
         # ax.imshow(depth_crop, cmap=mpplot.cm.bone_r)
@@ -227,7 +219,7 @@ class dense_regre(base_clean):
         ax.imshow(depth_crop, cmap=mpplot.cm.bone_r)
         pose3d = cube.transform_center_shrink(pose_out)
         pose2d, _ = cube.project_ortho(pose3d, roll=0, sort=False)
-        pose2d *= sizel
+        pose2d *= self.crop_size
         args.data_draw.draw_pose2d(
             ax, thedata,
             pose2d,
@@ -236,7 +228,7 @@ class dense_regre(base_clean):
         ax = mpplot.subplot(2, 3, 1)
         mpplot.gca().set_title('test image - {:d}'.format(img_id))
         img_name = args.data_io.index2imagename(img_id)
-        img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
+        img = args.data_io.read_image(self.data_inst.images_join(img_name, mode))
         ax.imshow(img, cmap=mpplot.cm.bone_r)
         args.data_draw.draw_pose2d(
             ax, thedata,
@@ -326,13 +318,22 @@ class dense_regre(base_clean):
                     activation_fn=tf.nn.relu,
                     normalizer_fn=slim.batch_norm):
                 with tf.variable_scope('stage128'):
-                    sc = 'stage64_image'
-                    net = slim.conv2d(input_tensor, 16, 3)
+                    sc = 'stage128'
+                    net = slim.conv2d(input_tensor, 8, 3)
                     net = incept_resnet.conv_maxpool(net, scope=sc)
                     self.end_point_list.append(sc)
                     if add_and_check_final(sc, net):
                         return net, end_points
-                    sc = 'stage32_image'
+                    sc = 'stage64'
+                    net = incept_resnet.conv_maxpool(net, scope=sc)
+                    # net = incept_resnet.resnet_k(
+                    #     net, scope='stage64_residual')
+                    # net = incept_resnet.reduce_net(
+                    #     net, scope='stage64_reduce')
+                    self.end_point_list.append(sc)
+                    if add_and_check_final(sc, net):
+                        return net, end_points
+                    sc = 'stage32_pre'
                     net = incept_resnet.resnet_k(
                         net, scope='stage32_res')
                     net = slim.conv2d(

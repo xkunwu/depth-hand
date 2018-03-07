@@ -119,6 +119,25 @@ def prop_ov3edt2(ortho3_crop, pose_raw, cube, caminfo, roll=0):
     return np.concatenate(edt_l, axis=2)
 
 
+def raw_to_heatmap2(pose_raw, cube, caminfo):
+    """ 2d heatmap for each joint """
+    hmap_size = caminfo.hmap_size
+    # return np.zeros((hmap_size, hmap_size, 21))
+    coord, depth = cube.raw_to_unit(pose_raw)
+    img_l = []
+    for c, d in zip(coord, depth):
+        img = cube.print_image(
+            c.reshape(1, -1), np.array([d]), hmap_size)
+        img = ndimage.gaussian_filter(  # still a probability
+            img, sigma=0.8)
+        # img /= np.max(img)
+        # mpplot = import_module('matplotlib.pyplot')
+        # mpplot.imshow(img, cmap=mpplot.cm.bone_r)
+        # mpplot.show()
+        img_l.append(img)
+    return np.stack(img_l, axis=2)
+
+
 def raw_to_udir2(image_crop, pose_raw, cube, caminfo):
     from numpy import linalg
     step = caminfo.hmap_size
@@ -147,6 +166,42 @@ def raw_to_udir2(image_crop, pose_raw, cube, caminfo):
     return np.concatenate(
         (olmap, uomap.reshape((step, step, 3 * num_j))),
         axis=-1)
+
+
+def udir2_to_raw(
+    olmap, uomap, image_crop,
+        cube, caminfo, nn=5):
+    from sklearn.preprocessing import normalize
+    hmap_size = caminfo.hmap_size
+    num_joint = olmap.shape[2]
+    theta = caminfo.region_size * 2
+    pose_out = np.empty([num_joint, 3])
+    scale = int(image_crop.shape[0] / hmap_size)
+    if 1 == scale:
+        image_hmap = image_crop
+    else:
+        image_hmap = image_crop[::scale, ::scale]  # downsampling
+    for joint in range(num_joint):
+        # restore from 3d
+        om = olmap[..., joint]
+        # hm[np.where(1e-2 > image_hmap)] = 0  # mask out void is wrong - joint not on the surface
+        top_id = om.argpartition(-nn, axis=None)[-nn:]  # top elements
+        x3, y3 = np.unravel_index(top_id, om.shape)
+        conf = om[x3, y3]
+        dist = theta - om[x3, y3] * theta  # inverse propotional
+        uom = uomap[..., 3 * joint:3 * (joint + 1)]
+        unit_off = uom[x3, y3, :]
+        unit_off = normalize(unit_off, norm='l2')
+        offset = unit_off * np.tile(dist, [3, 1]).T
+        p0 = cube.unit_to_raw(
+            np.vstack([x3, y3]).astype(float).T / hmap_size,
+            image_hmap[x3, y3])
+        pred3 = p0 + offset
+        pred32 = np.sum(
+            pred3 * np.tile(conf, [3, 1]).T, axis=0
+        ) / np.sum(conf)
+        pose_out[joint, :] = pred32
+    return pose_out
 
 
 def raw_to_vxoff_flat(vxcnt, pose_raw, cube, caminfo):

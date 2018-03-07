@@ -40,6 +40,7 @@ class train_abc():
         epoch = 0
         time_all_s = timer()
         valid_stop = self.args.valid_stop
+        valid_inc_cnt = 0
         self.args.model_inst.start_train()
         while epoch < self.args.max_epoch:
             epoch += 1
@@ -70,10 +71,18 @@ class train_abc():
                         valid_loss, mean_loss))
                 break
             elif mean_loss > valid_loss:
-                self.args.logger.info(
-                    'NOTE: validation loss starts to grow: {} --> {}'.format(
-                        valid_loss, mean_loss))
+                valid_inc_cnt += 1
+                if 4 < valid_inc_cnt:
+                    self.args.logger.info(
+                        'Break due to validation loss grow {} times: {} --> {}'.format(
+                            valid_inc_cnt, valid_loss, mean_loss))
+                    break
+                else:
+                    self.args.logger.info(
+                        'NOTE: validation loss starts to grow: {} --> {}'.format(
+                            valid_loss, mean_loss))
             else:
+                valid_inc_cnt = 0
                 # only save model when validation loss decrease
                 valid_loss = mean_loss
                 save_path = saver.save(sess, model_path)
