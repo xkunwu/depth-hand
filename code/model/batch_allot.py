@@ -169,57 +169,6 @@ class batch_clean(batch_crop2):
         return h5file['clean'], batch_data
 
 
-class batch_edt2(batch_clean):
-    def __init__(self, model_inst, store_size=-1):
-        super(batch_edt2, self).__init__(model_inst, store_size)
-        self.create_fn['edt2'] = self.create_edt2
-        self.create_fn['edt2m'] = self.create_edt2m
-
-    def create_edt2(self, filepack, h5file_name, num_line):
-        hmap_size = self.model_inst.hmap_size
-        out_dim = self.model_inst.join_num
-        h5file = filepack.write_h5(h5file_name)
-        h5file.create_dataset(
-            'edt2',
-            (num_line,
-                hmap_size, hmap_size,
-                out_dim),
-            chunks=(1,
-                    hmap_size, hmap_size,
-                    out_dim),
-            compression='lzf',
-            dtype='f4')
-        batch_data = np.empty(
-            shape=(
-                self.store_size,
-                hmap_size, hmap_size,
-                out_dim),
-            dtype='f4')
-        return h5file['edt2'], batch_data
-
-    def create_edt2m(self, filepack, h5file_name, num_line):
-        hmap_size = self.model_inst.hmap_size
-        out_dim = self.model_inst.join_num
-        h5file = filepack.write_h5(h5file_name)
-        h5file.create_dataset(
-            'edt2m',
-            (num_line,
-                hmap_size, hmap_size,
-                out_dim),
-            chunks=(1,
-                    hmap_size, hmap_size,
-                    out_dim),
-            compression='lzf',
-            dtype='f4')
-        batch_data = np.empty(
-            shape=(
-                self.store_size,
-                hmap_size, hmap_size,
-                out_dim),
-            dtype='f4')
-        return h5file['edt2m'], batch_data
-
-
 class batch_ortho3(batch_clean):
     def __init__(self, model_inst, store_size=-1):
         super(batch_ortho3, self).__init__(model_inst, store_size)
@@ -247,7 +196,7 @@ class batch_ortho3(batch_clean):
         return h5file['ortho3'], batch_data
 
 
-class batch_conv3(batch_clean):
+class batch_conv3(batch_ortho3):
     def __init__(self, model_inst, store_size=-1):
         super(batch_conv3, self).__init__(model_inst, store_size)
         self.create_fn['pcnt3'] = self.create_pcnt3
@@ -597,3 +546,54 @@ class batch_udir2(batch_hmap2):
                 out_dim),
             dtype='f4')
         return h5file['udir2'], batch_data
+
+
+class batch_edt2(batch_udir2):
+    def __init__(self, model_inst, store_size=-1):
+        super(batch_edt2, self).__init__(model_inst, store_size)
+        self.create_fn['edt2'] = self.create_edt2
+        self.create_fn['edt2m'] = self.create_edt2m
+
+    def create_edt2(self, filepack, h5file_name, num_line):
+        hmap_size = self.model_inst.hmap_size
+        out_dim = self.model_inst.join_num
+        h5file = filepack.write_h5(h5file_name)
+        h5file.create_dataset(
+            'edt2',
+            (num_line,
+                hmap_size, hmap_size,
+                out_dim),
+            chunks=(1,
+                    hmap_size, hmap_size,
+                    out_dim),
+            compression='lzf',
+            dtype='f4')
+        batch_data = np.empty(
+            shape=(
+                self.store_size,
+                hmap_size, hmap_size,
+                out_dim),
+            dtype='f4')
+        return h5file['edt2'], batch_data
+
+    def create_edt2m(self, filepack, h5file_name, num_line):
+        hmap_size = self.model_inst.hmap_size
+        out_dim = self.model_inst.join_num
+        h5file = filepack.write_h5(h5file_name)
+        h5file.create_dataset(
+            'edt2m',
+            (num_line,
+                hmap_size, hmap_size,
+                out_dim),
+            chunks=(1,
+                    hmap_size, hmap_size,
+                    out_dim),
+            compression='lzf',
+            dtype='f4')
+        batch_data = np.empty(
+            shape=(
+                self.store_size,
+                hmap_size, hmap_size,
+                out_dim),
+            dtype='f4')
+        return h5file['edt2m'], batch_data

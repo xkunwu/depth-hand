@@ -427,11 +427,11 @@ class base_regre(object):
             'test': {},
         }
         for name, store in self.store_name.items():
-            h5name = thedata.prepared_join('train', store)
+            h5name = thedata.prepared_join(store, 'train')
             h5file = args.filepack.push_h5(h5name)
             self.store_handle['train'][name] = h5file[name]
         for name, store in self.store_name.items():
-            h5name = thedata.prepared_join('test', store)
+            h5name = thedata.prepared_join(store, 'test')
             h5file = args.filepack.push_h5(h5name)
             self.store_handle['test'][name] = h5file[name]
 
@@ -491,8 +491,8 @@ class base_regre(object):
             np.fabs(pcnt_echt - pcnt_pred)))
 
     def draw_random(self, thedata, args):
-        mode = 'train'
-        # mode = 'test'
+        # mode = 'train'
+        mode = 'test'
         store_handle = self.store_handle[mode]
         index_h5 = store_handle['index']
         store_size = index_h5.shape[0]
@@ -531,7 +531,7 @@ class base_regre(object):
         ax = mpplot.subplot(1, 2, 1)
         mpplot.gca().set_title('test image - {:d}'.format(img_id))
         img_name = args.data_io.index2imagename(img_id)
-        img = args.data_io.read_image(self.data_inst.images_join(mode, img_name))
+        img = args.data_io.read_image(self.data_inst.images_join(img_name, mode))
         ax.imshow(img, cmap=mpplot.cm.bone_r)
         pose2d = args.data_ops.raw_to_2d(pose_raw_h5, thedata)
         ax.plot(pose2d[:, 1], pose2d[:, 0], 'o')

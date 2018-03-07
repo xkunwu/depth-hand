@@ -150,16 +150,19 @@ def draw_compare(args, predict_dir=None):
     print(restr)
     print('figures saved: error summary')
 
-# python -m train.evaluate --max_epoch=1 --batch_size=5 --bn_decay=0.9 --show_draw=True --model_name=base_regre
-# python -m train.evaluate --out_root=${HOME}/data/univue/palau --max_epoch=1 --batch_size=5 --bn_decay=0.9 --show_draw=True --model_name=base_regre
-# python -m train.evaluate --data_name=nyu_hand --num_eval=99 --max_epoch=1 --batch_size=5 --bn_decay=0.9 --show_draw=True --model_name=base_regre
-# python -m train.evaluate --data_name=nyu_hand --bn_decay=0.995 --decay_step=100000
+# python -m train.evaluate --max_epoch=1 --batch_size=5 --bn_decay=0.9 --show_draw=True --model_name=base_clean
+# python -m train.evaluate --out_root=${HOME}/data/univue/palau --max_epoch=1 --batch_size=5 --bn_decay=0.9 --show_draw=True --model_name=base_clean
+# python -m train.evaluate --data_name=nyu_hand --num_eval=99 --max_epoch=1 --batch_size=5 --bn_decay=0.9 --show_draw=True --model_name=base_clean
+
+# python -m train.evaluate --data_name=nyu_hand --max_epoch=50 --valid_stop=0.5 --bn_decay=0.995 --decay_step=100000
+# python -m train.evaluate --gpu_id=1 --data_name=nyu_hand --out_root=${HOME}/data/out0219 --max_epoch=50 --valid_stop=0.5 --bn_decay=0.995 --decay_step=100000
+
 # import pdb; pdb.set_trace()
 if __name__ == "__main__":
     from args_holder import args_holder
     # import tfplot
-    # with_train = True
-    with_train = False
+    with_train = True
+    # with_train = False
     with_eval = True
     # with_eval = False
 
@@ -184,7 +187,7 @@ if __name__ == "__main__":
     mpl.use('Agg')
     methlist = [
         # 'super_edt3',
-        # 'super_ov3edt2m',
+        'super_ov3edt2m',
         # 'super_ov3dist2',
         # 'super_ov3edt2',
         # 'super_edt2m',
@@ -204,7 +207,7 @@ if __name__ == "__main__":
         # 'base_conv3_inres',
         # 'ortho3view',
         # 'base_regre',
-        'base_clean',
+        # 'base_clean',
         # 'base_regre_inres',
         # 'base_clean_inres',
         # 'base_regre_hg',

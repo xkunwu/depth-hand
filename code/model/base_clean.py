@@ -95,7 +95,9 @@ class base_clean(base_regre):
         # mpplot.show()
         # sys.exit()
 
-        store_handle = self.store_handle['train']
+        # mode = 'train'
+        mode = 'test'
+        store_handle = self.store_handle[mode]
         index_h5 = store_handle['index']
         store_size = index_h5.shape[0]
         frame_id = np.random.choice(store_size)
@@ -135,7 +137,7 @@ class base_clean(base_regre):
         ax = mpplot.subplot(1, 2, 1)
         mpplot.gca().set_title('test image - {:d}'.format(img_id))
         img_name = args.data_io.index2imagename(img_id)
-        img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
+        img = args.data_io.read_image(self.data_inst.images_join(img_name, mode))
         ax.imshow(img, cmap=mpplot.cm.bone_r)
         pose_raw = self.yanker(poses_h5, resce_h5, self.caminfo)
         args.data_draw.draw_pose2d(
@@ -157,7 +159,7 @@ class base_clean(base_regre):
         print('[{}] drawing image #{:d} - done.'.format(
             self.name_desc, img_id))
 
-        fig, ax = mpplot.subplots(figsize=(5, 5))
-        ax.imshow(frame_h5, cmap=mpplot.cm.bone_r)
-        fig.tight_layout()
-        mpplot.show()
+        # fig, ax = mpplot.subplots(figsize=(5, 5))
+        # ax.imshow(frame_h5, cmap=mpplot.cm.bone_r)
+        # fig.tight_layout()
+        # mpplot.show()

@@ -6,6 +6,36 @@ from utils.iso_boxes import iso_cube
 from utils.regu_grid import latice_image
 
 
+def prow_ov3edt2m(args, thedata, mode, batch_data):
+    bi, ov3edt2, ov3dist2 = \
+        args[0], args[1], args[2]
+    ov3edt2m = np.multiply(ov3edt2, ov3dist2)
+    batch_data[bi, ...] = ov3edt2m
+
+
+def prow_ov3dist2(args, thedata, mode, batch_data):
+    bi, vxudir = \
+        args[0], args[1]
+    olmap = vxudir[..., :thedata.join_num]
+    hmap_size = thedata.hmap_size
+    num_j = thedata.join_num
+    ov3dist2 = np.empty((hmap_size, hmap_size, num_j * 3))
+    ov3dist2[..., :num_j] = np.swapaxes(np.max(olmap, axis=2), 0, 1)
+    ov3dist2[..., num_j:(2 * num_j)] = np.max(olmap, axis=1)
+    ov3dist2[..., (2 * num_j):] = np.swapaxes(np.max(olmap, axis=0), 0, 1)
+    batch_data[bi, ...] = ov3dist2
+
+
+def prow_ov3edt2(args, thedata, mode, batch_data):
+    bi, ortho3, poses, resce = \
+        args[0], args[1], args[2], args[3]
+    cube = iso_cube()
+    cube.load(resce)
+    ov3edt2 = dataops.prop_ov3edt2(
+        ortho3, poses.reshape(-1, 3), cube, thedata)
+    batch_data[bi, ...] = ov3edt2
+
+
 def prow_edt2m(args, thedata, mode, batch_data):
     bi, edt2, udir2 = \
         args[0], args[1], args[2]
@@ -33,11 +63,63 @@ def prow_udir2(args, thedata, mode, batch_data):
     batch_data[bi, ...] = udir2
 
 
+def prow_vxudir(args, thedata, mode, batch_data):
+    bi, pcnt3, poses, resce, = \
+        args[0], args[1], args[2], args[3]
+    cube = iso_cube()
+    cube.load(resce)
+    vxudir = dataops.raw_to_vxudir(
+        pcnt3, poses.reshape(-1, 3), cube, thedata)
+    batch_data[bi, ...] = vxudir
+
+
+def prow_pose_lab(args, thedata, mode, batch_data):
+    bi, poses, resce, = \
+        args[0], args[1], args[2]
+    cube = iso_cube()
+    cube.load(resce)
+    pose_lab = dataops.raw_to_vxlab(
+        poses.reshape(-1, 3), cube, thedata)
+    batch_data[bi, ...] = pose_lab
+
+
+def prow_pose_hit(args, thedata, mode, batch_data):
+    bi, poses, resce, = \
+        args[0], args[1], args[2]
+    cube = iso_cube()
+    cube.load(resce)
+    pose_hit = dataops.raw_to_vxhit(
+        poses.reshape(-1, 3), cube, thedata)
+    batch_data[bi, ...] = pose_hit
+
+
+def prow_vxhit(args, thedata, mode, batch_data):
+    bi, index, resce = \
+        args[0], args[1], args[2]
+    img_name = dataio.index2imagename(index)
+    img = dataio.read_image(thedata.images_join(img_name, mode))
+    cube = iso_cube()
+    cube.load(resce)
+    vxhit = dataops.to_vxhit(img, cube, thedata)
+    batch_data[bi, ...] = vxhit
+
+
+def prow_pcnt3(args, thedata, mode, batch_data):
+    bi, index, resce = \
+        args[0], args[1], args[2]
+    img_name = dataio.index2imagename(index)
+    img = dataio.read_image(thedata.images_join(img_name, mode))
+    cube = iso_cube()
+    cube.load(resce)
+    pcnt3 = dataops.to_pcnt3(img, cube, thedata)
+    batch_data[bi, ...] = pcnt3
+
+
 def prow_ortho3(args, thedata, mode, batch_data):
     bi, index, resce = \
         args[0], args[1], args[2]
     img_name = dataio.index2imagename(index)
-    img = dataio.read_image(thedata.images_join(mode, img_name))
+    img = dataio.read_image(thedata.images_join(img_name, mode))
     cube = iso_cube()
     cube.load(resce)
     img_ortho3 = dataops.to_ortho3(img, cube, thedata)
@@ -58,7 +140,7 @@ def prow_crop2(args, thedata, mode, batch_data):
     bi, index, resce = \
         args[0], args[1], args[2]
     img_name = dataio.index2imagename(index)
-    img = dataio.read_image(thedata.images_join(mode, img_name))
+    img = dataio.read_image(thedata.images_join(img_name, mode))
     cube = iso_cube()
     cube.load(resce)
     img_crop2 = dataops.to_crop2(img, cube, thedata)
@@ -69,7 +151,7 @@ def prow_clean(args, thedata, mode, batch_data):
     bi, index, resce = \
         args[0], args[1], args[2]
     img_name = dataio.index2imagename(index)
-    img = dataio.read_image(thedata.images_join(mode, img_name))
+    img = dataio.read_image(thedata.images_join(img_name, mode))
     cube = iso_cube()
     cube.load(resce)
     img_clean = dataops.to_clean(img, cube, thedata)

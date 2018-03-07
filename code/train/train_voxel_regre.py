@@ -282,6 +282,7 @@ class train_voxel_regre(train_abc):
         batch_count = 0
         loss_sum = 0
         num_stores = self.args.model_inst.store_size
+        eval_size = 1
         timerbar = progressbar.ProgressBar(
             maxval=num_stores,
             widgets=[
@@ -290,7 +291,8 @@ class train_voxel_regre(train_abc):
                 ' ', progressbar.ETA()]
         ).start()
         while True:
-            batch_data = self.args.model_inst.fetch_batch(1)
+            batch_data = self.args.model_inst.fetch_batch(
+                'test', eval_size)
             if batch_data is None:
                 break
             feed_dict = {
@@ -304,8 +306,8 @@ class train_voxel_regre(train_abc):
                 feed_dict=feed_dict)
             self.args.model_inst.evaluate_batch(pred_val)
             loss_sum += loss_val
+            batch_count += eval_size
             timerbar.update(batch_count)
-            batch_count += 1
         timerbar.finish()
         mean_loss = loss_sum / batch_count
         self.args.logger.info(

@@ -39,6 +39,7 @@ class train_abc():
         from datetime import timedelta
         epoch = 0
         time_all_s = timer()
+        valid_stop = self.args.valid_stop
         self.args.model_inst.start_train()
         while epoch < self.args.max_epoch:
             epoch += 1
@@ -63,7 +64,7 @@ class train_abc():
             self.args.logger.info(
                 'Epoch #{:03d} processing time: {}'.format(
                     epoch, time_e))
-            if mean_loss > (valid_loss * 1.1):
+            if mean_loss > (valid_loss * (1 + valid_stop)):
                 self.args.logger.info(
                     'Break due to validation loss starts to grow: {} --> {}'.format(
                         valid_loss, mean_loss))

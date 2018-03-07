@@ -21,7 +21,7 @@ class base_conv3(base_clean):
         self.crop_size = 64
         # self.num_appen = 4
 
-    def fetch_batch(self, fetch_size=None):
+    def fetch_batch(self, mode='train', fetch_size=None):
         if fetch_size is None:
             fetch_size = self.batch_size
         batch_end = self.batch_beg + fetch_size
@@ -32,15 +32,16 @@ class base_conv3(base_clean):
         # # print(self.batch_beg, batch_end, self.split_end)
         if batch_end >= self.split_end:
             return None
+        store_handle = self.store_handle[mode]
         self.batch_data['batch_frame'] = np.expand_dims(
-            self.store_handle['pcnt3'][self.batch_beg:batch_end, ...],
+            store_handle['pcnt3'][self.batch_beg:batch_end, ...],
             axis=-1)
         self.batch_data['batch_poses'] = \
-            self.store_handle['pose_c'][self.batch_beg:batch_end, ...]
+            store_handle['pose_c'][self.batch_beg:batch_end, ...]
         self.batch_data['batch_index'] = \
-            self.store_handle['index'][self.batch_beg:batch_end, ...]
+            store_handle['index'][self.batch_beg:batch_end, ...]
         self.batch_data['batch_resce'] = \
-            self.store_handle['resce'][self.batch_beg:batch_end, ...]
+            store_handle['resce'][self.batch_beg:batch_end, ...]
         self.batch_beg = batch_end
         return self.batch_data
 
@@ -48,22 +49,12 @@ class base_conv3(base_clean):
         """ Receive parameters specific to the data """
         super(base_conv3, self).receive_data(thedata, args)
         self.store_name = {
-            'index': self.train_file,
-            'poses': self.train_file,
-            'resce': self.train_file,
-            'clean': os.path.join(
-                self.prepare_dir, 'clean_{}'.format(self.crop_size)),
-            'pose_c': os.path.join(self.prepare_dir, 'pose_c'),
-            'pcnt3': os.path.join(
-                self.prepare_dir, 'pcnt3_{}'.format(self.crop_size)),
-        }
-        self.store_precon = {
-            'index': [],
-            'poses': [],
-            'resce': [],
-            'clean': ['index', 'resce'],
-            'pose_c': ['poses', 'resce'],
-            'pcnt3': ['index', 'resce'],
+            'index': thedata.annotation,
+            'poses': thedata.annotation,
+            'resce': thedata.annotation,
+            'pose_c': 'pose_c',
+            'clean': 'clean_{}'.format(self.crop_size),
+            'pcnt3': 'pcnt3_{}'.format(self.crop_size),
         }
         self.frame_type = 'clean'
 
@@ -95,15 +86,18 @@ class base_conv3(base_clean):
         # mlab.show()
         # sys.exit()
 
-        index_h5 = self.store_handle['index']
+        # mode = 'train'
+        mode = 'test'
+        store_handle = self.store_handle[mode]
+        index_h5 = store_handle['index']
         store_size = index_h5.shape[0]
         frame_id = np.random.choice(store_size)
         # frame_id = 0  # frame_id = img_id - 1
-        frame_id = 239
+        # frame_id = 239
         img_id = index_h5[frame_id, ...]
-        frame_h5 = self.store_handle['pcnt3'][frame_id, ...]
-        poses_h5 = self.store_handle['pose_c'][frame_id, ...].reshape(-1, 3)
-        resce_h5 = self.store_handle['resce'][frame_id, ...]
+        frame_h5 = store_handle['pcnt3'][frame_id, ...]
+        poses_h5 = store_handle['pose_c'][frame_id, ...].reshape(-1, 3)
+        resce_h5 = store_handle['resce'][frame_id, ...]
 
         print('[{}] drawing image #{:d} ...'.format(self.name_desc, img_id))
         print(np.min(frame_h5), np.max(frame_h5))
@@ -117,7 +111,7 @@ class base_conv3(base_clean):
 
         ax = mpplot.subplot(2, 2, 1)
         img_name = args.data_io.index2imagename(img_id)
-        img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
+        img = args.data_io.read_image(self.data_inst.images_join(img_name, mode))
         ax.imshow(img, cmap=mpplot.cm.bone_r)
         pose_raw = self.yanker(poses_h5, resce_h5, self.caminfo)
         args.data_draw.draw_pose2d(
@@ -203,16 +197,16 @@ class base_conv3(base_clean):
         if not self.args.show_draw:
             mlab.options.offscreen = True
         else:
-            # mlab.figure(size=(800, 800))
-            # # mlab.contour3d(frame)
-            # mlab.pipeline.volume(mlab.pipeline.scalar_field(frame_h5))
-            # mlab.pipeline.image_plane_widget(
-            #     mlab.pipeline.scalar_field(frame_h5),
-            #     plane_orientation='z_axes',
-            #     slice_index=self.crop_size / 2)
-            # np.set_printoptions(precision=4)
-            # # print(frame[12:20, 12:20, 16])
-            # mlab.outline()
+            mlab.figure(size=(800, 800))
+            # mlab.contour3d(frame)
+            mlab.pipeline.volume(mlab.pipeline.scalar_field(frame_h5))
+            mlab.pipeline.image_plane_widget(
+                mlab.pipeline.scalar_field(frame_h5),
+                plane_orientation='z_axes',
+                slice_index=self.crop_size / 2)
+            np.set_printoptions(precision=4)
+            # print(frame[12:20, 12:20, 16])
+            mlab.outline()
             from utils.image_ops import draw_dist3
             draw_dist3(vxcnt_crop, voxize_crop, 2)
             mlab.draw()

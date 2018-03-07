@@ -100,6 +100,9 @@ class args_holder:
             '--max_epoch', type=int, default=10,
             help='Epoch to run [default: 10]')
         self.parser.add_argument(
+            '--valid_stop', type=float, default=0.1,
+            help='stop training early when validation increased [default: 0.1]')
+        self.parser.add_argument(
             '--batch_size', type=int, default=50,
             help='Batch size during training [default: 50]')
         # self.parser.add_argument(

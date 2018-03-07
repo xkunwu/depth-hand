@@ -87,12 +87,12 @@ def draw_pose_raw(ax, thedata, img, pose_raw, show_margin=False):
 
 def draw_raw3d_pose(ax, thedata, pose_raw, zdir='z'):
     p3wrist = np.array([pose_raw[0, :]])
-    for fii, joints in enumerate(thedata.join_id):
+    for fii, joints in enumerate(thedata.join_id[2:]):
         p3joints = pose_raw[joints, :]
-        color_v0 = Color(thedata.join_color[fii + 1])
+        color_v0 = Color(thedata.join_color[fii + 2])
         color_v0.luminance = 0.3
         color_range = [C.rgb for C in make_color_range(
-            color_v0, thedata.join_color[fii + 1], len(p3joints) + 1)]
+            color_v0, thedata.join_color[fii + 2], len(p3joints) + 1)]
         for jj, joint in enumerate(p3joints):
             ax.scatter(
                 p3joints[jj, 0], p3joints[jj, 1], p3joints[jj, 2],
@@ -104,11 +104,25 @@ def draw_raw3d_pose(ax, thedata, pose_raw, zdir='z'):
             p3joints_w[:, 0], p3joints_w[:, 1], p3joints_w[:, 2],
             '-',
             linewidth=2.0,
-            color=thedata.join_color[fii + 1].rgb,
+            color=thedata.join_color[fii + 2].rgb,
             zdir=zdir
         )
     ax.scatter(
         p3wrist[0, 0], p3wrist[0, 1], p3wrist[0, 2],
         color=thedata.join_color[0].rgb,
         zdir=zdir
+    )
+    p3joints = np.array(pose_raw[thedata.join_id[1], :])
+    ax.plot(
+        p3joints[:, 0], p3joints[:, 1], p3joints[:, 2],
+        'o',
+        color=thedata.join_color[1].rgb
+    )
+    p3joints = np.vstack((p3wrist, p3joints))
+    p3joints[[0, 1], :] = p3joints[[1, 0], :]
+    ax.plot(
+        p3joints[:, 0], p3joints[:, 1], p3joints[:, 2],
+        '-',
+        linewidth=2.0,
+        color=thedata.join_color[1].rgb
     )

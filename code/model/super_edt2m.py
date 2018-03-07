@@ -11,7 +11,7 @@ class super_edt2m(super_edt2):
     def __init__(self, args):
         super(super_edt2m, self).__init__(args)
 
-    def fetch_batch(self, fetch_size=None):
+    def fetch_batch(self, mode='train', fetch_size=None):
         if fetch_size is None:
             fetch_size = self.batch_size
         batch_end = self.batch_beg + fetch_size
@@ -22,17 +22,18 @@ class super_edt2m(super_edt2):
         # # print(self.batch_beg, batch_end, self.split_end)
         if batch_end >= self.split_end:
             return None
+        store_handle = self.store_handle[mode]
         self.batch_data['batch_frame'] = np.expand_dims(
-            self.store_handle['clean'][self.batch_beg:batch_end, ...],
+            store_handle['clean'][self.batch_beg:batch_end, ...],
             axis=-1)
         self.batch_data['batch_poses'] = \
-            self.store_handle['pose_c'][self.batch_beg:batch_end, ...]
+            store_handle['pose_c'][self.batch_beg:batch_end, ...]
         self.batch_data['batch_edt2'] = \
-            self.store_handle['edt2m'][self.batch_beg:batch_end, ...]
+            store_handle['edt2m'][self.batch_beg:batch_end, ...]
         self.batch_data['batch_index'] = \
-            self.store_handle['index'][self.batch_beg:batch_end, ...]
+            store_handle['index'][self.batch_beg:batch_end, ...]
         self.batch_data['batch_resce'] = \
-            self.store_handle['resce'][self.batch_beg:batch_end, ...]
+            store_handle['resce'][self.batch_beg:batch_end, ...]
         self.batch_beg = batch_end
         return self.batch_data
 
@@ -42,33 +43,22 @@ class super_edt2m(super_edt2):
         thedata.hmap_size = self.hmap_size
         self.out_dim = self.join_num * 3
         self.store_name = {
-            'index': self.train_file,
-            'poses': self.train_file,
-            'resce': self.train_file,
-            'pose_c': os.path.join(self.prepare_dir, 'pose_c'),
-            'clean': os.path.join(
-                self.prepare_dir, 'clean_{}'.format(self.crop_size)),
-            'edt2': os.path.join(
-                self.prepare_dir, 'edt2_{}'.format(self.hmap_size)),
-            'udir2': os.path.join(
-                self.prepare_dir, 'udir2_{}'.format(self.hmap_size)),
-            'edt2m': os.path.join(
-                self.prepare_dir, 'edt2m_{}'.format(self.hmap_size)),
-        }
-        self.store_precon = {
-            'index': [],
-            'poses': [],
-            'resce': [],
-            'pose_c': ['poses', 'resce'],
-            'clean': ['index', 'resce'],
-            'edt2': ['clean', 'poses', 'resce'],
-            'udir2': ['clean', 'poses', 'resce'],
-            'edt2m': ['edt2', 'udir2'],
+            'index': thedata.annotation,
+            'poses': thedata.annotation,
+            'resce': thedata.annotation,
+            'pose_c': 'pose_c',
+            'clean': 'clean_{}'.format(self.crop_size),
+            'edt2': 'edt2_{}'.format(self.hmap_size),
+            'udir2': 'udir2_{}'.format(self.hmap_size),
+            'edt2m': 'edt2m_{}'.format(self.hmap_size),
         }
         self.frame_type = 'clean'
 
     def draw_random(self, thedata, args):
-        index_h5 = self.store_handle['index']
+        # mode = 'train'
+        mode = 'test'
+        store_handle = self.store_handle[mode]
+        index_h5 = store_handle['index']
         store_size = index_h5.shape[0]
         frame_id = np.random.choice(store_size)
         # frame_id = 892  # frame_id = img_id - 1
@@ -79,10 +69,10 @@ class super_edt2m(super_edt2):
         # frame_id = 239
         # frame_id = 26
         img_id = index_h5[frame_id, ...]
-        frame_h5 = self.store_handle['clean'][frame_id, ...]
-        poses_h5 = self.store_handle['pose_c'][frame_id, ...].reshape(-1, 3)
-        resce_h5 = self.store_handle['resce'][frame_id, ...]
-        edt2_h5 = self.store_handle['edt2m'][frame_id, ...]
+        frame_h5 = store_handle['clean'][frame_id, ...]
+        poses_h5 = store_handle['pose_c'][frame_id, ...].reshape(-1, 3)
+        resce_h5 = store_handle['resce'][frame_id, ...]
+        edt2_h5 = store_handle['edt2m'][frame_id, ...]
 
         print('[{}] drawing image #{:d} ...'.format(self.name_desc, img_id))
         print(np.min(frame_h5), np.max(frame_h5))
@@ -113,7 +103,7 @@ class super_edt2m(super_edt2):
         ax = mpplot.subplot(2, 2, 1)
         mpplot.gca().set_title('test image - {:d}'.format(img_id))
         img_name = args.data_io.index2imagename(img_id)
-        img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
+        img = args.data_io.read_image(self.data_inst.images_join(img_name, mode))
         ax.imshow(img, cmap=mpplot.cm.bone_r)
         pose_raw = self.yanker(poses_h5, resce_h5, self.caminfo)
         args.data_draw.draw_pose2d(

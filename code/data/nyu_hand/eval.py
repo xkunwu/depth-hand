@@ -171,7 +171,7 @@ def evaluate_poses(thedata, model_name, predict_dir, predict_file):
 
     errors = compare_error_h5(
         thedata,
-        thedata.prepared_join('test', thedata.annotation),
+        thedata.annotation_test,
         predict_file
     )
     # mpplot.gcf().clear()

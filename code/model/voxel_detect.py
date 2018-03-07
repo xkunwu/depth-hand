@@ -26,7 +26,7 @@ class voxel_detect(base_conv3):
         self.hmap_size = 32
         self.map_scale = self.crop_size / self.hmap_size
 
-    def fetch_batch(self, fetch_size=None):
+    def fetch_batch(self, mode='train', fetch_size=None):
         if fetch_size is None:
             fetch_size = self.batch_size
         batch_end = self.batch_beg + fetch_size
@@ -37,18 +37,19 @@ class voxel_detect(base_conv3):
         # # print(self.batch_beg, batch_end, self.split_end)
         if batch_end >= self.split_end:
             return None
+        store_handle = self.store_handle[mode]
         self.batch_data['batch_frame'] = np.expand_dims(
-            self.store_handle['vxhit'][self.batch_beg:batch_end, ...],
+            store_handle['vxhit'][self.batch_beg:batch_end, ...],
             axis=-1)
         # self.batch_data['batch_poses'] = \
-        #     self.store_handle['pose_hit'][self.batch_beg:batch_end, ...]
+        #     store_handle['pose_hit'][self.batch_beg:batch_end, ...]
         self.batch_data['batch_poses'] = \
-            self.store_handle['pose_lab'][
+            store_handle['pose_lab'][
                 self.batch_beg:batch_end, ...].astype(np.int32)
         self.batch_data['batch_index'] = \
-            self.store_handle['index'][self.batch_beg:batch_end, ...]
+            store_handle['index'][self.batch_beg:batch_end, ...]
         self.batch_data['batch_resce'] = \
-            self.store_handle['resce'][self.batch_beg:batch_end, ...]
+            store_handle['resce'][self.batch_beg:batch_end, ...]
         self.batch_beg = batch_end
         return self.batch_data
 
@@ -58,26 +59,13 @@ class voxel_detect(base_conv3):
         thedata.hmap_size = self.hmap_size
         self.out_dim = (self.hmap_size ** 3) * self.join_num
         self.store_name = {
-            'index': self.train_file,
-            'poses': self.train_file,
-            'resce': self.train_file,
-            'clean': os.path.join(
-                self.prepare_dir, 'clean_{}'.format(self.crop_size)),
-            # 'pose_hit': os.path.join(
-            #     self.prepare_dir, 'pose_hit_{}'.format(self.hmap_size)),
-            'pose_lab': os.path.join(
-                self.prepare_dir, 'pose_lab_{}'.format(self.hmap_size)),
-            'vxhit': os.path.join(
-                self.prepare_dir, 'vxhit_{}'.format(self.crop_size)),
-        }
-        self.store_precon = {
-            'index': [],
-            'poses': [],
-            'resce': [],
-            'clean': ['index', 'resce'],
-            # 'pose_hit': ['poses', 'resce'],
-            'pose_lab': ['poses', 'resce'],
-            'vxhit': ['index', 'resce'],
+            'index': thedata.annotation,
+            'poses': thedata.annotation,
+            'resce': thedata.annotation,
+            'clean': 'clean_{}'.format(self.crop_size),
+            # 'pose_hit': 'pose_hit_{}'.format(self.hmap_size),
+            'pose_lab': 'pose_lab_{}'.format(self.hmap_size),
+            'vxhit': 'vxhit_{}'.format(self.crop_size),
         }
         self.frame_type = 'clean'
 
@@ -118,16 +106,19 @@ class voxel_detect(base_conv3):
         from mpl_toolkits.mplot3d import Axes3D
         from mayavi import mlab
 
-        index_h5 = self.store_handle['index']
+        # mode = 'train'
+        mode = 'test'
+        store_handle = self.store_handle[mode]
+        index_h5 = store_handle['index']
         store_size = index_h5.shape[0]
         frame_id = np.random.choice(store_size)
         # frame_id = 0  # frame_id = img_id - 1
-        frame_id = 239
+        # frame_id = 239
         img_id = index_h5[frame_id, ...]
-        frame_h5 = self.store_handle['vxhit'][frame_id, ...]
-        poses_h5 = self.store_handle['poses'][frame_id, ...].reshape(-1, 3)
-        pose_lab_h5 = self.store_handle['pose_lab'][frame_id, ...]
-        resce_h5 = self.store_handle['resce'][frame_id, ...]
+        frame_h5 = store_handle['vxhit'][frame_id, ...]
+        poses_h5 = store_handle['poses'][frame_id, ...].reshape(-1, 3)
+        pose_lab_h5 = store_handle['pose_lab'][frame_id, ...]
+        resce_h5 = store_handle['resce'][frame_id, ...]
 
         print('[{}] drawing image #{:d} ...'.format(self.name_desc, img_id))
         print(np.min(frame_h5), np.max(frame_h5))
@@ -138,7 +129,7 @@ class voxel_detect(base_conv3):
         cube.load(resce3)
         cube.show_dims()
         img_name = args.data_io.index2imagename(img_id)
-        img = args.data_io.read_image(os.path.join(self.image_dir, img_name))
+        img = args.data_io.read_image(self.data_inst.images_join(img_name, mode))
         from colour import Color
         colors = [Color('orange').rgb, Color('red').rgb, Color('lime').rgb]
         fig, _ = mpplot.subplots(nrows=2, ncols=4, figsize=(4 * 5, 2 * 5))

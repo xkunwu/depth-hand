@@ -127,8 +127,7 @@ def prow_vxhit(args, thedata, batch_data):
     bi, index, resce = \
         args[0], args[1], args[2]
     img_name = dataio.index2imagename(index)
-    img = dataio.read_image(os.path.join(
-        thedata.training_images, img_name))
+    img = dataio.read_image(thedata.images_join(img_name))
     cube = iso_cube()
     cube.load(resce)
     vxhit = dataops.to_vxhit(img, cube, thedata)
@@ -153,8 +152,7 @@ def prow_pcnt3(args, thedata, batch_data):
     bi, index, resce = \
         args[0], args[1], args[2]
     img_name = dataio.index2imagename(index)
-    img = dataio.read_image(os.path.join(
-        thedata.training_images, img_name))
+    img = dataio.read_image(thedata.images_join(img_name))
     cube = iso_cube()
     cube.load(resce)
     pcnt3 = dataops.to_pcnt3(img, cube, thedata)
@@ -165,8 +163,7 @@ def prow_ortho3(args, thedata, batch_data):
     bi, index, resce = \
         args[0], args[1], args[2]
     img_name = dataio.index2imagename(index)
-    img = dataio.read_image(os.path.join(
-        thedata.training_images, img_name))
+    img = dataio.read_image(thedata.images_join(img_name))
     cube = iso_cube()
     cube.load(resce)
     img_ortho3 = dataops.to_ortho3(img, cube, thedata)
@@ -197,8 +194,7 @@ def prow_crop2(args, thedata, batch_data):
     bi, index, resce = \
         args[0], args[1], args[2]
     img_name = dataio.index2imagename(index)
-    img = dataio.read_image(os.path.join(
-        thedata.training_images, img_name))
+    img = dataio.read_image(thedata.images_join(img_name))
     cube = iso_cube()
     cube.load(resce)
     img_crop2 = dataops.to_crop2(img, cube, thedata)
@@ -209,8 +205,7 @@ def prow_clean(args, thedata, batch_data):
     bi, index, resce = \
         args[0], args[1], args[2]
     img_name = dataio.index2imagename(index)
-    img = dataio.read_image(os.path.join(
-        thedata.training_images, img_name))
+    img = dataio.read_image(thedata.images_join(img_name))
     cube = iso_cube()
     cube.load(resce)
     img_clean = dataops.to_clean(img, cube, thedata)

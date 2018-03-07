@@ -77,14 +77,14 @@ class nyu_handholder:
         num_line = 0
         for precon in precon_list:
             precon_h5[precon] = filepack.push_h5(
-                path_pre_fn(mode, store_name[precon]))
+                path_pre_fn(store_name[precon], mode))
             num_line = precon_h5[precon][precon].shape[0]
         store_size = batchallot.store_size
         print(
             'preparing data ({}): {:d} lines with store size {:d} ...'.format(
-                path_pre_fn(mode, store_name[target]), num_line, store_size))
+                path_pre_fn(store_name[target], mode), num_line, store_size))
         target_h5, batch_data = batchallot.create_fn[target](
-            filepack, path_pre_fn(mode, store_name[target]), num_line
+            filepack, path_pre_fn(store_name[target], mode), num_line
         )
         timerbar = progressbar.ProgressBar(
             maxval=num_line,
@@ -123,14 +123,14 @@ class nyu_handholder:
         for precon in precon_list:
             self.prepare_data_recur(
                 precon, store_name, filepack, batchallot)
-        path_train = self.prepared_join('train', store_name[target])
+        path_train = self.prepared_join(store_name[target], 'train')
         if not os.path.exists(path_train):
             self._prepare_data_full_path(
                 target, precon_list, store_name,
                 self.prepared_join, 'train',
                 filepack, batchallot
             )
-        path_test = self.prepared_join('test', store_name[target])
+        path_test = self.prepared_join(store_name[target], 'test')
         if not os.path.exists(path_test):
             self._prepare_data_full_path(
                 target, precon_list, store_name,
@@ -255,8 +255,8 @@ class nyu_handholder:
             self.data_dir, 'train', 'joint_data.mat')
         annot_origin_test = os.path.join(
             self.data_dir, 'test', 'joint_data.mat')
-        annotation_train = self.prepared_join('train', self.annotation)
-        annotation_test = self.prepared_join('test', self.annotation)
+        annotation_train = self.prepared_join(self.annotation, 'train')
+        annotation_test = self.prepared_join(self.annotation, 'test')
         self.num_training = int(0)
         pose_limit = np.array([
             [np.inf, np.inf, np.inf],
@@ -299,8 +299,8 @@ class nyu_handholder:
 
     def init_data(self):
         update_log = False
-        annotation_train = self.prepared_join('train', self.annotation)
-        annotation_test = self.prepared_join('test', self.annotation)
+        annotation_train = self.prepared_join(self.annotation, 'train')
+        annotation_test = self.prepared_join(self.annotation, 'test')
         if (
                 (not os.path.exists(annotation_train)) or
                 (not os.path.exists(annotation_test))):
@@ -339,10 +339,10 @@ class nyu_handholder:
 
         return update_log
 
-    def images_join(self, mode, filename):
+    def images_join(self, filename='', mode='train'):
         return os.path.join(self.data_dir, mode, filename)
 
-    def prepared_join(self, mode, filename):
+    def prepared_join(self, filename='', mode='train'):
         return os.path.join(self.out_dir, 'prepared', mode, filename)
 
     def __init__(self, args):
@@ -357,14 +357,12 @@ class nyu_handholder:
         # self.training_images = os.path.join(self.data_dir, 'train')
         # self.test_images = os.path.join(self.data_dir, 'test')
         self.annotation = 'annotation'
-        # self.annotation_train = self.annotation_train_join(
-        #     self.annotation)
-        # self.annotation_test = self.annotation_test_join(
-        #     self.annotation)
-        prepared_train = self.prepared_join('train', '')
+        self.annotation_test = self.prepared_join(
+            self.annotation, 'test')
+        prepared_train = self.prepared_join('', 'train')
         if not os.path.exists(prepared_train):
             os.makedirs(prepared_train)
-        prepared_test = self.prepared_join('test', '')
+        prepared_test = self.prepared_join('', 'test',)
         if not os.path.exists(prepared_test):
             os.makedirs(prepared_test)
         self.store_precon = {
@@ -372,29 +370,42 @@ class nyu_handholder:
             'poses': [],
             'resce': [],
             'pose_c': ['poses', 'resce'],
+            'pose_hit': ['poses', 'resce'],
+            'pose_lab': ['poses', 'resce'],
             'crop2': ['index', 'resce'],
             'clean': ['index', 'resce'],
+            'ortho3': ['index', 'resce'],
+            'ov3edt2': ['ortho3', 'poses', 'resce'],
+            'pcnt3': ['index', 'resce'],
+            'vxhit': ['index', 'resce'],
+            'vxudir': ['pcnt3', 'poses', 'resce'],
+            'edt2': ['clean', 'poses', 'resce'],
+            'udir2': ['clean', 'poses', 'resce'],
+            'edt2m': ['edt2', 'udir2'],
+            'ov3dist2': ['vxudir'],
+            'ov3edt2': ['ortho3', 'poses', 'resce'],
+            'ov3edt2m': ['ov3edt2', 'ov3dist2'],
         }
         self.store_prow = {
             'pose_c': datapro.prow_pose_c,
             # 'pose_c1': datapro.prow_pose_c1,
-            # 'pose_hit': datapro.prow_pose_hit,
-            # 'pose_lab': datapro.prow_pose_lab,
+            'pose_hit': datapro.prow_pose_hit,
+            'pose_lab': datapro.prow_pose_lab,
             'crop2': datapro.prow_crop2,
             'clean': datapro.prow_clean,
             'ortho3': datapro.prow_ortho3,
-            # 'pcnt3': datapro.prow_pcnt3,
+            'pcnt3': datapro.prow_pcnt3,
             # 'truncd': datapro.prow_truncd,
             # 'tsdf3': datapro.prow_tsdf3,
-            # 'vxhit': datapro.prow_vxhit,
+            'vxhit': datapro.prow_vxhit,
             # 'vxoff': datapro.prow_vxoff,
-            # 'vxudir': datapro.prow_vxudir,
+            'vxudir': datapro.prow_vxudir,
             # 'hmap2': datapro.prow_hmap2,
             'udir2': datapro.prow_udir2,
             # 'vxedt': datapro.prow_vxedt,
             'edt2': datapro.prow_edt2,
-            # 'ov3edt2': datapro.prow_ov3edt2,
+            'ov3edt2': datapro.prow_ov3edt2,
             'edt2m': datapro.prow_edt2m,
-            # 'ov3dist2': datapro.prow_ov3dist2,
-            # 'ov3edt2m': datapro.prow_ov3edt2m,
+            'ov3dist2': datapro.prow_ov3dist2,
+            'ov3edt2m': datapro.prow_ov3edt2m,
         }

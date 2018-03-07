@@ -107,8 +107,8 @@ class hands17holder:
     bbox_color = Color('orange')
 
     def _prepare_data_full_path(
-        self, target, precon_list, store_name, path_pre_fn,
-            filepack, batchallot):
+        self, target, precon_list, store_name,
+            path_pre_fn, filepack, batchallot):
         precon_h5 = {}
         num_line = 0
         for precon in precon_list:
@@ -159,18 +159,11 @@ class hands17holder:
         for precon in precon_list:
             self.prepare_data_recur(
                 precon, store_name, filepack, batchallot)
-        path_train = self.prepared_train_join(store_name[target])
+        path_train = self.prepared_join(store_name[target])
         if not os.path.exists(path_train):
             self._prepare_data_full_path(
                 target, precon_list, store_name,
-                self.prepared_train_join,
-                filepack, batchallot
-            )
-        path_test = self.prepared_test_join(store_name[target])
-        if not os.path.exists(path_test):
-            self._prepare_data_full_path(
-                target, precon_list, store_name,
-                self.prepared_test_join,
+                self.prepared_join,
                 filepack, batchallot
             )
 
@@ -178,6 +171,7 @@ class hands17holder:
         from itertools import islice
         from utils.coder import file_pack
         from model.batch_allot import batch_index
+        annotation_train = self.prepared_join(self.annotation)
         self.num_training = int(0)
         pose_limit = np.array([
             [np.inf, np.inf, np.inf],
@@ -190,7 +184,7 @@ class hands17holder:
             batchallot = batch_index(self, num_line)
             store_size = batchallot.store_size
             h5file, batch_data = batchallot.create_index(
-                filepack, self.annotation_train, num_line, num_line)
+                filepack, annotation_train, num_line, num_line)
             timerbar = progressbar.ProgressBar(
                 maxval=num_line,
                 widgets=[
@@ -266,7 +260,8 @@ class hands17holder:
 
     def init_data(self):
         update_log = False
-        if (not os.path.exists(self.annotation_train)):
+        annotation_train = self.prepared_join(self.annotation)
+        if (not os.path.exists(annotation_train)):
             from timeit import default_timer as timer
             from datetime import timedelta
             time_s = timer()
@@ -281,7 +276,7 @@ class hands17holder:
             )
             update_log = True
         else:
-            with h5py.File(self.annotation_train, 'r') as h5file:
+            with h5py.File(annotation_train, 'r') as h5file:
                 self.num_training = h5file['index'].shape[0]
             self.logger.info('collected {:d} images'.format(
                 self.num_training))
@@ -311,39 +306,25 @@ class hands17holder:
         #         self.train_test_split,
         #         self.num_training - self.train_test_split,
         #         split_num))
-        test_file = self.annotation_test
-        if not os.path.exists(test_file):
-            with h5py.File(self.annotation_train, 'r') as h5file:
+        annotation_test = self.annotation_test
+        if not os.path.exists(annotation_test):
+            with h5py.File(annotation_train, 'r') as h5file:
                 index = h5file['index'][self.train_test_split:, ...]
                 poses = h5file['poses'][self.train_test_split:, ...]
-                with h5py.File(test_file, 'w') as writer:
+                with h5py.File(annotation_test, 'w') as writer:
                     dataio.write_h5(writer, index, poses)
-                # with open(test_file + '_1.txt', 'w') as writer:
+                # with open(annotation_test + '_1.txt', 'w') as writer:
                 #     dataio.write_txt(writer, index, poses)
-            # dataio.h5_to_txt(test_file, test_file + '.txt')
+            # dataio.h5_to_txt(annotation_test, annotation_test + '.txt')
             print('split out test annoations.')
 
         return update_log
 
-    def annotation_train_join(self, filename):
-        return os.path.join(
-            self.out_dir,
-            'prepared',
-            filename
-        )
+    def images_join(self, filename='', mode='train'):
+        return os.path.join(self.data_dir, 'training', 'images', filename)
 
-    def annotation_test_join(self, filename):
-        return self.annotation_train_join(filename)
-
-    def prepared_train_join(self, filename):
-        return os.path.join(
-            self.out_dir,
-            'prepared',
-            filename
-        )
-
-    def prepared_test_join(self, filename):
-        return self.prepared_train_join(filename)
+    def prepared_join(self, filename='', mode='train'):
+        return os.path.join(self.out_dir, 'prepared', filename)
 
     def __init__(self, args):
         self.data_dir = args.data_dir
@@ -353,32 +334,42 @@ class hands17holder:
         # self.anchor_num = args.anchor_num
         self.crop_range = args.crop_range
         # self.z_range[1] = self.crop_range * 2. + self.z_range[0]
-        self.training_images = os.path.join(self.data_dir, 'training/images')
-        self.test_images = os.path.join(self.data_dir, 'training/images')
+        # self.training_images = os.path.join(self.data_dir, 'training/images')
+        # self.test_images = os.path.join(self.data_dir, 'training/images')
         self.training_annot_origin = os.path.join(
             self.data_dir, 'training/Training_Annotation.txt')
         # self.annotation_cleaned = os.path.join(
         #     self.out_dir, 'annotation')
         self.annotation = 'annotation'
-        self.annotation_train = self.annotation_train_join(
-            self.annotation)
-        self.annotation_test = self.annotation_test_join(
-            'annotation_test')
+        self.annotation_test = self.prepared_join('annotation_test')
         self.frame_images = os.path.join(self.data_dir, 'frame/images')
         self.frame_bbox = os.path.join(self.data_dir, 'frame/BoundingBox.txt')
-        self.prepared_train = self.prepared_train_join('')
-        if not os.path.exists(self.prepared_train):
-            os.makedirs(self.prepared_train)
-        self.prepared_test = self.prepared_train_join('')
-        if not os.path.exists(self.prepared_test):
-            os.makedirs(self.prepared_test)
+        prepared_train = self.prepared_join('', 'train')
+        if not os.path.exists(prepared_train):
+            os.makedirs(prepared_train)
+        prepared_test = self.prepared_join('', 'test',)
+        if not os.path.exists(prepared_test):
+            os.makedirs(prepared_test)
         self.store_precon = {
             'index': [],
             'poses': [],
             'resce': [],
             'pose_c': ['poses', 'resce'],
+            'pose_hit': ['poses', 'resce'],
+            'pose_lab': ['poses', 'resce'],
             'crop2': ['index', 'resce'],
             'clean': ['index', 'resce'],
+            'ortho3': ['index', 'resce'],
+            'ov3edt2': ['ortho3', 'poses', 'resce'],
+            'pcnt3': ['index', 'resce'],
+            'vxhit': ['index', 'resce'],
+            'vxudir': ['pcnt3', 'poses', 'resce'],
+            'edt2': ['clean', 'poses', 'resce'],
+            'udir2': ['clean', 'poses', 'resce'],
+            'edt2m': ['edt2', 'udir2'],
+            'ov3dist2': ['vxudir'],
+            'ov3edt2': ['ortho3', 'poses', 'resce'],
+            'ov3edt2m': ['ov3edt2', 'ov3dist2'],
         }
         self.store_prow = {
             'pose_c': datapro.prow_pose_c,
