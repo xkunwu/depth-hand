@@ -99,7 +99,8 @@ class regu_grid:
         seqid = np.ravel_multi_index(indices.T, (step, step, step))
         unid, counts = np.unique(seqid, return_counts=True)
         pcnt[unid] = counts.astype(float)
-        pcnt /= np.max(pcnt)  # normalized density
+        if 1e-2 < np.max(pcnt):
+            pcnt /= np.max(pcnt)  # normalized density
         pcnt = pcnt.reshape((step, step, step))
         # pcnt = np.zeros(shape=(step, step, step))
         # for index in indices:

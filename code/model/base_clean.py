@@ -61,6 +61,7 @@ class base_clean(base_regre):
             store_handle['index'][self.batch_beg:batch_end, ...]
         self.batch_data['batch_resce'] = \
             store_handle['resce'][self.batch_beg:batch_end, ...]
+        # print('fetched: {} --> {}'.format(self.batch_beg, batch_end))
         self.batch_beg = batch_end
         return self.batch_data
 
@@ -103,6 +104,7 @@ class base_clean(base_regre):
         frame_id = np.random.choice(store_size)
         # frame_id = 0  # frame_id = img_id - 1
         # frame_id = 239
+        # frame_id = 2600
         img_id = index_h5[frame_id, ...]
         frame_h5 = store_handle['clean'][frame_id, ...]
         poses_h5 = store_handle['pose_c'][frame_id, ...].reshape(-1, 3)

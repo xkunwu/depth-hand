@@ -27,7 +27,7 @@ class nyu_handholder:
     # hmap_size = 32  # for detection models
     # anchor_num = 16  # for attention model
     crop_range = 480.  # +/- spacial capture range
-    z_range = (100., 1060.)  # empirical valid depth range
+    z_range = (100., 3060.)  # empirical valid depth range
     z_max = 9999.  # max distance set to 10m
     # camera info
     focal = (588.036865, 587.075073)
@@ -238,26 +238,28 @@ class nyu_handholder:
         return write_beg, pose_limit
 
     # def _merge_annotation(self):
+    #     annotation_train = self.prepared_join(self.annotation, 'train')
+    #     annotation_test = self.prepared_join(self.annotation, 'test')
+    #     annotation_merged = self.prepared_join(self.annotation + '_merged', 'train')
     #     with file_pack() as filepack:
     #         batchallot = batch_index(self, self.num_annotation)
     #         h5out, _ = batchallot.create_index(
-    #             filepack, self.annotation_cleaned,
+    #             filepack, annotation_merged,
     #             self.num_annotation, None)
     #         batchallot.write(
-    #             filepack.push_h5(self.annotation_train),
+    #             filepack.push_h5(annotation_train),
     #             h5out, 0, self.num_training)
     #         batchallot.write(
-    #             filepack.push_h5(self.annotation_test),
+    #             filepack.push_h5(annotation_test),
     #             h5out, self.num_training, self.num_annotation)
 
     def remove_out_frame_annot(self):
-        annot_origin_train = os.path.join(
-            self.data_dir, 'train', 'joint_data.mat')
-        annot_origin_test = os.path.join(
-            self.data_dir, 'test', 'joint_data.mat')
+        annot_origin_train = self.images_join('joint_data.mat', 'train')
+        annot_origin_test = self.images_join('joint_data.mat', 'test')
         annotation_train = self.prepared_join(self.annotation, 'train')
         annotation_test = self.prepared_join(self.annotation, 'test')
         self.num_training = int(0)
+        self.num_evaluate = int(0)
         pose_limit = np.array([
             [np.inf, np.inf, np.inf],
             [-np.inf, -np.inf, -np.inf],
@@ -278,6 +280,7 @@ class nyu_handholder:
             pose_limit[1, :] = np.maximum(
                 pose_limit[1, :],
                 lim[1, :])
+        # use splited training data only
         with file_pack() as filepack:
             if num_eval is None:
                 self.num_evaluate, lim = self._remove_out_frame_mat(
@@ -332,6 +335,27 @@ class nyu_handholder:
         # the last portion is used for test (compare models)
         self.train_test_split = 0
         self.train_valid_split = int(portion * (split_num - 1))
+
+        # # use splited training data only
+        # self.train_test_split = int(portion * (split_num - 1))
+        # self.train_valid_split = int(portion * (split_num - 2))
+        # self.num_annotation = self.num_training
+        # self.num_evaluate = self.num_annotation - self.train_test_split
+        # self.num_training = self.train_test_split
+
+        # # use splited training data only
+        # annotation_test = self.annotation_test
+        # if not os.path.exists(annotation_test):
+        #     with h5py.File(annotation_train, 'r') as h5file:
+        #         index = h5file['index'][self.train_test_split:, ...]
+        #         poses = h5file['poses'][self.train_test_split:, ...]
+        #         with h5py.File(annotation_test, 'w') as writer:
+        #             dataio.write_h5(writer, index, poses)
+        #         # with open(annotation_test + '_1.txt', 'w') as writer:
+        #         #     dataio.write_txt(writer, index, poses)
+        #     # dataio.h5_to_txt(annotation_test, annotation_test + '.txt')
+        #     print('split out test annoations.')
+
         self.logger.info('collected {:d} images: {:d} training, {:d} validation, {:d} evaluate'.format(
             self.num_annotation, self.train_valid_split,
             self.num_training - self.train_valid_split,
@@ -341,9 +365,11 @@ class nyu_handholder:
 
     def images_join(self, filename='', mode='train'):
         return os.path.join(self.data_dir, mode, filename)
+        # return os.path.join(self.data_dir, 'train', filename)
 
     def prepared_join(self, filename='', mode='train'):
         return os.path.join(self.out_dir, 'prepared', mode, filename)
+        # return os.path.join(self.out_dir, 'prepared', filename)
 
     def __init__(self, args):
         self.args = args
@@ -354,11 +380,9 @@ class nyu_handholder:
         # self.anchor_num = args.anchor_num
         self.crop_range = args.crop_range
         # self.z_range[1] = self.crop_range * 2. + self.z_range[0]
-        # self.training_images = os.path.join(self.data_dir, 'train')
-        # self.test_images = os.path.join(self.data_dir, 'test')
         self.annotation = 'annotation'
-        self.annotation_test = self.prepared_join(
-            self.annotation, 'test')
+        self.annotation_test = self.prepared_join('annotation', 'test')
+        # self.annotation_test = self.prepared_join('annotation_test', 'test')
         prepared_train = self.prepared_join('', 'train')
         if not os.path.exists(prepared_train):
             os.makedirs(prepared_train)

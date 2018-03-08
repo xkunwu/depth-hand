@@ -41,7 +41,8 @@ def compare_error_h5(thedata, fname_echt, fname_pred):
     with h5py.File(fname_echt, 'r') as file_s, \
             h5py.File(fname_pred, 'r') as file_t:
         num_line = file_t['index'].shape[0]
-        if 0 != np.sum(file_s['index'][:num_line] - file_t['index'][()]):
+        # print(np.vstack((file_s['index'][:num_line], file_t['index'][:num_line])))
+        if 0 != np.sum(file_s['index'][:num_line] - file_t['index'][:num_line]):
             print('ERROR - different names index!')
             return
         poses_s = file_s['poses'][:num_line, ...].reshape(-1, 3)

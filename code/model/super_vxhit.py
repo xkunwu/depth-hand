@@ -24,7 +24,7 @@ class super_vxhit(voxel_detect):
         self.hmap_size = 32
         self.map_scale = self.crop_size / self.hmap_size
 
-    def fetch_batch(self, fetch_size=None):
+    def fetch_batch(self, mode='train', fetch_size=None):
         if fetch_size is None:
             fetch_size = self.batch_size
         batch_end = self.batch_beg + fetch_size
@@ -35,17 +35,18 @@ class super_vxhit(voxel_detect):
         # # print(self.batch_beg, batch_end, self.split_end)
         if batch_end >= self.split_end:
             return None
+        store_handle = self.store_handle[mode]
         self.batch_data['batch_frame'] = np.expand_dims(
-            self.store_handle['vxhit'][self.batch_beg:batch_end, ...],
+            store_handle['vxhit'][self.batch_beg:batch_end, ...],
             axis=-1)
         self.batch_data['batch_poses'] = \
-            self.store_handle['pose_c'][self.batch_beg:batch_end, ...]
-        self.batch_data['batch_vxhit'] = self.store_handle['pose_lab'][
+            store_handle['pose_c'][self.batch_beg:batch_end, ...]
+        self.batch_data['batch_vxhit'] = store_handle['pose_lab'][
             self.batch_beg:batch_end, ..., :self.join_num]
         self.batch_data['batch_index'] = \
-            self.store_handle['index'][self.batch_beg:batch_end, ...]
+            store_handle['index'][self.batch_beg:batch_end, ...]
         self.batch_data['batch_resce'] = \
-            self.store_handle['resce'][self.batch_beg:batch_end, ...]
+            store_handle['resce'][self.batch_beg:batch_end, ...]
         self.batch_beg = batch_end
         return self.batch_data
 
@@ -55,25 +56,13 @@ class super_vxhit(voxel_detect):
         thedata.hmap_size = self.hmap_size
         self.out_dim = self.join_num * 3
         self.store_name = {
-            'index': self.train_file,
-            'poses': self.train_file,
-            'resce': self.train_file,
-            'clean': os.path.join(
-                self.prepare_dir, 'clean_{}'.format(self.crop_size)),
-            'pose_lab': os.path.join(
-                self.prepare_dir, 'pose_lab_{}'.format(self.hmap_size)),
-            'vxhit': os.path.join(
-                self.prepare_dir, 'vxhit_{}'.format(self.crop_size)),
-            'pose_c': os.path.join(self.prepare_dir, 'pose_c'),
-        }
-        self.store_precon = {
-            'index': [],
-            'poses': [],
-            'resce': [],
-            'clean': ['index', 'resce'],
-            'pose_lab': ['poses', 'resce'],
-            'vxhit': ['index', 'resce'],
-            'pose_c': ['poses', 'resce'],
+            'index': thedata.annotation,
+            'poses': thedata.annotation,
+            'resce': thedata.annotation,
+            'pose_c': 'pose_c',
+            'clean': 'clean_{}'.format(self.crop_size),
+            'pose_lab': 'pose_lab_{}'.format(self.hmap_size),
+            'vxhit': 'vxhit_{}'.format(self.crop_size),
         }
         self.frame_type = 'clean'
 

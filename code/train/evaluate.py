@@ -1,4 +1,5 @@
 import os
+import sys
 import progressbar
 from importlib import import_module
 from shutil import copyfile
@@ -77,7 +78,6 @@ def draw_compare(args, predict_dir=None):
     # return
     num_method = len(methods)
     print('{:d} methods collected for comparison ...'.format(num_method))
-    annot_test = args.data_inst.annotation_test
     error_l = []
     timerbar = progressbar.ProgressBar(
         maxval=num_method,
@@ -90,7 +90,7 @@ def draw_compare(args, predict_dir=None):
     for predict in predictions:
         error = dataeval.compare_error_h5(
             args.data_inst,
-            annot_test,
+            args.data_inst.annotation_test,
             predict
         )
         # print(error.shape)
@@ -154,34 +154,33 @@ def draw_compare(args, predict_dir=None):
 # python -m train.evaluate --out_root=${HOME}/data/univue/palau --max_epoch=1 --batch_size=5 --bn_decay=0.9 --show_draw=True --model_name=base_clean
 # python -m train.evaluate --data_name=nyu_hand --num_eval=99 --max_epoch=1 --batch_size=5 --bn_decay=0.9 --show_draw=True --model_name=base_clean
 
-# python -m train.evaluate --data_name=nyu_hand --max_epoch=50 --valid_stop=0.5 --bn_decay=0.995 --decay_step=100000
-# python -m train.evaluate --gpu_id=1 --data_name=nyu_hand --out_root=${HOME}/data/out0219 --max_epoch=50 --valid_stop=0.5 --bn_decay=0.995 --decay_step=100000
+# python -m train.evaluate --data_name=nyu_hand --max_epoch=20 --valid_stop=0.5 --bn_decay=0.995 --decay_step=100000
+# python -m train.evaluate --gpu_id=1 --data_name=nyu_hand --out_root=${HOME}/data/out0219 --max_epoch=20 --valid_stop=0.5 --bn_decay=0.995 --decay_step=100000
 
 # import pdb; pdb.set_trace()
 if __name__ == "__main__":
     from args_holder import args_holder
     # import tfplot
-    with_train = True
-    # with_train = False
+    # with_train = True
+    with_train = False
     with_eval = True
     # with_eval = False
 
-    # mpl = import_module('matplotlib')
-    # mpl.use('Agg')
-    with args_holder() as argsholder:
-        argsholder.parse_args()
-        args = argsholder.args
-        argsholder.create_instance()
-        # import shutil
-        # shutil.rmtree(args.out_dir)
-        # os.makedirs(args.out_dir)
-
-        run_one(args, with_train, with_eval)
-        argsholder.append_log()
-
-        # draw_compare(args)
-    import sys
-    sys.exit()
+    # # mpl = import_module('matplotlib')
+    # # mpl.use('Agg')
+    # with args_holder() as argsholder:
+    #     argsholder.parse_args()
+    #     args = argsholder.args
+    #     argsholder.create_instance()
+    #     # import shutil
+    #     # shutil.rmtree(args.out_dir)
+    #     # os.makedirs(args.out_dir)
+    #
+    #     run_one(args, with_train, with_eval)
+    #     argsholder.append_log()
+    #
+    #     # draw_compare(args)
+    # sys.exit()
 
     mpl = import_module('matplotlib')
     mpl.use('Agg')
@@ -190,13 +189,13 @@ if __name__ == "__main__":
         'super_ov3edt2m',
         # 'super_ov3dist2',
         # 'super_ov3edt2',
-        # 'super_edt2m',
+        'super_edt2m',
         # 'super_edt2',
         # 'super_dist3',
         # 'voxel_regre',
         # 'voxel_offset',
-        # 'super_vxhit',
-        # 'voxel_detect',
+        'super_vxhit',
+        'voxel_detect',
         # 'super_dist2',
         # 'super_udir2',
         # 'super_hmap2',
@@ -205,9 +204,9 @@ if __name__ == "__main__":
         # 'trunc_dist',
         # 'base_conv3',
         # 'base_conv3_inres',
-        # 'ortho3view',
+        'ortho3view',
         # 'base_regre',
-        # 'base_clean',
+        'base_clean',
         # 'base_regre_inres',
         # 'base_clean_inres',
         # 'base_regre_hg',
@@ -221,9 +220,11 @@ if __name__ == "__main__":
             args.model_name = meth
             argsholder.create_instance()
             run_one(args, with_train, with_eval)
+            # sys.exit()
             # run_one(args, True, True)
             # run_one(args, False, False)
             argsholder.append_log()
+            args.model_inst.detect_write_images()
     with args_holder() as argsholder:
         argsholder.parse_args()
         argsholder.create_instance()
