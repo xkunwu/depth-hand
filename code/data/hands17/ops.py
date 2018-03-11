@@ -537,6 +537,8 @@ def prop_edt2(image_crop, pose_raw, cube, caminfo, roll=0):
     masked_edt = np.ma.masked_array(image_hmap, mask)
     edt_out = distance_transform_edt(mask) * istep
     edt = image_hmap - edt_out
+    # edt_in = distance_transform_edt(~mask) * istep
+    # edt = edt_in - edt_out
     pose3d = cube.transform_center_shrink(pose_raw)
     pose2d, _ = cube.project_ortho(pose3d, roll=roll, sort=False)
     pose2d = np.floor(pose2d * hmap_size).astype(int)
@@ -558,6 +560,7 @@ def prop_edt2(image_crop, pose_raw, cube, caminfo, roll=0):
             #     (val > edt))
         else:
             phi = masked_edt.copy()
+            # phi = edt.copy()
         phi[pose[0], pose[1]] = 0.
         df = skfmm.distance(phi, dx=1e-1)
         df_max = np.max(df)
@@ -567,6 +570,7 @@ def prop_edt2(image_crop, pose_raw, cube, caminfo, roll=0):
         # if 1 != scale:
         #     df = df[::scale, ::scale]  # downsampling
         edt_l.append(df)
+        # edt_l.append(edt)
     return np.stack(edt_l, axis=2)
 
 

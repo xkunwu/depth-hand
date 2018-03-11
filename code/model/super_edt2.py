@@ -104,15 +104,27 @@ class super_edt2(base_clean):
         print(np.min(frame_h5), np.max(frame_h5))
         print(np.histogram(frame_h5, range=(1e-4, np.max(frame_h5))))
         print(np.min(poses_h5, axis=0), np.max(poses_h5, axis=0))
+        cube = iso_cube()
+        cube.load(resce_h5)
+        pose_raw = self.yanker(poses_h5, resce_h5, self.caminfo)
+        from utils.image_ops import draw_edt2
+
+        # phi_l = self.data_module.ops.prop_edt2(
+        #     frame_h5, pose_raw, cube, self.data_inst
+        # )
+        # phi = phi_l[..., -10]
+        # fig, ax = mpplot.subplots(figsize=(5, 5))
+        # ax.imshow(frame_h5, cmap=mpplot.cm.bone_r)
+        # draw_edt2(fig, ax, phi)
+        # fig.tight_layout()
+        # mpplot.show()
+
         from colour import Color
         colors = [Color('orange').rgb, Color('red').rgb, Color('lime').rgb]
         fig, _ = mpplot.subplots(nrows=2, ncols=2, figsize=(2 * 5, 2 * 5))
 
         ax = mpplot.subplot(2, 2, 2)
         mpplot.gca().set_title('test storage read')
-        resce3 = resce_h5[0:4]
-        cube = iso_cube()
-        cube.load(resce3)
         # draw_pose_pred(
         #     fig, ax, frame_h5, poses_h5, resce_h5,
         #     args.data_draw.draw_pose2d, thedata)
@@ -131,7 +143,6 @@ class super_edt2(base_clean):
         img_name = args.data_io.index2imagename(img_id)
         img = args.data_io.read_image(self.data_inst.images_join(img_name, mode))
         ax.imshow(img, cmap=mpplot.cm.bone_r)
-        pose_raw = self.yanker(poses_h5, resce_h5, self.caminfo)
         args.data_draw.draw_pose2d(
             ax, thedata,
             args.data_ops.raw_to_2d(pose_raw, thedata)
@@ -142,7 +153,6 @@ class super_edt2(base_clean):
         for ii, rect in enumerate(rects):
             rect.draw(ax, colors[ii])
 
-        from utils.image_ops import draw_edt2
         ax = mpplot.subplot(2, 2, 3)
         joint_id = self.join_num - 1
         edt2 = edt2_h5[..., joint_id]

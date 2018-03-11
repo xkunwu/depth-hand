@@ -178,7 +178,7 @@ class train_dense_regre(train_abc):
                 self.logger.info(
                     'batch {} validate loss: {}'.format(
                         batch_count, loss_val))
-            if batch_count % 100 == 0:
+            if 0 == (batch_count % 100):
                 valid_writer.add_summary(summary, step)
             batch_count += 1
         mean_loss = loss_sum / batch_count

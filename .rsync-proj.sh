@@ -32,16 +32,19 @@ mkdir -p ${TARGET}
 echo downloading \
     from: [${SOURCE}] \
     to: [${TARGET}]
-rsync -auvh -e ssh --include='*.txt' --include='*.log' \
+rsync -auvhm -e ssh \
+    --include='*.txt' --include='*.log' \
+    --include='*.png' --include='*/' \
+    --exclude '*' \
     ${SOURCE} \
     ${TARGET}
-## download model checkpoint
-SOURCE=${SERVER}:${OUT_DIR}/output/${DATA_NAME}/log/blinks/${MODEL}/model.ckpt*
-TARGET=${HOME}/${OUT_DIR}/${SERVER}/${DATA_NAME}/log/${MODEL}
-mkdir -p ${TARGET}
-echo downloading \
-    from: [${SOURCE}] \
-    to: [${TARGET}]
-rsync -auvh -e ssh \
-    ${SOURCE} \
-    ${TARGET}
+# ## download model checkpoint
+# SOURCE=${SERVER}:${OUT_DIR}/output/${DATA_NAME}/log/blinks/${MODEL}/model.ckpt*
+# TARGET=${HOME}/${OUT_DIR}/${SERVER}/${DATA_NAME}/log/${MODEL}
+# mkdir -p ${TARGET}
+# echo downloading \
+#     from: [${SOURCE}] \
+#     to: [${TARGET}]
+# rsync -auvh -e ssh \
+#     ${SOURCE} \
+#     ${TARGET}

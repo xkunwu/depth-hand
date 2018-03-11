@@ -254,9 +254,12 @@ class base_regre(object):
 
     def detect_write_images(self):
         batch_beg = self.args.data_inst.train_test_split
-        outdir = os.path.join(self.args.log_dir_t, 'images')
-        if not os.path.exists(outdir):
-            os.makedirs(outdir)
+        outdir_good = os.path.join(self.args.log_dir_t, 'good')
+        if not os.path.exists(outdir_good):
+            os.makedirs(outdir_good)
+        outdir_bad = os.path.join(self.args.log_dir_t, 'bad')
+        if not os.path.exists(outdir_bad):
+            os.makedirs(outdir_bad)
         with h5py.File(self.predict_file, 'r') as pred_h5:
             fig = mpplot.figure(figsize=(5, 5))
             ax = fig.add_axes([0, 0, 1, 1])
@@ -275,32 +278,45 @@ class base_regre(object):
             poses_echt_h5 = store_handle['poses']
             resce_h5 = store_handle['resce']
             index_h5 = store_handle['index']
-            error_cap = 50
+            error_cap = (10, 50)
             bad_cnt = 0
+            good_cnt = 0
             for li in np.arange(num_line):
                 poses_pred = poses_pred_h5[li, ...].reshape(-1, 3)
                 poses_echt = poses_echt_h5[(batch_beg + li), ...].reshape(-1, 3)
                 error = np.mean(np.sqrt(
                     np.sum((poses_pred - poses_echt) ** 2, axis=1)
                 ))
-                if error_cap > error:
-                    continue
-                bad_cnt += 1
-                self._draw_image_pose(
-                    ax,
-                    frame_h5[(batch_beg + li), ...],
-                    poses_pred,
-                    resce_h5[(batch_beg + li), ...],
-                    self.caminfo)
-                mpplot.savefig(os.path.join(
-                    outdir,
-                    self.data_module.io.index2imagename(index_h5[li])))
-                ax.clear()
+                if error_cap[1] < error:
+                    bad_cnt += 1
+                    self._draw_image_pose(
+                        ax,
+                        frame_h5[(batch_beg + li), ...],
+                        poses_pred,
+                        resce_h5[(batch_beg + li), ...],
+                        self.caminfo)
+                    mpplot.savefig(os.path.join(
+                        outdir_bad,
+                        self.data_module.io.index2imagename(index_h5[li])))
+                    ax.clear()
+                if error_cap[0] > error:
+                    good_cnt += 1
+                    if 0 == (good_cnt % 100):
+                        self._draw_image_pose(
+                            ax,
+                            frame_h5[(batch_beg + li), ...],
+                            poses_pred,
+                            resce_h5[(batch_beg + li), ...],
+                            self.caminfo)
+                        mpplot.savefig(os.path.join(
+                            outdir_good,
+                            self.data_module.io.index2imagename(index_h5[li])))
+                        ax.clear()
                 timerbar.update(li)
             timerbar.finish()
             mpplot.close(fig)
-            self.logger.info('{} bad detections for error cap {}'.format(
-                bad_cnt, error_cap))
+            self.logger.info('{} good detections, {} bad detections for error cap [{}]'.format(
+                good_cnt, bad_cnt, error_cap))
 
     def yanker(self, pose_local, resce, caminfo):
         cube = iso_cube()

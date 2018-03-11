@@ -114,6 +114,13 @@ def prow_vxhit(args, thedata, mode, batch_data):
     batch_data[bi, ...] = vxhit
 
 
+def prow_tsdf3(args, thedata, mode, batch_data):
+    bi, pcnt3 = \
+        args[0], args[1]
+    tsdf3 = dataops.trunc_belief(pcnt3)
+    batch_data[bi, ...] = tsdf3
+
+
 def prow_pcnt3(args, thedata, mode, batch_data):
     bi, index, resce = \
         args[0], args[1], args[2]

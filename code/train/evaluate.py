@@ -166,47 +166,47 @@ if __name__ == "__main__":
     with_eval = True
     # with_eval = False
 
-    # # mpl = import_module('matplotlib')
-    # # mpl.use('Agg')
-    # with args_holder() as argsholder:
-    #     argsholder.parse_args()
-    #     args = argsholder.args
-    #     argsholder.create_instance()
-    #     # import shutil
-    #     # shutil.rmtree(args.out_dir)
-    #     # os.makedirs(args.out_dir)
-    #
-    #     run_one(args, with_train, with_eval)
-    #     argsholder.append_log()
-    #
-    #     # draw_compare(args)
-    # sys.exit()
+    # mpl = import_module('matplotlib')
+    # mpl.use('Agg')
+    with args_holder() as argsholder:
+        argsholder.parse_args()
+        args = argsholder.args
+        argsholder.create_instance()
+        # import shutil
+        # shutil.rmtree(args.out_dir)
+        # os.makedirs(args.out_dir)
+
+        run_one(args, with_train, with_eval)
+        argsholder.append_log()
+
+        # draw_compare(args)
+    sys.exit()
 
     mpl = import_module('matplotlib')
     mpl.use('Agg')
     methlist = [
         # 'super_edt3',
-        'super_ov3edt2m',
+        # 'super_ov3edt2m',
         # 'super_ov3dist2',
         # 'super_ov3edt2',
-        'super_edt2m',
+        # 'super_edt2m',
         # 'super_edt2',
         # 'super_dist3',
         # 'voxel_regre',
         # 'voxel_offset',
-        'super_vxhit',
-        'voxel_detect',
+        # 'super_vxhit',
+        # 'voxel_detect',
         # 'super_dist2',
         # 'super_udir2',
         # 'super_hmap2',
         # 'dense_regre',
-        # 'direc_tsdf',
+        'direc_tsdf',
         # 'trunc_dist',
         # 'base_conv3',
         # 'base_conv3_inres',
-        'ortho3view',
+        # 'ortho3view',
         # 'base_regre',
-        'base_clean',
+        # 'base_clean',
         # 'base_regre_inres',
         # 'base_clean_inres',
         # 'base_regre_hg',
@@ -223,8 +223,8 @@ if __name__ == "__main__":
             # sys.exit()
             # run_one(args, True, True)
             # run_one(args, False, False)
-            argsholder.append_log()
             args.model_inst.detect_write_images()
+            argsholder.append_log()
     with args_holder() as argsholder:
         argsholder.parse_args()
         argsholder.create_instance()

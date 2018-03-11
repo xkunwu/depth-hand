@@ -401,6 +401,60 @@ def to_vxhit(img, cube, caminfo):
     return pcnt3
 
 
+def direc_belief(pcnt):
+    """ not optimized! """
+    size = pcnt.shape[0]
+    phi = np.ones_like(pcnt)
+    z0front = np.ones((size, size)) * size
+    for index in np.transpose(np.where(0 < pcnt)):
+        if z0front[index[0], index[1]] > index[2]:
+            z0front[index[0], index[1]] = index[2]
+    # print(z0front)
+    zrange = np.ones((size, size, size))
+    zrange[:, :, np.arange(size)] *= np.arange(size)
+    # print(zrange[..., 2])
+    for z in range(size):
+        phi[zrange[..., z] == z0front, z] = 0
+        phi[zrange[..., z] > z0front, z] = -1
+    # print(phi[..., 0])
+    # print(phi[..., 1])
+    # print(phi[..., 2])
+    # print(phi[..., 3])
+    # print(phi[..., 4])
+    # print(phi[..., 5])
+    bef = skfmm.distance(phi, dx=1e-1, narrow=0.3)
+    return bef
+
+
+def direc_belief_simple(pcnt):
+    vxhit = (1e-2 > pcnt)
+    from scipy import ndimage
+    df = ndimage.distance_transform_edt(vxhit)
+    df[3 < df] = 0
+    from utils.image_ops import draw_dist3
+    from mayavi import mlab
+    draw_dist3(df, 32, 2)
+    mlab.show()
+    return df
+    # phi = np.ones_like(pcnt)
+    # # z0front = np.argmax(vxhit, axis=2)
+    # # mask = np.all(vxhit, axis=2)
+    # # z0front[~mask] = size - 1
+    # phi[vxhit] = 0
+    # bef = skfmm.distance(phi, dx=1e-1, narrow=0.3)
+    # return bef
+
+
+def trunc_belief(pcnt):
+    pcnt_r = np.copy(pcnt)
+    befs = []
+    for spi in range(3):
+        pcnt_r = np.rollaxis(pcnt_r, -1)
+        # befs.append(direc_belief_simple(pcnt_r))
+        befs.append(direc_belief(pcnt_r))
+    return np.stack(befs, axis=3)
+
+
 def to_pcnt3(img, cube, caminfo):
     step = caminfo.crop_size
     points3_pick = cube.pick(img_to_raw(img, caminfo))
