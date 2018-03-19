@@ -18,17 +18,17 @@ model_ref = {
     'voxel_regre': '3D CR w/ offset',
     'voxel_offset': '3D offset regression',
     'super_vxhit': '3D CR w/ detection',
-    'voxel_detect': 'Moon et. al. (Arxiv\'17)',
+    'voxel_detect': 'Moon et.~al.~(Arxiv\'17)',
     'super_dist2': '2D CR w/ Euclidean distance',
     'super_udir2': '2D CR w/ offset',
     'super_hmap2': '2D CR w/ heatmap',
-    # 'dense_regre': 'Wan et. al. (Arxiv\'17)',
+    # 'dense_regre': 'Wan et.~al.~(Arxiv\'17)',
     'dense_regre': '2D offset regression',
-    'direc_tsdf': 'Ge et. al. (CVPR\'17)',
+    'direc_tsdf': 'Ge et.~al.~(CVPR\'17)',
     'trunc_dist': '3D truncated Euclidean distance',
     'base_conv3': '3D CR',
     'base_conv3_inres': '3D CR w/ inception-resnet',
-    'ortho3view': 'Ge et. al. (CVPR\'16)',
+    'ortho3view': 'Ge et.~al.~(CVPR\'16)',
     'base_clean': '2D CR',
     'base_regre': '2D CR-background',
     'base_clean_inres': '2D CR w/ inception-resnet',
@@ -52,8 +52,9 @@ def run_one(args, with_train=False, with_eval=False):
 
 
 def convert_legacy_txt(predictions):
-    dataio = import_module(
-        'data.' + args.data_name + '.io')
+    dataio = getattr(
+        import_module('data.' + args.data_name + '.io'),
+        'io')
     for predict in predictions:
         txt_back = predict + '.txt'
         os.rename(predict, txt_back)
@@ -63,8 +64,9 @@ def convert_legacy_txt(predictions):
 
 def draw_compare(args, predict_dir=None):
     mpplot = import_module('matplotlib.pyplot')
-    dataeval = import_module(
-        'data.' + args.data_name + '.eval')
+    dataeval = getattr(
+        import_module('data.' + args.data_name + '.eval'),
+        'eval')
     if predict_dir is None:
         predict_dir = args.model_inst.predict_dir
     predictions = []
@@ -163,24 +165,24 @@ if __name__ == "__main__":
     # import tfplot
     # with_train = True
     with_train = False
-    with_eval = True
-    # with_eval = False
+    # with_eval = True
+    with_eval = False
 
-    # mpl = import_module('matplotlib')
-    # mpl.use('Agg')
-    with args_holder() as argsholder:
-        argsholder.parse_args()
-        args = argsholder.args
-        argsholder.create_instance()
-        # import shutil
-        # shutil.rmtree(args.out_dir)
-        # os.makedirs(args.out_dir)
-
-        run_one(args, with_train, with_eval)
-        argsholder.append_log()
-
-        # draw_compare(args)
-    sys.exit()
+    # # mpl = import_module('matplotlib')
+    # # mpl.use('Agg')
+    # with args_holder() as argsholder:
+    #     argsholder.parse_args()
+    #     args = argsholder.args
+    #     argsholder.create_instance()
+    #     # import shutil
+    #     # shutil.rmtree(args.out_dir)
+    #     # os.makedirs(args.out_dir)
+    #
+    #     run_one(args, with_train, with_eval)
+    #     argsholder.append_log()
+    #
+    #     # draw_compare(args)
+    # sys.exit()
 
     mpl = import_module('matplotlib')
     mpl.use('Agg')
@@ -192,7 +194,7 @@ if __name__ == "__main__":
         # 'super_edt2m',
         # 'super_edt2',
         # 'super_dist3',
-        # 'voxel_regre',
+        'voxel_regre',
         # 'voxel_offset',
         # 'super_vxhit',
         # 'voxel_detect',
@@ -200,13 +202,13 @@ if __name__ == "__main__":
         # 'super_udir2',
         # 'super_hmap2',
         # 'dense_regre',
-        'direc_tsdf',
+        # 'direc_tsdf',
         # 'trunc_dist',
         # 'base_conv3',
         # 'base_conv3_inres',
         # 'ortho3view',
         # 'base_regre',
-        # 'base_clean',
+        'base_clean',
         # 'base_regre_inres',
         # 'base_clean_inres',
         # 'base_regre_hg',
@@ -225,15 +227,15 @@ if __name__ == "__main__":
             # run_one(args, False, False)
             args.model_inst.detect_write_images()
             argsholder.append_log()
-    with args_holder() as argsholder:
-        argsholder.parse_args()
-        argsholder.create_instance()
-        args = argsholder.args
-        draw_compare(args)
-        # argsholder.append_log()
-        # args.model_inst.check_dir(args.data_inst, args)
-        # args.model_inst.detect_write_images()
-    copyfile(
-        os.path.join(args.log_dir, 'univue.log'),
-        os.path.join(args.model_inst.predict_dir, 'univue.log')
-    )
+    # with args_holder() as argsholder:
+    #     argsholder.parse_args()
+    #     argsholder.create_instance()
+    #     args = argsholder.args
+    #     draw_compare(args)
+    #     # argsholder.append_log()
+    #     # args.model_inst.check_dir(args.data_inst, args)
+    #     # args.model_inst.detect_write_images()
+    # copyfile(
+    #     os.path.join(args.log_dir, 'univue.log'),
+    #     os.path.join(args.model_inst.predict_dir, 'univue.log')
+    # )

@@ -294,14 +294,29 @@ class args_holder:
             'data.' + self.args.data_name)
         self.args.data_provider = import_module(
             'data.' + self.args.data_name + '.provider')
-        self.args.data_draw = import_module(
-            'data.' + self.args.data_name + '.draw')
-        self.args.data_eval = import_module(
-            'data.' + self.args.data_name + '.eval')
-        self.args.data_ops = import_module(
-            'data.' + self.args.data_name + '.ops')
-        self.args.data_io = import_module(
-            'data.' + self.args.data_name + '.io')
+        # self.args.data_draw = import_module(
+        #     'data.' + self.args.data_name + '.draw')
+        # self.args.data_eval = import_module(
+        #     'data.' + self.args.data_name + '.eval')
+        # self.args.data_ops = import_module(
+        #     'data.' + self.args.data_name + '.ops')
+        # self.args.data_io = import_module(
+        #     'data.' + self.args.data_name + '.io')
+        self.args.data_draw = getattr(
+            import_module('data.' + self.args.data_name + '.draw'),
+            'draw')
+        self.args.data_eval = getattr(
+            import_module('data.' + self.args.data_name + '.eval'),
+            'eval')
+        self.args.data_io = getattr(
+            import_module('data.' + self.args.data_name + '.io'),
+            'io')
+        self.args.data_ops = getattr(
+            import_module('data.' + self.args.data_name + '.ops'),
+            'ops')
+        # self.args.data_provider = getattr(
+        #     import_module('data.' + self.args.data_name + '.provider'),
+        #     'provider')
         self.args.data_class = getattr(
             import_module('data.' + self.args.data_name + '.holder'),
             self.args.data_name + 'holder'

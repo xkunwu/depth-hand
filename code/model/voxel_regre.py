@@ -23,7 +23,7 @@ class voxel_regre(voxel_offset):
         self.hmap_size = 16
         self.map_scale = self.crop_size / self.hmap_size
 
-    def fetch_batch(self, fetch_size=None):
+    def fetch_batch(self, mode='train', fetch_size=None):
         if fetch_size is None:
             fetch_size = self.batch_size
         batch_end = self.batch_beg + fetch_size
@@ -34,19 +34,20 @@ class voxel_regre(voxel_offset):
         # # print(self.batch_beg, batch_end, self.split_end)
         if batch_end >= self.split_end:
             return None
+        store_handle = self.store_handle[mode]
         self.batch_data['batch_frame'] = np.expand_dims(
-            self.store_handle['pcnt3'][self.batch_beg:batch_end, ...],
+            store_handle['pcnt3'][self.batch_beg:batch_end, ...],
             axis=-1)
         self.batch_data['batch_poses'] = \
-            self.store_handle['pose_c'][self.batch_beg:batch_end, ...]
+            store_handle['pose_c'][self.batch_beg:batch_end, ...]
         # self.batch_data['batch_poses'] = \
-        #     self.store_handle['pose_c'][self.batch_beg:batch_end, ...]
+        #     store_handle['pose_c'][self.batch_beg:batch_end, ...]
         self.batch_data['batch_vxudir'] = \
-            self.store_handle['vxudir'][self.batch_beg:batch_end, ...]
+            store_handle['vxudir'][self.batch_beg:batch_end, ...]
         self.batch_data['batch_index'] = \
-            self.store_handle['index'][self.batch_beg:batch_end, ...]
+            store_handle['index'][self.batch_beg:batch_end, ...]
         self.batch_data['batch_resce'] = \
-            self.store_handle['resce'][self.batch_beg:batch_end, ...]
+            store_handle['resce'][self.batch_beg:batch_end, ...]
         self.batch_beg = batch_end
         return self.batch_data
 
@@ -56,25 +57,13 @@ class voxel_regre(voxel_offset):
         thedata.hmap_size = self.hmap_size
         self.out_dim = self.join_num * 3
         self.store_name = {
-            'index': self.train_file,
-            'poses': self.train_file,
-            'resce': self.train_file,
-            'clean': os.path.join(
-                self.prepare_dir, 'clean_{}'.format(self.crop_size)),
-            'pcnt3': os.path.join(
-                self.prepare_dir, 'pcnt3_{}'.format(self.crop_size)),
-            'vxudir': os.path.join(
-                self.prepare_dir, 'vxudir_{}'.format(self.hmap_size)),
-            'pose_c': os.path.join(self.prepare_dir, 'pose_c'),
-        }
-        self.store_precon = {
-            'index': [],
-            'poses': [],
-            'resce': [],
-            'clean': ['index', 'resce'],
-            'pcnt3': ['index', 'resce'],
-            'vxudir': ['pcnt3', 'poses', 'resce'],
-            'pose_c': ['poses', 'resce'],
+            'index': thedata.annotation,
+            'poses': thedata.annotation,
+            'resce': thedata.annotation,
+            'pose_c': 'pose_c',
+            'clean': 'clean_{}'.format(self.crop_size),
+            'pcnt3': 'pcnt3_{}'.format(self.crop_size),
+            'vxudir': 'vxudir_{}'.format(self.hmap_size),
         }
         self.frame_type = 'clean'
 

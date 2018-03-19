@@ -72,7 +72,7 @@ class voxel_detect(base_conv3):
     # def write_pred(self, fanno, caminfo,
     #                batch_index, batch_resce, pred):
     #     for ii in range(batch_index.shape[0]):
-    #         img_name = self.data_module.io.index2imagename(batch_index[ii, 0])
+    #         img_name = self.args.data_io.index2imagename(batch_index[ii, 0])
     #         resce = batch_resce[ii, :]
     #         vxmap = pred[ii, ...]
     #         vxhit = np.argmax(vxmap, axis=0)  # convert to label

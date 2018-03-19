@@ -5,8 +5,8 @@ import numpy as np
 from colour import Color
 import progressbar
 import h5py
-from . import ops as dataops
-from . import io as dataio
+from .ops import ops as dataops
+from .io import io as dataio
 from . import provider as datapro
 from utils.iso_boxes import iso_cube
 
@@ -362,6 +362,7 @@ class hands17holder:
             'ortho3': ['index', 'resce'],
             'ov3edt2': ['ortho3', 'poses', 'resce'],
             'pcnt3': ['index', 'resce'],
+            'tsdf3': ['pcnt3'],
             'vxhit': ['index', 'resce'],
             'vxudir': ['pcnt3', 'poses', 'resce'],
             'edt2': ['clean', 'poses', 'resce'],

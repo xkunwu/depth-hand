@@ -34,8 +34,8 @@ class voxel_detect(base_conv3):
         self.out_dim = thedata.join_num
 
     def provider_worker(self, line, image_dir, caminfo):
-        img_name, pose_raw = self.data_module.io.parse_line_annot(line)
-        img = self.data_module.io.read_image(os.path.join(image_dir, img_name))
+        img_name, pose_raw = self.args.data_io.parse_line_annot(line)
+        img = self.args.data_io.read_image(os.path.join(image_dir, img_name))
         pcnt, resce = self.data_module.ops.voxel_hit(
             img, pose_raw, caminfo.crop_size, caminfo)
         resce3 = resce[0:4]
@@ -45,7 +45,7 @@ class voxel_detect(base_conv3):
         vxhit = self.data_module.ops.raw_to_vxlab(
             pose_raw, cube, self.hmap_size, caminfo
         )
-        index = self.data_module.io.imagename2index(img_name)
+        index = self.args.data_io.imagename2index(img_name)
         return (index, np.expand_dims(pcnt, axis=-1),
                 pose_pca.flatten().T, vxhit, resce)
 
@@ -77,7 +77,7 @@ class voxel_detect(base_conv3):
     def write_pred(self, fanno, caminfo,
                    batch_index, batch_resce, pred):
         for ii in range(batch_index.shape[0]):
-            img_name = self.data_module.io.index2imagename(batch_index[ii, 0])
+            img_name = self.args.data_io.index2imagename(batch_index[ii, 0])
             resce = batch_resce[ii, :]
             vxmap = pred[ii, ...]
             vxhit = np.argmax(vxmap, axis=0)  # convert to label

@@ -99,7 +99,7 @@ class dense_regre(base_clean):
     #                batch_frame, batch_poses):
     #     num_j = self.join_num
     #     for ii in range(batch_index.shape[0]):
-    #         img_name = self.data_module.io.index2imagename(batch_index[ii, 0])
+    #         img_name = self.args.data_io.index2imagename(batch_index[ii, 0])
     #         resce = batch_resce[ii, :]
     #         depth = np.squeeze(batch_frame[ii, ...])
     #         hmap2 = batch_poses[ii, ..., 0 * num_j:1 * num_j]

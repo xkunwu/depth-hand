@@ -126,7 +126,7 @@ class base_regre(object):
         ax.imshow(frame, cmap=mpplot.cm.bone_r)
         pose2d, _ = cube.raw_to_unit(poses)
         pose2d *= caminfo.crop_size
-        self.data_module.draw.draw_pose2d(
+        self.args.data_draw.draw_pose2d(
             ax, caminfo,
             pose2d,
         )
@@ -161,7 +161,7 @@ class base_regre(object):
                 frame, poses, resce,
                 caminfo)
             print('draw predition #{:d}: {}'.format(
-                img_id, self.data_module.io.index2imagename(img_id)))
+                img_id, self.args.data_io.index2imagename(img_id)))
             img_id = np.random.randint(1, high=pred_h5['poses'].shape[0])
             ax = mpplot.subplot(2, 4, 3)
             frame = frame_h5[(batch_beg + img_id), ...]
@@ -179,7 +179,7 @@ class base_regre(object):
                 frame, poses, resce,
                 caminfo)
             print('draw predition #{:d}: {}'.format(
-                img_id, self.data_module.io.index2imagename(img_id)))
+                img_id, self.args.data_io.index2imagename(img_id)))
             img_id = np.random.randint(1, high=pred_h5['poses'].shape[0])
             ax = mpplot.subplot(2, 4, 5)
             frame = frame_h5[(batch_beg + img_id), ...]
@@ -197,7 +197,7 @@ class base_regre(object):
                 frame, poses, resce,
                 caminfo)
             print('draw predition #{:d}: {}'.format(
-                img_id, self.data_module.io.index2imagename(img_id)))
+                img_id, self.args.data_io.index2imagename(img_id)))
             img_id = np.random.randint(1, high=pred_h5['poses'].shape[0])
             ax = mpplot.subplot(2, 4, 7)
             frame = frame_h5[(batch_beg + img_id), ...]
@@ -215,7 +215,7 @@ class base_regre(object):
                 frame, poses, resce,
                 caminfo)
             print('draw predition #{:d}: {}'.format(
-                img_id, self.data_module.io.index2imagename(img_id)))
+                img_id, self.args.data_io.index2imagename(img_id)))
         return img_id
 
     def end_evaluate(self, thedata, args):
@@ -227,9 +227,9 @@ class base_regre(object):
         index = store_handle['index'][
             batch_beg:(batch_beg + num_eval), ...]
         with h5py.File(self.predict_file, 'w') as writer:
-            self.data_module.io.write_h5(writer, index, poses)
+            self.args.data_io.write_h5(writer, index, poses)
         # with open(self.predict_file + '.txt', 'w') as writer:
-        #     self.data_module.io.write_txt(writer, index, poses)
+        #     self.args.data_io.write_txt(writer, index, poses)
         print('written annotations for {} test images'.format(num_eval))
 
         fig = mpplot.figure(figsize=(4 * 5, 2 * 5))
@@ -242,7 +242,7 @@ class base_regre(object):
         fname = 'detection_{}_{:d}.png'.format(self.name_desc, img_id)
         mpplot.savefig(os.path.join(self.predict_dir, fname))
         mpplot.close(fig)
-        error_maxj, err_mean = self.data_module.eval.evaluate_poses(
+        error_maxj, err_mean = self.args.data_eval.evaluate_poses(
             self.caminfo, self.name_desc,
             self.predict_dir, self.predict_file)
         self.logger.info('maximal per-joint mean error: {}'.format(
@@ -251,6 +251,22 @@ class base_regre(object):
         self.logger.info('mean error: {}'.format(
             err_mean
         ))
+
+    def _draw_image_pose_compare(
+        self, ax, caminfo, frame, resce,
+            poses_pred, poses_echt):
+        cube = iso_cube()
+        cube.load(resce)
+        ax.imshow(frame, cmap=mpplot.cm.bone_r)
+        pose2d_pred, _ = cube.raw_to_unit(poses_pred)
+        pose2d_pred *= caminfo.crop_size
+        pose2d_echt, _ = cube.raw_to_unit(poses_echt)
+        pose2d_echt *= caminfo.crop_size
+        self.args.data_draw.draw_pose2d_compare(
+            ax, caminfo,
+            pose2d_pred,
+            pose2d_echt,
+        )
 
     def detect_write_images(self):
         batch_beg = self.args.data_inst.train_test_split
@@ -278,7 +294,7 @@ class base_regre(object):
             poses_echt_h5 = store_handle['poses']
             resce_h5 = store_handle['resce']
             index_h5 = store_handle['index']
-            error_cap = (10, 50)
+            error_cap = (10, 20)
             bad_cnt = 0
             good_cnt = 0
             for li in np.arange(num_line):
@@ -289,29 +305,52 @@ class base_regre(object):
                 ))
                 if error_cap[1] < error:
                     bad_cnt += 1
-                    self._draw_image_pose(
-                        ax,
-                        frame_h5[(batch_beg + li), ...],
-                        poses_pred,
-                        resce_h5[(batch_beg + li), ...],
-                        self.caminfo)
-                    mpplot.savefig(os.path.join(
-                        outdir_bad,
-                        self.data_module.io.index2imagename(index_h5[li])))
-                    ax.clear()
+                    # # self._draw_image_pose(
+                    # #     ax,
+                    # #     frame_h5[(batch_beg + li), ...],
+                    # #     poses_pred,
+                    # #     resce_h5[(batch_beg + li), ...],
+                    # #     self.caminfo)
+                    # self._draw_image_pose_compare(
+                    #     ax, self.caminfo,
+                    #     frame_h5[(batch_beg + li), ...],
+                    #     resce_h5[(batch_beg + li), ...],
+                    #     poses_pred, poses_echt)
+                    # ax.axis('off')
+                    # mpplot.savefig(os.path.join(
+                    #     outdir_bad,
+                    #     self.args.data_io.index2imagename(index_h5[li])))
+                    # ax.clear()
                 if error_cap[0] > error:
                     good_cnt += 1
-                    if 0 == (good_cnt % 100):
-                        self._draw_image_pose(
-                            ax,
-                            frame_h5[(batch_beg + li), ...],
-                            poses_pred,
-                            resce_h5[(batch_beg + li), ...],
-                            self.caminfo)
-                        mpplot.savefig(os.path.join(
-                            outdir_good,
-                            self.data_module.io.index2imagename(index_h5[li])))
-                        ax.clear()
+                    # if 0 == (good_cnt % 100):
+                    #     # self._draw_image_pose(
+                    #     #     ax,
+                    #     #     frame_h5[(batch_beg + li), ...],
+                    #     #     poses_pred,
+                    #     #     resce_h5[(batch_beg + li), ...],
+                    #     #     self.caminfo)
+                    #     self._draw_image_pose_compare(
+                    #         ax, self.caminfo,
+                    #         frame_h5[(batch_beg + li), ...],
+                    #         resce_h5[(batch_beg + li), ...],
+                    #         poses_pred, poses_echt)
+                    #     ax.axis('off')
+                    #     mpplot.savefig(os.path.join(
+                    #         outdir_good,
+                    #         self.args.data_io.index2imagename(index_h5[li])))
+                    #     ax.clear()
+                if 0 == (li % 1000):
+                    self._draw_image_pose_compare(
+                        ax, self.caminfo,
+                        frame_h5[(batch_beg + li), ...],
+                        resce_h5[(batch_beg + li), ...],
+                        poses_pred, poses_echt)
+                    ax.axis('off')
+                    mpplot.savefig(os.path.join(
+                        outdir_bad,
+                        self.args.data_io.index2imagename(index_h5[li])))
+                    ax.clear()
                 timerbar.update(li)
             timerbar.finish()
             mpplot.close(fig)

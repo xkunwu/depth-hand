@@ -1,7 +1,7 @@
 import os
 import numpy as np
-from . import ops as dataops
-from . import io as dataio
+from .ops import ops as dataops
+from .io import io as dataio
 from utils.iso_boxes import iso_cube
 from utils.regu_grid import latice_image
 

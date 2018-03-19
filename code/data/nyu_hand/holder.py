@@ -4,8 +4,8 @@ from colour import Color
 import progressbar
 import h5py
 import scipy.io
-from . import ops as dataops
-from . import io as dataio
+from .ops import ops as dataops
+from .io import io as dataio
 from . import provider as datapro
 from utils.iso_boxes import iso_cube
 from utils.coder import file_pack
