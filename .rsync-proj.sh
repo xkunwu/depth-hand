@@ -1,12 +1,13 @@
 #/bin/sh
-PROJ_NAME=univue-hand-pose
+#PROJ_NAME=univue-hand-pose
+PROJ_NAME=${PWD##*/}
 PROJ_DIR=projects
 OUT_DIR=data/univue
 SERVER=${1:-palau}
 DATA_NAME=${2:-hands17}
 MODEL=${3:-base_clean}
 ## upload code
-SOURCE=${HOME}/${PROJ_DIR}/${PROJ_NAME}/
+SOURCE=${PWD}/
 TARGET=${SERVER}:${PROJ_DIR}/${PROJ_NAME}/
 echo uploading \
     from: [${SOURCE}] \

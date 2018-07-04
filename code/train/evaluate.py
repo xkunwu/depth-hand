@@ -194,7 +194,7 @@ if __name__ == "__main__":
         # 'super_edt2m',
         # 'super_edt2',
         # 'super_dist3',
-        'voxel_regre',
+        # 'voxel_regre',
         # 'voxel_offset',
         # 'super_vxhit',
         # 'voxel_detect',
@@ -208,7 +208,7 @@ if __name__ == "__main__":
         # 'base_conv3_inres',
         # 'ortho3view',
         # 'base_regre',
-        'base_clean',
+        # 'base_clean',
         # 'base_regre_inres',
         # 'base_clean_inres',
         # 'base_regre_hg',
@@ -227,14 +227,14 @@ if __name__ == "__main__":
             # run_one(args, False, False)
             args.model_inst.detect_write_images()
             argsholder.append_log()
-    # with args_holder() as argsholder:
-    #     argsholder.parse_args()
-    #     argsholder.create_instance()
-    #     args = argsholder.args
-    #     draw_compare(args)
-    #     # argsholder.append_log()
-    #     # args.model_inst.check_dir(args.data_inst, args)
-    #     # args.model_inst.detect_write_images()
+    with args_holder() as argsholder:
+        argsholder.parse_args()
+        argsholder.create_instance()
+        args = argsholder.args
+        draw_compare(args)
+        # argsholder.append_log()
+        # args.model_inst.check_dir(args.data_inst, args)
+        # args.model_inst.detect_write_images()
     # copyfile(
     #     os.path.join(args.log_dir, 'univue.log'),
     #     os.path.join(args.model_inst.predict_dir, 'univue.log')

@@ -10,9 +10,13 @@ seaborn
 jupyter
 notebook
 imageio
-opencv
+opencv-python
 progressbar2
 traits
 configobj
 envisage
 h5py
+colour
+#mayavi
+PyQt5
+git+https://github.com/wookayin/tensorflow-plot.git@master
