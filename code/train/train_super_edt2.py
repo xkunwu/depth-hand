@@ -218,12 +218,14 @@ class train_super_edt2(train_abc):
             pred_op, end_points = self.args.model_inst.get_model(
                 frames_op, is_training_tf,
                 self.args.bn_decay, self.args.regu_scale)
-            # loss_op = self.args.model_inst.get_loss(
-            #     pred_op, poses_op, edt2_op, end_points)
-            loss_l2, loss_edt, loss_reg = self.args.model_inst.get_loss(
-                pred_op, poses_op, edt2_op, end_points)
-            test_op = loss_l2 + loss_edt
+            loss_l2, loss_reg = self.args.model_inst.get_loss_eval(
+                pred_op, poses_op)
+            test_op = loss_l2
             loss_op = test_op + loss_reg
+            # loss_l2, loss_edt, loss_reg = self.args.model_inst.get_loss(
+            #     pred_op, poses_op, edt2_op, end_points)
+            # test_op = loss_l2 + loss_edt
+            # loss_op = test_op + loss_reg
 
             saver = tf.train.Saver()
 

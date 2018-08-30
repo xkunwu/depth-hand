@@ -192,7 +192,7 @@ class super_edt2(base_clean):
 
         from tensorflow.contrib import slim
         from model.incept_resnet import incept_resnet
-        from model.hourglass import hourglass
+        # from model.hourglass import hourglass
         # ~/anaconda2/lib/python2.7/site-packages/tensorflow/contrib/layers/
         with tf.variable_scope(
                 scope, self.name_desc, [input_tensor]):
@@ -339,3 +339,13 @@ class super_edt2(base_clean):
         loss_reg = tf.add_n(tf.get_collection(
             tf.GraphKeys.REGULARIZATION_LOSSES))
         return loss_l2, loss_edt, loss_reg
+
+    def get_loss_eval(self, pred, echt):
+        """ simple sum-of-squares loss
+            pred: BxHxWx(J*5)
+            echt: BxHxWx(J*5)
+        """
+        loss_l2 = tf.nn.l2_loss(pred - echt)  # already divided by 2
+        loss_reg = tf.add_n(tf.get_collection(
+            tf.GraphKeys.REGULARIZATION_LOSSES))
+        return loss_l2, loss_reg

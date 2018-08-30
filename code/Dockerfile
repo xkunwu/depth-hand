@@ -1,5 +1,7 @@
 # Use Tensorflow from nvidia-docker image as parent image
 FROM nvcr.io/nvidia/tensorflow:18.06-py3
+# Use Tensorflow from Tensorflow image as parent image
+FROM tensorflow/tensorflow:latest-gpu-py3
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
