@@ -9,8 +9,9 @@ __pycache__/
 *.pyc
 .tags*
 .ipynb_checkpoints
-output/*
-eval/*
+output/
+eval/
+survey/
 log/*
 *.log
 *.aux
