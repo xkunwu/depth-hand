@@ -5,11 +5,16 @@ Makefile
 cmake_install.cmake
 install_manifest.txt
 CTestTestfile.cmake
+__pycache__/
 *.pyc
 .tags*
 .ipynb_checkpoints
+*.log
 log/*
 output/*
+eval/*
 *.aux
 *.synctex.gz
 *.bak
+todo.md
+rsync-proj.sh
