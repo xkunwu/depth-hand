@@ -160,6 +160,8 @@ def draw_compare(args, predict_dir=None):
 # python -m train.evaluate --gpu_id=1 --data_name=nyu_hand --out_root=${HOME}/data/out0219 --max_epoch=20 --valid_stop=0.5 --bn_decay=0.995 --decay_step=100000
 
 # import pdb; pdb.set_trace()
+
+
 if __name__ == "__main__":
     from args_holder import args_holder
     # import tfplot
@@ -168,21 +170,21 @@ if __name__ == "__main__":
     # with_eval = True
     with_eval = False
 
-    # # mpl = import_module('matplotlib')
-    # # mpl.use('Agg')
-    # with args_holder() as argsholder:
-    #     argsholder.parse_args()
-    #     args = argsholder.args
-    #     argsholder.create_instance()
-    #     # import shutil
-    #     # shutil.rmtree(args.out_dir)
-    #     # os.makedirs(args.out_dir)
-    #
-    #     run_one(args, with_train, with_eval)
-    #     argsholder.append_log()
-    #
-    #     # draw_compare(args)
-    # sys.exit()
+    # mpl = import_module('matplotlib')
+    # mpl.use('Agg')
+    with args_holder() as argsholder:
+        argsholder.parse_args()
+        args = argsholder.args
+        argsholder.create_instance()
+        # import shutil
+        # shutil.rmtree(args.out_dir)
+        # os.makedirs(args.out_dir)
+
+        run_one(args, with_train, with_eval)
+        argsholder.append_log()
+
+        # draw_compare(args)
+    sys.exit()
 
     mpl = import_module('matplotlib')
     mpl.use('Agg')

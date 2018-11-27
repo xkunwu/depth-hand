@@ -1,3 +1,5 @@
+Cython
+psutil
 numpy
 pandas
 scipy
@@ -7,8 +9,8 @@ scikit-fmm
 pillow
 matplotlib
 seaborn
-jupyter
-notebook
+jupyterlab
+#jupyter
 imageio
 opencv-python
 progressbar2
@@ -20,3 +22,5 @@ colour
 #mayavi
 PyQt5
 git+https://github.com/wookayin/tensorflow-plot.git@master
+#tensorflow-gpu
+pyrealsense2

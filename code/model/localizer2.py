@@ -25,38 +25,6 @@ from utils.iso_boxes import iso_cube
 #             anchors.T, resce)
 #
 #
-# def yank_localizer2_rect(index, anchors, caminfo):
-#     lattice = latice_image(
-#         np.array(caminfo.image_size).astype(float),
-#         caminfo.anchor_num)
-#     points2, wsizes = lattice.yank_anchor_single(
-#         index,
-#         anchors
-#     )
-#     z_cen = dataops.estimate_z(
-#         caminfo.region_size, wsizes, caminfo.focal[0])
-#     # print(np.append(points2, [wsizes, z_cen]).reshape(1, -1))
-#     centre = dataops.d2z_to_raw(
-#         np.append(points2, z_cen).reshape(1, -1),
-#         caminfo
-#     )
-#     return points2, wsizes, centre.flatten()
-#
-#
-# def yank_localizer2(pose_local, resce, caminfo):
-#     anchor_num = caminfo.anchor_num ** 2
-#     # label = np.argmax(pose_local[:anchor_num]).astype(int)
-#     pcnt = pose_local[:anchor_num].reshape(
-#         caminfo.anchor_num, caminfo.anchor_num)
-#     index = np.array(np.unravel_index(np.argmax(pcnt), pcnt.shape))
-#     # convert logits to probability, due to network design
-#     logits = pcnt[index[0], index[1]]
-#     confidence = 1 / (1 + np.exp(-logits))
-#     anchors = pose_local[anchor_num:]
-#     points2, wsizes, centre = yank_localizer2_rect(
-#         index, anchors, caminfo)
-#     return centre, index, confidence
-
 
 class localizer2(base_clean):
     """ this is the 2D version of attention model """
@@ -65,7 +33,7 @@ class localizer2(base_clean):
         self.net_type = 'locor'
         self.crop_size = 256  # resized to this squared
         self.anchor_num = 8
-        self.num_appen = 4
+        #self.num_appen = 4
         self.predict_file = os.path.join(
             self.predict_dir, 'detection_{}'.format(
                 self.name_desc))
@@ -75,8 +43,37 @@ class localizer2(base_clean):
         """ Receive parameters specific to the data """
         super(localizer2, self).receive_data(thedata, args)
         self.out_dim = self.anchor_num ** 2 * 4
-        self.provider_worker = self.provider.prow_localizer2
-        self.yanker = self.provider.yank_localizer2
+
+    # def yank_rect(index, anchors, caminfo):
+    #     lattice = latice_image(
+    #         np.array(caminfo.image_size).astype(float),
+    #         caminfo.anchor_num)
+    #     points2, wsizes = lattice.yank_anchor_single(
+    #         index,
+    #         anchors
+    #     )
+    #     z_cen = dataops.estimate_z(
+    #         caminfo.region_size, wsizes, caminfo.focal[0])
+    #     # print(np.append(points2, [wsizes, z_cen]).reshape(1, -1))
+    #     centre = dataops.d2z_to_raw(
+    #         np.append(points2, z_cen).reshape(1, -1),
+    #         caminfo
+    #     )
+    #     return points2, wsizes, centre.flatten()
+    #
+    # def yanker(pose_local, resce, caminfo):
+    #     anchor_num = caminfo.anchor_num ** 2
+    #     # label = np.argmax(pose_local[:anchor_num]).astype(int)
+    #     pcnt = pose_local[:anchor_num].reshape(
+    #         caminfo.anchor_num, caminfo.anchor_num)
+    #     index = np.array(np.unravel_index(np.argmax(pcnt), pcnt.shape))
+    #     # convert logits to probability, due to network design
+    #     logits = pcnt[index[0], index[1]]
+    #     confidence = 1 / (1 + np.exp(-logits))
+    #     anchors = pose_local[anchor_num:]
+    #     points2, wsizes, centre = yank_rect(
+    #         index, anchors, caminfo)
+    #     return centre, index, confidence
 
     def evaluate_batch(self, writer, pred_val):
         self.provider.write_region2(
@@ -340,7 +337,7 @@ class localizer2(base_clean):
             np.argmax(pcnt), pcnt.shape))
         anchors = poses_h5[anchor_num:]
         print(index)
-        points2, wsizes, centre = self.provider.yank_localizer2_rect(
+        points2, wsizes, centre = self.yank_rect(
             index, anchors, self.caminfo)
         print(np.append(points2, wsizes).reshape(1, -1))
         rect = iso_rect(points2 - wsizes, wsizes * 2)

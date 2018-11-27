@@ -172,7 +172,7 @@ class incept_resnet:
             print(net.shape)
             shape2 = net.get_shape()
             fc_num = shape2[3] * 2
-            net = slim.conv3d(
+            net = slim.conv2d(
                 net, fc_num, shape2[1:3],
                 padding='VALID', scope='fullconn4')
             # net = slim.avg_pool2d(  # --> 2x2x?

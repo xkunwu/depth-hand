@@ -1,9 +1,0 @@
-- [x] iterative refine
-- [x] inres net
-- [x] producing small results
-    - due to using different batch size while evaluating, which is necessary for streaming
-- [] 2d localizer
-- [] ref. object detector application
-- [x] detection based approach
-- [x] data clean parallelization
-    - or preprocess earlier!

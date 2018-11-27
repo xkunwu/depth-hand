@@ -10,22 +10,9 @@ import h5py
 from model.base_conv3 import base_conv3
 import matplotlib.pyplot as mpplot
 from colour import Color
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-BASE_DIR = os.path.abspath(os.path.join(BASE_DIR, os.pardir))
-sys.path.append(BASE_DIR)
-file_pack = getattr(
-    import_module('utils.coder'),
-    'file_pack'
-)
-iso_cube = getattr(
-    import_module('utils.iso_boxes'),
-    'iso_cube'
-)
-regu_grid = getattr(
-    import_module('utils.regu_grid'),
-    'regu_grid'
-)
+from utils.coder import file_pack
+from utils.iso_boxes import iso_cube
+from utils.regu_grid import regu_grid
 
 
 # def prow_localizer3(line, image_dir, caminfo):

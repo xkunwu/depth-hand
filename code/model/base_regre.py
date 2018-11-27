@@ -375,6 +375,8 @@ class base_regre(object):
         time_e = str(timedelta(seconds=timer() - time_s))
         self.logger.info('data prepared [{}], time: {}'.format(
             self.__class__.__name__, time_e))
+        self.logger.info('the following stored data are required: {}'.format(
+            list(self.store_name.values())))
 
         self.store_handle = {
             'train': {},
@@ -567,7 +569,7 @@ class base_regre(object):
             end_points[name] = net
             return name == final_endpoint
         from tensorflow.contrib import slim
-        from incept_resnet import incept_resnet
+        from model.incept_resnet import incept_resnet
         # ~/anaconda2/lib/python2.7/site-packages/tensorflow/contrib/layers/
         with tf.variable_scope(
                 scope, self.name_desc, [input_tensor]):

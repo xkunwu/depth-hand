@@ -1,0 +1,7 @@
+#!/bin/sh
+
+autocutsel -s CLIPBOARD -fork
+xrdb $HOME/.Xresources
+xsetroot -solid grey
+x-terminal-emulator -geometry 80x24+10+10 -ls -title "$VNCDESKTOP Desktop" &
+startxfce4 &

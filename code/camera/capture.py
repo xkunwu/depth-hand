@@ -9,21 +9,12 @@ import tensorflow as tf
 import matplotlib.pyplot as mpplot
 from colour import Color
 import cv2
-import pyrealsense as pyrs
+import pyrealsense2 as pyrs
 import time
 # from multiprocessing import Queue, Pool
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-BASE_DIR = os.path.abspath(os.path.join(BASE_DIR, os.pardir))
-sys.path.append(BASE_DIR)
-args_holder = getattr(
-    import_module('args_holder'),
-    'args_holder'
-)
-iso_cube = getattr(
-    import_module('utils.iso_boxes'),
-    'iso_cube'
-)
+from args_holder import args_holder
+from utils.iso_boxes import iso_cube
 
 
 class capture:
@@ -157,15 +148,24 @@ class capture:
                 }
                 cube, index, confidence = self.detect_region(
                     depth, sess, ops)
-                # cube = iso_cube(np.array([-200, 20, 400]), 120)
-                # show results
                 self.show_results_stream(
                     depth, cube, index, confidence)
-                # self.show_results(depth, cube)
                 # sys.stdout.write('.')
                 # sys.stdout.flush()
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     break
+
+    def capture_test(self, serv, dev):
+        mpplot.subplots(nrows=1, ncols=2, figsize=(6, 6 * 2))
+        while True:
+            depth = self.read_frame_from_device(dev)
+            depth = self.preprocess_input(depth)
+            cube = iso_cube(np.array([-200, 20, 400]), 120)
+            self.show_results(depth, cube)
+            # sys.stdout.write('.')
+            # sys.stdout.flush()
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
 
     def capture_loop(self):
         # Initialize service
@@ -175,7 +175,8 @@ class capture:
             with serv.Device(streams=(depth_stream,)) as dev:
                 # Wait for device to initialize
                 time.sleep(1.)
-                self.capture_detect(serv, dev)
+                #self.capture_detect(serv, dev)
+                self.capture_test(serv, dev)
 
 
 if __name__ == '__main__':
