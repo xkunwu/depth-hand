@@ -2,11 +2,10 @@ import os
 import sys
 from importlib import import_module
 import numpy as np
-# from matplotlib import pyplot as mpplot
-# from matplotlib.colors import NoNorm
+import matplotlib.pyplot as mpplot
+from matplotlib.animation import FuncAnimation
 import tensorflow as tf
 # from tensorflow.contrib import slim
-import matplotlib.pyplot as mpplot
 from colour import Color
 import cv2
 import pyrealsense2 as pyrs
@@ -120,7 +119,7 @@ class capture:
             pred_val, self.args, self.caminfo_ir)
         return cube, index, confidence
 
-    def capture_detect(self, serv, dev):
+    def capture_detect(self, pipeline, dev):
         tf.reset_default_graph()
         with tf.device('/gpu:' + str(self.args.gpu_id)):
             frames_op, _ = self.args.model_inst.placeholder_inputs(1)
@@ -155,7 +154,7 @@ class capture:
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     break
 
-    def capture_test(self, serv, dev):
+    def capture_test(self, pipeline, dev):
         mpplot.subplots(nrows=1, ncols=2, figsize=(6, 6 * 2))
         while True:
             depth = self.read_frame_from_device(dev)
@@ -168,15 +167,94 @@ class capture:
                 break
 
     def capture_loop(self):
-        # Initialize service
-        with pyrs.Service() as serv:
-            depth_stream = pyrs.stream.DepthStream()
-            # Initialize device
-            with serv.Device(streams=(depth_stream,)) as dev:
-                # Wait for device to initialize
-                time.sleep(1.)
-                #self.capture_detect(serv, dev)
-                self.capture_test(serv, dev)
+        # Create a pipeline
+        pipeline = pyrs.pipeline()
+
+        # Create a config and configure the stream
+        config = pyrs.config()
+        config.enable_stream(pyrs.stream.depth, 640, 480, pyrs.format.z16, 30)
+        config.enable_stream(pyrs.stream.color, 640, 480, pyrs.format.rgb8, 30)
+        #config.enable_stream(pyrs.stream.color, 640, 480, pyrs.format.bgr8, 30)
+
+        # Start streaming
+        profile = pipeline.start(config)
+
+        # Getting the depth sensor's depth scale
+        depth_sensor = profile.get_device().first_depth_sensor()
+        #depth_sensor.set_option(pyrs.option.depth_units, 0.001); # RuntimeError: This option is read-only!
+        depth_scale = depth_sensor.get_depth_scale()
+        print("Depth Scale is: ", depth_scale)
+
+        # clip the background
+        #clipping_distance_in_meters = 1 #1 meter
+        #clipping_distance = clipping_distance_in_meters / depth_scale
+        clipping_distance = self.caminfo_ir.z_range[1] # in metric system
+
+        # Create an align object
+        align_to = pyrs.stream.color
+        align = pyrs.align(align_to)
+
+        # Create the figure canvas
+        fig, _ = mpplot.subplots(nrows=1, ncols=2, figsize=(2 * 5, 1 * 5))
+        ax1 = mpplot.subplot(1, 2, 1)
+        ax1.set_axis_off()
+        ax2 = mpplot.subplot(1, 2, 2)
+        ax2.set_axis_off()
+        mpplot.subplots_adjust(left=0, right=1, top=1, bottom=0)
+        im1 = ax1.imshow(np.zeros([480, 640], dtype=np.uint16), vmin=0., vmax=1., cmap=mpplot.cm.bone_r)
+        im2 = ax2.imshow(np.zeros([480, 640, 3], dtype=np.uint8))
+
+        def update(i):
+            frames = pipeline.wait_for_frames()
+
+            # Get frameset of only depth
+            #depth = frames.get_depth_frame()
+            #if not depth:
+            #    continue
+            #depth_image = np.asanyarray(depth)
+
+            # Get aligned color and depth frameset
+            aligned_frames = align.process(frames)
+            aligned_depth_frame = aligned_frames.get_depth_frame()
+            color_frame = aligned_frames.get_color_frame()
+            if not aligned_depth_frame or not color_frame:
+                return
+            depth_image = np.asanyarray(aligned_depth_frame.get_data())
+            depth_image = depth_image * depth_scale / 0.001 # scale to metric
+            color_image = np.asanyarray(color_frame.get_data())
+            #color_image = np.asanyarray(color_frame.get_data())[..., ::-1]
+
+            # Remove background - Set to grey
+            grey_color = 159
+            depth_image_3d = np.dstack(
+                    (depth_image, depth_image, depth_image))
+            bg_removed = np.where(
+                    (depth_image_3d > clipping_distance) | (depth_image_3d <= 0),
+                    grey_color, color_image)
+            np.clip(
+                depth_image,
+                self.caminfo_ir.z_range[0], clipping_distance,
+                out=depth_image )
+
+            # Rendering
+            im1.set_data(depth_image / clipping_distance)
+            #im1.set_data(depth_image.astype(float) / clipping_distance)
+            im2.set_data(bg_removed)
+            #im2.set_data(color_image)
+
+            #self.capture_detect(pipeline, dev)
+            #self.capture_test(pipeline, dev)
+            
+        try:
+            ani = FuncAnimation(fig, update, blit=False, interval=1)
+            def close(event):
+                if event.key == 'q':
+                    mpplot.close(event.canvas.figure)
+            cid = fig.canvas.mpl_connect("key_press_event", close)
+            mpplot.show()
+        finally:
+            mpplot.close(fig)
+            pipeline.stop()
 
 
 if __name__ == '__main__':

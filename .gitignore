@@ -20,3 +20,4 @@ log/*
 todo.md
 rsync-proj.sh
 imgui.ini
+jupyter.out
