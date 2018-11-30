@@ -17,7 +17,8 @@ class iso_rect:
         self.sidelen = args[0]
 
     def show_dims(self):
-        print(self.cll, self.sidelen)
+        print("cll: {}; cen: {}; side: {}".format(
+            self.cll, self.cll + self.sidelen / 2, self.sidelen))
 
     def pick(self, points2):
         cmin = self.cll
@@ -73,7 +74,7 @@ class iso_aabb:
         self.sidelen = args[0]
 
     def show_dims(self):
-        print(self.cen, self.sidelen)
+        print("cen: {}; side: {}".format(self.cen, self.sidelen))
 
     def build(self, points3, m=0.):
         pmin = np.min(points3, axis=0)
@@ -116,7 +117,7 @@ class iso_cube:
         # self.evecs = Quaternion(args[4:8]).rotation_matrix
 
     def show_dims(self):
-        print(self.cen, self.sidelen)
+        print("cen: {}; side: {}".format(self.cen, self.sidelen))
         # print(self.evecs)
 
     def get_sidelen(self):

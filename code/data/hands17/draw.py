@@ -23,6 +23,7 @@ class draw(object):
             Args:
                 pose2d: nx2 array, image domain coordinates
         """
+        plot_list = []
         p2wrist = np.array([pose2d[0, :]])
         no_color = Color('black').rgb
         for fii, joints in enumerate(thedata.join_id):
@@ -37,36 +38,40 @@ class draw(object):
                 color_v0, thedata.join_color[fii + 1], len(p2joints) + 1)]
             for jj, joint in enumerate(p2joints):
                 if with_color:
-                    ax.plot(
+                    pp = ax.plot(
                         p2joints[jj, 1], p2joints[jj, 0],
                         # p2joints[jj, 0], p2joints[jj, 1],
                         'o',
                         color=color_range[jj + 1]
                     )
+                    plot_list.append(pp)
                 else:
-                    ax.plot(
+                    pp = ax.plot(
                         p2joints[jj, 1], p2joints[jj, 0],
                         # p2joints[jj, 0], p2joints[jj, 1],
                         'o',
                         color=no_color
                     )
+                    plot_list.append(pp)
             p2joints = np.vstack((p2wrist, p2joints))
             if with_color:
-                ax.plot(
+                pp = ax.plot(
                     p2joints[:, 1], p2joints[:, 0],
                     # p2joints[:, 0], p2joints[:, 1],
                     '-',
                     linewidth=2.0,
                     color=thedata.join_color[fii + 1].rgb
                 )
+                plot_list.append(pp)
             else:
-                ax.plot(
+                pp = ax.plot(
                     p2joints[:, 1], p2joints[:, 0],
                     # p2joints[:, 0], p2joints[:, 1],
                     '-',
                     linewidth=2.0,
                     color=no_color
                 )
+                plot_list.append(pp)
             # path = mpath.Path(p2joints)
             # verts = path.interpolated(steps=step).vertices
             # x, y = verts[:, 0], verts[:, 1]
@@ -80,19 +85,21 @@ class draw(object):
         #     )
         # )
         if with_color:
-            ax.plot(
+            pp = ax.plot(
                 p2wrist[0, 1], p2wrist[0, 0],
                 # p2wrist[0, 0], p2wrist[0, 1],
                 'o',
                 color=thedata.join_color[0].rgb
             )
+            plot_list.append(pp)
         else:
-            ax.plot(
+            pp = ax.plot(
                 p2wrist[0, 1], p2wrist[0, 0],
                 # p2wrist[0, 0], p2wrist[0, 1],
                 'o',
                 color=no_color
             )
+            plot_list.append(pp)
         # for fii, bone in enumerate(thedata.bone_id):
         #     for jj in range(4):
         #         p0 = pose2d[bone[jj][0], :]
@@ -108,6 +115,7 @@ class draw(object):
         #         #          thedata.join_color[fii + 1], 1)
 
         # return fig2data(mpplot.gcf(), show_margin)
+        return plot_list
 
     @classmethod
     def draw_pose2d_compare(cls, ax, thedata, poses_pred, poses_echt):

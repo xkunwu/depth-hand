@@ -360,7 +360,6 @@ class hands17holder:
             'crop2': ['index', 'resce'],
             'clean': ['index', 'resce'],
             'ortho3': ['index', 'resce'],
-            'ov3edt2': ['ortho3', 'poses', 'resce'],
             'pcnt3': ['index', 'resce'],
             'tsdf3': ['pcnt3'],
             'vxhit': ['index', 'resce'],

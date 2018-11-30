@@ -357,6 +357,15 @@ class base_regre(object):
             self.logger.info('{} good detections, {} bad detections for error cap [{}]'.format(
                 good_cnt, bad_cnt, error_cap))
 
+    @staticmethod
+    def prow_one(img, cube, args, caminfo):
+        img_oped = args.data_ops.to_crop2(img, cube, caminfo)
+        return img_oped
+
+    @staticmethod
+    def rece_one(pose_local, cube, caminfo):
+        return cube.transform_add_center(pose_local)
+
     def yanker(self, pose_local, resce, caminfo):
         cube = iso_cube()
         cube.load(resce)

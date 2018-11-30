@@ -77,6 +77,11 @@ class base_clean(base_regre):
         }
         self.frame_type = 'clean'
 
+    @staticmethod
+    def prow_one(img, cube, args, caminfo):
+        img_oped = args.data_ops.to_clean(img, cube, caminfo)
+        return img_oped
+
     def draw_random(self, thedata, args):
         import matplotlib.pyplot as mpplot
 
