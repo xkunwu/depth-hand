@@ -1,5 +1,4 @@
 import os
-import sys
 from collections import namedtuple
 import numpy as np
 import matplotlib.pyplot as mpplot
@@ -7,7 +6,6 @@ from matplotlib.animation import FuncAnimation
 import tensorflow as tf
 # from tensorflow.contrib import slim
 from colour import Color
-import cv2
 import pyrealsense2 as pyrs
 import time
 # from multiprocessing import Queue, Pool
@@ -81,14 +79,10 @@ class capture:
         # ax2.set_axis_off()
         # mpplot.subplots_adjust(left=0, right=1, top=1, bottom=0)
         mpplot.tight_layout()
-        # need to define vmax, otherwise cannot update
-        im1 = ax1.imshow(
+        im1 = ax1.imshow(  # need to define vmax, otherwise cannot update
             np.zeros(self.caminfo.image_size, dtype=np.uint16),
             vmin=0., vmax=1., cmap=mpplot.cm.bone_r)
         im2 = ax2.imshow(np.zeros([480, 640, 3], dtype=np.uint8))
-        # ax1.invert_xaxis()  # mirror the horizontal direction
-        # ax2.invert_xaxis()
-        # axes = fig.get_axes()
         canvas = self.Canvas(
             fig=fig, ims=(im1, im2), axes=fig.get_axes())
         return canvas
@@ -199,8 +193,8 @@ class capture:
             canvas = self.canvas
             ax = canvas.axes[0]
             [p.remove() for p in reversed(ax.patches)]  # remove previews Rectangle drawings
-            for i, line in enumerate(ax.lines):
-                ax.lines.pop(i)  # remove all lines
+            for artist in ax.lines + ax.collections:
+                artist.remove()  # remove all lines
             depth_image, color_image, bg_removed = self.read_frame_from_device(
                 pipeline, align, depth_scale)
             # depth_image = self.test_depth  # TEST!!
