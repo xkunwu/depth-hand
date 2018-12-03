@@ -10,7 +10,6 @@ __pycache__/
 .tags*
 .ipynb_checkpoints
 output/
-eval/
 survey/
 log/*
 *.log
