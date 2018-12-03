@@ -225,8 +225,9 @@ class capture:
         tf.reset_default_graph()
         with tf.Graph().as_default(), \
                 tf.device('/gpu:' + str(self.args.gpu_id)):
-            frames_op, _ = \
+            placeholders = \
                 self.args.model_inst.placeholder_inputs(1)
+            frames_op = placeholders.frames_tf
             is_training_tf = tf.placeholder(
                 tf.bool, shape=(), name='is_training')
             pred_op, end_points = self.args.model_inst.get_model(
@@ -323,6 +324,7 @@ if __name__ == '__main__':
         argsholder.parse_args()
         ARGS = argsholder.args
         ARGS.mode = 'detect'
+        ARGS.model_name = 'super_edt2m'
         argsholder.create_instance()
         # ARGS.model_inst.check_dir(ARGS.data_inst, ARGS)  # TESTDATA!!
         cap = capture(ARGS)

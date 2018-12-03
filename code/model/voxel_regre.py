@@ -1,6 +1,7 @@
 import os
 from importlib import import_module
 import numpy as np
+from collections import namedtuple
 import tensorflow as tf
 import progressbar
 import h5py
@@ -215,7 +216,8 @@ class voxel_regre(voxel_offset):
                 batch_size,
                 self.hmap_size, self.hmap_size, self.hmap_size,
                 self.join_num * 4))
-        return frames_tf, poses_tf, vxudir_tf
+        Placeholders = namedtuple("Placeholders", "frames_tf poses_tf ext_tf")
+        return Placeholders(frames_tf, poses_tf, vxudir_tf)
 
     @staticmethod
     def smooth_l1(xa):

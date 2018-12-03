@@ -3,6 +3,7 @@ import sys
 from importlib import import_module
 # from psutil import virtual_memory
 import numpy as np
+from collections import namedtuple
 import tensorflow as tf
 from tensorflow.contrib import slim
 # import progressbar
@@ -402,7 +403,8 @@ class localizer3(base_conv3):
                 1))
         poses_tf = tf.placeholder(
             tf.float32, shape=(batch_size, self.out_dim))
-        return frames_tf, poses_tf
+        Placeholders = namedtuple("Placeholders", "frames_tf poses_tf")
+        return Placeholders(frames_tf, poses_tf)
 
     def get_loss(self, pred, echt, end_points):
         """ simple sum-of-squares loss

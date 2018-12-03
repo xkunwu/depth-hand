@@ -1,6 +1,7 @@
 import os
 from importlib import import_module
 import numpy as np
+from collections import namedtuple
 import tensorflow as tf
 import matplotlib.pyplot as mpplot
 from model.super_edt2 import super_edt2
@@ -303,4 +304,5 @@ class super_ov3edt2(super_edt2):
                 batch_size,
                 self.hmap_size, self.hmap_size,
                 self.join_num * 3))
-        return frames_tf, poses_tf, ov3edt2_tf
+        Placeholders = namedtuple("Placeholders", "frames_tf poses_tf ext_tf")
+        return Placeholders(frames_tf, poses_tf, ov3edt2_tf)

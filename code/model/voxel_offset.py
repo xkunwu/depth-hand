@@ -1,6 +1,7 @@
 import os
 from importlib import import_module
 import numpy as np
+from collections import namedtuple
 import tensorflow as tf
 from .base_conv3 import base_conv3
 from utils.iso_boxes import iso_cube
@@ -326,7 +327,8 @@ class voxel_offset(base_conv3):
                 batch_size,
                 self.hmap_size, self.hmap_size, self.hmap_size,
                 self.join_num * 4))
-        return frames_tf, poses_tf
+        Placeholders = namedtuple("Placeholders", "frames_tf poses_tf")
+        return Placeholders(frames_tf, poses_tf)
 
     @staticmethod
     def smooth_l1(xa):

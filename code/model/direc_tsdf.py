@@ -1,6 +1,7 @@
 import os
 from importlib import import_module
 import numpy as np
+from collections import namedtuple
 import tensorflow as tf
 from model.base_conv3 import base_conv3
 from utils.iso_boxes import iso_cube
@@ -220,4 +221,5 @@ class direc_tsdf(base_conv3):
                 3))
         poses_tf = tf.placeholder(
             tf.float32, shape=(batch_size, self.out_dim))
-        return frames_tf, poses_tf
+        Placeholders = namedtuple("Placeholders", "frames_tf poses_tf")
+        return Placeholders(frames_tf, poses_tf)

@@ -103,8 +103,10 @@ class train_abc():
         tf.reset_default_graph()
         with tf.Graph().as_default(), \
                 tf.device('/gpu:' + str(self.args.gpu_id)):
-            frames_op, poses_op = \
+            placeholders = \
                 self.args.model_inst.placeholder_inputs()
+            frames_op = placeholders.frames_tf
+            poses_op = placeholders.poses_tf
             is_training_tf = tf.placeholder(
                 tf.bool, shape=(), name='is_training')
 
@@ -298,8 +300,10 @@ class train_abc():
         with tf.Graph().as_default(), \
                 tf.device('/gpu:' + str(self.args.gpu_id)):
             # sequential evaluate, suited for streaming
-            frames_op, poses_op = \
+            placeholders = \
                 self.args.model_inst.placeholder_inputs(1)
+            frames_op = placeholders.frames_tf
+            poses_op = placeholders.poses_tf
             is_training_tf = tf.placeholder(
                 tf.bool, shape=(), name='is_training')
 

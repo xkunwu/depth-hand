@@ -153,6 +153,7 @@ def draw_compare(args, predict_dir=None):
     print('figures saved: error summary')
 
 # python -m train.evaluate --max_epoch=1 --batch_size=5 --bn_decay=0.9 --show_draw=True --model_name=base_clean
+# python -m train.evaluate --max_epoch=1 --batch_size=5 --model_name=super_edt2m
 # python -m train.evaluate --out_root=${HOME}/data/univue/palau --max_epoch=1 --batch_size=5 --bn_decay=0.9 --show_draw=True --model_name=base_clean
 # python -m train.evaluate --data_name=nyu_hand --num_eval=99 --max_epoch=1 --batch_size=5 --bn_decay=0.9 --show_draw=True --model_name=base_clean
 

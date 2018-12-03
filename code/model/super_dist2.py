@@ -1,6 +1,7 @@
 import os
 from importlib import import_module
 import numpy as np
+from collections import namedtuple
 import tensorflow as tf
 import matplotlib.pyplot as mpplot
 from cv2 import resize as cv2resize
@@ -334,7 +335,8 @@ class super_dist2(base_clean):
                 batch_size,
                 self.hmap_size, self.hmap_size,
                 self.join_num))
-        return frames_tf, poses_tf, udir2_tf
+        Placeholders = namedtuple("Placeholders", "frames_tf poses_tf ext_tf")
+        return Placeholders(frames_tf, poses_tf, udir2_tf)
 
     @staticmethod
     def smooth_l1(xa):
