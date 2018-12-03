@@ -1,6 +1,6 @@
-# Title
+# Hand in Depth
 
-> This is an example file with default selections.
+> Single view depth image based hand detection and pose estimation.
 
 ## Install
 

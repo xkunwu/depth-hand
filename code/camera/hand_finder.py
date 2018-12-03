@@ -21,10 +21,12 @@ class hand_finder:
         if z0 > caminfo.crop_range:
             self.estr = "hand out of detection range"
             return False
-        zrs = z0 + caminfo.region_size * 2
+        zrs = z0 + caminfo.region_size
+        # zrs = z0 + caminfo.region_size * 2
         in_id = np.where(np.logical_and(z0 - 0.01 < dlist, dlist < zrs))
         xin, yin = np.unravel_index(in_id, dimg.shape)
-        p2z = np.vstack((yin, xin, dlist[in_id])).T
+        # p2z = np.vstack((yin, xin, dlist[in_id])).T  # TESTDATA!!
+        p2z = np.vstack((xin, yin, dlist[in_id])).T
         p3d = self.args.data_ops.d2z_to_raw(
             p2z, self.caminfo_ir)
         pmax = np.max(p3d, axis=0)
@@ -34,7 +36,7 @@ class hand_finder:
         cube = iso_cube(
             (pmax + pmin) / 2,
             self.caminfo_ir.region_size)
-        # print(cube.dump())
+        # print(cube.dump())  # [120.0000 -158.0551 -116.6658 240.0000]
         return cube
 
     def region_grow(self, dimg):

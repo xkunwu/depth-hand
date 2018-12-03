@@ -363,8 +363,10 @@ class base_regre(object):
         return img_oped
 
     @staticmethod
-    def rece_one(pose_local, cube, caminfo):
-        return cube.transform_add_center(pose_local)
+    def rece_one(poses, cube, caminfo):
+        pose_local = poses.reshape(-1, 3)
+        pose_raw = cube.transform_add_center(pose_local)
+        return pose_raw
 
     def yanker(self, pose_local, resce, caminfo):
         cube = iso_cube()
@@ -439,6 +441,22 @@ class base_regre(object):
         logger.info('\n{}'.format(pcnt_pred))
         logger.info('\n{}'.format(
             np.fabs(pcnt_echt - pcnt_pred)))
+
+    def fetch_random(self, args):
+        mode = 'test'
+        store_handle = self.store_handle[mode]
+        index_h5 = store_handle['index']
+        store_size = index_h5.shape[0]
+        frame_id = np.random.choice(store_size)
+        frame_id = 287  # frame_id = img_id - 1
+        img_id = index_h5[frame_id, ...]
+        img_name = args.data_io.index2imagename(img_id)
+        img = args.data_io.read_image(self.data_inst.images_join(img_name, mode))
+        resce_h5 = store_handle['resce'][frame_id, ...]
+        resce3 = resce_h5[0:4]
+        cube = iso_cube()
+        cube.load(resce3)
+        return img, cube
 
     def draw_random(self, thedata, args):
         # mode = 'train'

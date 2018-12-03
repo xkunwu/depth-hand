@@ -83,7 +83,7 @@ class capture:
         mpplot.tight_layout()
         # need to define vmax, otherwise cannot update
         im1 = ax1.imshow(
-            np.zeros(self.caminfo_ir.image_size, dtype=np.uint16),
+            np.zeros(self.caminfo.image_size, dtype=np.uint16),
             vmin=0., vmax=1., cmap=mpplot.cm.bone_r)
         im2 = ax2.imshow(np.zeros([480, 640, 3], dtype=np.uint8))
         # ax1.invert_xaxis()  # mirror the horizontal direction
@@ -95,11 +95,17 @@ class capture:
 
     def __init__(self, args):
         self.args = args
+        self.caminfo = self.caminfo_ir
+        # self.caminfo = args.data_inst  # TEST!!
 
         # create the rendering canvas
         def close(event):
             if event.key == 'q':
                 mpplot.close(event.canvas.figure)
+            if event.key == 'b':
+                mpplot.savefig(os.path.join(
+                    self.args.out_dir,
+                    'capture_{}.png'.format(time.time())))
 
         self.canvas = self.create_canvas()
         self.canvas.fig.canvas.mpl_connect(
@@ -107,7 +113,7 @@ class capture:
         self.pplot = []
 
         # for test purpose
-        self.test_depth = np.zeros(self.caminfo_ir.image_size, dtype=np.uint16)
+        self.test_depth = np.zeros(self.caminfo.image_size, dtype=np.uint16)
         self.test_depth[10:20, 10:20] = 240
 
     @staticmethod
@@ -156,7 +162,7 @@ class capture:
         ax = canvas.axes[0]
         rects = cube.proj_rects_3(
             self.args.data_ops.raw_to_2d,
-            self.caminfo_ir
+            self.caminfo
         )
         colors = [Color('orange').rgb, Color('red').rgb, Color('lime').rgb]
         for ii, rect in enumerate(rects):
@@ -164,13 +170,14 @@ class capture:
         if pose_det is None:
             return
         self.pplot = self.args.data_draw.draw_pose2d(
-            ax, self.caminfo_ir,
-            self.args.data_ops.raw_to_2d(pose_det, self.caminfo_ir)
+            ax, self.caminfo,
+            self.args.data_ops.raw_to_2d(pose_det, self.caminfo)
         )
 
     def detect_region(self, depth, cube, sess, ops):
         depth_prow = self.args.model_inst.prow_one(
-            depth, cube, self.args, self.caminfo_ir)
+            depth, cube, self.args, self.caminfo)
+        # self.canvas.ims[0].set_data(depth_prow)  # TEST!!
         depth_prow = np.expand_dims(depth_prow, -1)
         depth_prow = np.expand_dims(depth_prow, 0)
         feed_dict = {
@@ -181,12 +188,12 @@ class capture:
             ops['pred'],
             feed_dict=feed_dict)
         pose_det = self.args.model_inst.rece_one(
-            pred_val.reshape(3, -1).T, cube, self.caminfo_ir)
+            pred_val, cube, self.caminfo)
         return pose_det
 
     def show_detection(
             self, pipeline, align, depth_scale, sess, ops):
-        hfinder = hand_finder(self.args, self.caminfo_ir)
+        hfinder = hand_finder(self.args, self.caminfo)
 
         def update(i):
             canvas = self.canvas
@@ -197,8 +204,9 @@ class capture:
             depth_image, color_image, bg_removed = self.read_frame_from_device(
                 pipeline, align, depth_scale)
             # depth_image = self.test_depth  # TEST!!
+            # depth_image, cube = self.args.model_inst.fetch_random(self.args)  # TESTDATA!!
             canvas.ims[0].set_data(
-                depth_image / self.caminfo_ir.z_range[1])
+                depth_image / self.caminfo.z_range[1])
             canvas.ims[1].set_data(bg_removed)
             cube = hfinder.simp_crop(depth_image)
             if cube is False:
@@ -231,7 +239,10 @@ class capture:
             config.log_device_placement = False
             with tf.Session(config=config) as sess:
                 model_path = self.args.model_inst.ckpt_path
+                print('restoring model from: {} ...'.format(
+                    model_path))
                 saver.restore(sess, model_path)
+                print('model restored.')
                 ops = {
                     'batch_frame': frames_op,
                     'is_training': is_training_tf,
@@ -247,7 +258,7 @@ class capture:
             depth_image, color_image, bg_removed = self.read_frame_from_device(
                 pipeline, align, depth_scale)
             canvas.ims[0].set_data(
-                depth_image / self.caminfo_ir.z_range[1])
+                depth_image / self.caminfo.z_range[1])
             canvas.ims[1].set_data(bg_removed)
             cube = iso_cube(np.array([0, 0, 400]), 120)
             # cube=iso_cube(np.array([-200, 20, 400]), 120)
@@ -256,9 +267,8 @@ class capture:
         # assign return value is necessary! Otherwise no updates.
         anim = FuncAnimation(
             self.canvas.fig, update, blit=False, interval=1)
-        mpplot.show()
         anim.save(
-            os.path.join(self.args.out_dir, "capture.mp4"),
+            os.path.join(self.args.out_dir, "capture_{}.mp4".format(time.time())),
             fps=30, extra_args=['-vcodec', 'libx264'])
 
     def capture_loop(self):
@@ -283,7 +293,7 @@ class capture:
         # clip the background
         # clipping_distance_in_meters = 1 #1 meter
         # clipping_distance = clipping_distance_in_meters / depth_scale
-        # z_range = self.caminfo_ir.z_range  # in metric system
+        # z_range = self.caminfo.z_range  # in metric system
 
         # Create an align object
         align_to = pyrs.stream.color
@@ -301,7 +311,7 @@ def test_camera(cap):
     cube = iso_cube(np.array([0, 0, 400]), 120)
     rects = cube.proj_rects_3(
         cap.args.data_ops.raw_to_2d,
-        cap.caminfo_ir
+        cap.caminfo
     )
     np.set_printoptions(formatter={'float': '{:6.4f}'.format})
     for ii, rect in enumerate(rects):
@@ -314,6 +324,7 @@ if __name__ == '__main__':
         ARGS = argsholder.args
         ARGS.mode = 'detect'
         argsholder.create_instance()
+        # ARGS.model_inst.check_dir(ARGS.data_inst, ARGS)  # TESTDATA!!
         cap = capture(ARGS)
         test_camera(cap)
         cap.capture_loop()
