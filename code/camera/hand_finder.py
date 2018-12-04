@@ -1,6 +1,78 @@
 import numpy as np
+from collections import deque
 from matplotlib.mlab import PCA
 from utils.iso_boxes import iso_cube
+
+
+class MomentTrack:
+    def __init__(self, steprange):
+        self.track_rank = 3
+        """ set probablity to 0.01 when move too far
+            e^(-a*x^2) = 0.01
+            a = -log(0.01) / x^2
+        """
+        self.steprange = steprange
+        self.alpha = - np.log(0.01) / (steprange * steprange)
+        self.isocen = deque(maxlen=self.track_rank)  # center of detections
+        self.cendis = deque(maxlen=self.track_rank)  # center displacement
+        self.delta = deque(maxlen=self.track_rank)  # displacement distance
+        # for ci in range(self.track_rank):
+        #     self.cendis.append(np.zeros(3))
+        #     self.cendis.append(0)
+
+    def get_prob(self, delta):
+        return np.exp(-self.alpha * (delta * delta))
+
+    def get_momentum(self, delta):
+        if len(self.delta) > 0:
+            return abs(delta - self.delta[-1])
+        else:
+            raise ValueError('should have values')
+            return 0
+
+    def get_cen_moment(self, cen, delta):
+        if len(self.isocen) == 0:
+            raise ValueError('should have values')
+        else:
+            mm = self.get_momentum(delta)
+            prob = self.get_prob(mm)
+            cen_m = (1 - prob) * self.isocen[-1] + prob * cen
+            print(delta, mm, prob)
+            return cen_m
+
+    def update(self, cen):
+        if len(self.cendis) == 0:
+            self.isocen.append(cen)
+            self.cendis.append(0)
+            self.delta.append(0)
+            return cen
+        disp = cen - self.isocen[-1]
+        delta = np.linalg.norm(disp)
+        if self.steprange < delta:
+            return False
+        cen_m = self.get_cen_moment(cen, delta)
+        self.isocen.append(cen_m)
+        self.cendis.append(self.isocen[-1] - self.isocen[-2])
+        self.delta.append(np.linalg.norm(self.cendis[-1]))
+        return cen_m
+
+    def clear(self):
+        self.isocen.clear()
+        self.cendis.clear()
+        self.delta.clear()
+
+    def test(self):
+        fib = [1, 1, 2, 3, 5, 8, 13, 21, 34]
+        cens = np.vstack((
+            fib, np.zeros(len(fib)), np.zeros(len(fib)))).T
+        for c in cens:
+            cm = self.update(c)
+            print(c, cm)
+            print(self.isocen)
+            print(self.cendis)
+            print(self.delta)
+            print("=========\n")
+        self.clear()
 
 
 class hand_finder:
@@ -8,6 +80,9 @@ class hand_finder:
         self.args = args
         self.caminfo_ir = caminfo_ir
         self.estr = ""
+        maxm = caminfo_ir.region_size / 1  # maximum move is 12mm
+        self.tracker = MomentTrack(maxm)
+        self.tracker.test()
 
     def simp_crop(self, dimg):
         caminfo = self.caminfo_ir
@@ -20,6 +95,8 @@ class hand_finder:
         # print("10th closest point: {}".format(z0)) # 193.10437004605774
         if z0 > caminfo.crop_range:
             self.estr = "hand out of detection range"
+            print(self.estr)
+            self.tracker.clear()
             return False
         zrs = z0 + caminfo.region_size
         # zrs = z0 + caminfo.region_size * 2
@@ -31,10 +108,14 @@ class hand_finder:
             p2z, self.caminfo_ir)
         pmax = np.max(p3d, axis=0)
         pmin = np.min(p3d, axis=0)
-        self.cen = (pmax + pmin) / 2
-        self.sidelen = np.max(pmax - pmin) / 2
+        cen = (pmax + pmin) / 2
+        cen_m = self.tracker.update(cen)
+        print(cen, cen_m)
+        if cen_m is False:
+            # self.tracker.clear()
+            return False
         cube = iso_cube(
-            (pmax + pmin) / 2,
+            cen_m,
             self.caminfo_ir.region_size)
         # print(cube.dump())  # [120.0000 -158.0551 -116.6658 240.0000]
         return cube

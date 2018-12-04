@@ -376,6 +376,9 @@ class base_regre(object):
         # return cube.transform_expand_move(pose_local)
 
     def check_dir(self, thedata, args):
+        """ Prepare all the required data recursively.
+            Should only be call before training.
+        """
         from timeit import default_timer as timer
         from datetime import timedelta
         time_s = timer()

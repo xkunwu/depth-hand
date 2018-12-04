@@ -1,6 +1,8 @@
 import os
 from collections import namedtuple
 import numpy as np
+from collections import deque
+from copy import deepcopy
 import matplotlib.pyplot as mpplot
 from matplotlib.animation import FuncAnimation
 import tensorflow as tf
@@ -76,21 +78,62 @@ class capture:
         ax1.set_xlim(0, 640)
         ax1.set_ylim(480, 0)
         ax2 = mpplot.subplot(1, 2, 2)
+        # ax3 = mpplot.subplot(1, 3, 3)
         # ax2.set_axis_off()
         # mpplot.subplots_adjust(left=0, right=1, top=1, bottom=0)
-        mpplot.tight_layout()
-        im1 = ax1.imshow(  # need to define vmax, otherwise cannot update
-            np.zeros(self.caminfo.image_size, dtype=np.uint16),
+        im1 = ax1.imshow(
+            np.zeros(self.caminfo.image_size, dtype=np.float),
             vmin=0., vmax=1., cmap=mpplot.cm.bone_r)
         im2 = ax2.imshow(np.zeros([480, 640, 3], dtype=np.uint8))
+        # im3 = ax3.imshow(
+        #     np.zeros((128, 128), dtype=np.float),
+        #     vmin=0., vmax=1., cmap=mpplot.cm.bone_r)
+        mpplot.tight_layout()
         canvas = self.Canvas(
-            fig=fig, ims=(im1, im2), axes=fig.get_axes())
+            fig=fig, ims=(im1, im2), axes=(ax1, ax2))
         return canvas
+
+    def create_debug_canvas(self):
+        # Create the figure canvas
+        fig, _ = mpplot.subplots(nrows=1, ncols=3, figsize=(3 * 4, 1 * 4))
+        ax1 = mpplot.subplot(1, 3, 1)
+        ax2 = mpplot.subplot(1, 3, 2)
+        ax3 = mpplot.subplot(1, 3, 3)
+        im1 = ax1.imshow(
+            np.zeros((128, 128), dtype=np.float),
+            vmin=0., vmax=1., cmap=mpplot.cm.bone_r)
+        im2 = ax2.imshow(
+            np.zeros((128, 128), dtype=np.float),
+            vmin=0., vmax=1., cmap=mpplot.cm.bone_r)
+        im3 = ax3.imshow(
+            np.zeros((128, 128), dtype=np.float),
+            vmin=0., vmax=1., cmap=mpplot.cm.bone_r)
+        mpplot.tight_layout()
+        canvas = self.Canvas(
+            fig=fig, ims=(im1, im2, im3), axes=(ax1, ax2, ax3))
+        return canvas
+
+    def show_debug_fig(self, img, cube):
+        points3_pick = cube.pick(
+            self.args.data_ops.img_to_raw(img, self.caminfo))
+        points3_norm = cube.transform_center_shrink(points3_pick)
+        print(points3_pick.shape, points3_norm.shape)
+        coord, depth = cube.project_ortho(points3_norm, roll=0)
+        img_crop = cube.print_image(coord, depth, self.caminfo.crop_size)
+        self.debug_fig.ims[0].set_data(img_crop)
+        coord, depth = cube.project_ortho(points3_norm, roll=1)
+        img_crop = cube.print_image(coord, depth, self.caminfo.crop_size)
+        self.debug_fig.ims[1].set_data(img_crop)
+        coord, depth = cube.project_ortho(points3_norm, roll=2)
+        img_crop = cube.print_image(coord, depth, self.caminfo.crop_size)
+        self.debug_fig.ims[2].set_data(img_crop)
 
     def __init__(self, args):
         self.args = args
         self.caminfo = self.caminfo_ir
         # self.caminfo = args.data_inst  # TEST!!
+        # self.debug_fig = False
+        self.debug_fig = True
 
         # create the rendering canvas
         def close(event):
@@ -104,7 +147,8 @@ class capture:
         self.canvas = self.create_canvas()
         self.canvas.fig.canvas.mpl_connect(
             "key_press_event", close)
-        self.pplot = []
+        if self.debug_fig:
+            self.debug_fig = self.create_debug_canvas()
 
         # for test purpose
         self.test_depth = np.zeros(self.caminfo.image_size, dtype=np.uint16)
@@ -163,7 +207,7 @@ class capture:
             rect.draw(ax, colors[ii])
         if pose_det is None:
             return
-        self.pplot = self.args.data_draw.draw_pose2d(
+        self.args.data_draw.draw_pose2d(
             ax, self.caminfo,
             self.args.data_ops.raw_to_2d(pose_det, self.caminfo)
         )
@@ -208,10 +252,13 @@ class capture:
             pose_det = self.detect_region(
                 depth_image, cube, sess, ops)
             self.show_results(canvas, cube, pose_det)
+            self.show_debug_fig(depth_image, cube)
 
         # assign return value is necessary! Otherwise no updates.
         anim = FuncAnimation(
             self.canvas.fig, update, blit=False, interval=1)
+        anim_debug = FuncAnimation(
+            self.debug_fig.fig, update, blit=False, interval=1)
         mpplot.show()
 
     def capture_detect(
