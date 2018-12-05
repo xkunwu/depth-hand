@@ -8,7 +8,6 @@ from matplotlib.animation import FuncAnimation
 import tensorflow as tf
 # from tensorflow.contrib import slim
 from colour import Color
-import pyrealsense2 as pyrs
 import time
 # from multiprocessing import Queue, Pool
 from args_holder import args_holder
@@ -117,7 +116,7 @@ class capture:
         points3_pick = cube.pick(
             self.args.data_ops.img_to_raw(img, self.caminfo))
         points3_norm = cube.transform_center_shrink(points3_pick)
-        print(points3_pick.shape, points3_norm.shape)
+        # print(points3_pick.shape, points3_norm.shape)
         coord, depth = cube.project_ortho(points3_norm, roll=0)
         img_crop = cube.print_image(coord, depth, self.caminfo.crop_size)
         self.debug_fig.ims[0].set_data(img_crop)
@@ -150,49 +149,6 @@ class capture:
         if self.debug_fig:
             self.debug_fig = self.create_debug_canvas()
 
-        # for test purpose
-        self.test_depth = np.zeros(self.caminfo.image_size, dtype=np.uint16)
-        self.test_depth[10:20, 10:20] = 240
-
-    @staticmethod
-    def read_frame_from_device(
-            pipeline, align, depth_scale, z_range=caminfo_ir.z_range):
-        frames = pipeline.wait_for_frames()
-
-        # Get frameset of only depth
-        # depth = frames.get_depth_frame()
-        # if not depth:
-        #     continue
-        # depth_image = np.asanyarray(depth)
-
-        # Get aligned color and depth frameset
-        aligned_frames = align.process(frames)
-        aligned_depth_frame = aligned_frames.get_depth_frame()
-        color_frame = aligned_frames.get_color_frame()
-        if not aligned_depth_frame or not color_frame:
-            return
-        depth_image = np.asanyarray(aligned_depth_frame.get_data())
-        depth_image = depth_image * depth_scale / 0.001  # scale to metric
-        color_image = np.asanyarray(color_frame.get_data())
-        # color_image = np.asanyarray(color_frame.get_data())[..., ::-1]
-        # mirror the horizontal direction
-        depth_image = np.flip(depth_image, 1)
-        color_image = np.flip(color_image, 1)
-
-        # Remove background - Set to grey
-        grey_color = 159
-        depth_image_3d = np.dstack(
-            (depth_image, depth_image, depth_image))
-        bg_removed = np.where(
-            (depth_image_3d > z_range[1]) | (depth_image_3d <= 0),
-            grey_color, color_image)
-        np.clip(
-            depth_image,
-            z_range[0], z_range[1],
-            out=depth_image)
-
-        return depth_image, color_image, bg_removed
-
     def show_results(
         self, canvas,
             cube=iso_cube(np.array([-200, 20, 400]), 120),
@@ -215,7 +171,6 @@ class capture:
     def detect_region(self, depth, cube, sess, ops):
         depth_prow = self.args.model_inst.prow_one(
             depth, cube, self.args, self.caminfo)
-        # self.canvas.ims[0].set_data(depth_prow)  # TEST!!
         depth_prow = np.expand_dims(depth_prow, -1)
         depth_prow = np.expand_dims(depth_prow, 0)
         feed_dict = {
@@ -229,8 +184,7 @@ class capture:
             pred_val, cube, self.caminfo)
         return pose_det
 
-    def show_detection(
-            self, pipeline, align, depth_scale, sess, ops):
+    def show_detection(self, cam, sess, ops):
         hfinder = hand_finder(self.args, self.caminfo)
 
         def update(i):
@@ -239,16 +193,16 @@ class capture:
             [p.remove() for p in reversed(ax.patches)]  # remove previews Rectangle drawings
             for artist in ax.lines + ax.collections:
                 artist.remove()  # remove all lines
-            depth_image, color_image, bg_removed = self.read_frame_from_device(
-                pipeline, align, depth_scale)
-            # depth_image = self.test_depth  # TEST!!
-            # depth_image, cube = self.args.model_inst.fetch_random(self.args)  # TESTDATA!!
+            camframes = cam.provide()
+            depth_image = camframes.depth
+            color_image = camframes.color
             canvas.ims[0].set_data(
                 depth_image / self.caminfo.z_range[1])
-            canvas.ims[1].set_data(bg_removed)
+            canvas.ims[1].set_data(color_image)
             cube = hfinder.simp_crop(depth_image)
             if cube is False:
                 return
+            # cube = camframes.extra  # FetchHands17
             pose_det = self.detect_region(
                 depth_image, cube, sess, ops)
             self.show_results(canvas, cube, pose_det)
@@ -257,12 +211,12 @@ class capture:
         # assign return value is necessary! Otherwise no updates.
         anim = FuncAnimation(
             self.canvas.fig, update, blit=False, interval=1)
-        anim_debug = FuncAnimation(
-            self.debug_fig.fig, update, blit=False, interval=1)
+        if self.debug_fig:
+            anim_debug = FuncAnimation(
+                self.debug_fig.fig, update, blit=False, interval=1)
         mpplot.show()
 
-    def capture_detect(
-            self, pipeline, align, depth_scale):
+    def capture_detect(self, cam):
         tf.reset_default_graph()
         with tf.Graph().as_default(), \
                 tf.device('/gpu:' + str(self.args.gpu_id)):
@@ -290,18 +244,17 @@ class capture:
                     'is_training': is_training_tf,
                     'pred': pred_op
                 }
-                self.show_detection(
-                    pipeline, align, depth_scale, sess, ops)
+                self.show_detection(cam, sess, ops)
 
-    def capture_test(
-            self, pipeline, align, depth_scale):
+    def capture_test(self, cam):
         def update(i):
             canvas = self.canvas
-            depth_image, color_image, bg_removed = self.read_frame_from_device(
-                pipeline, align, depth_scale)
+            camframes = cam.provide()
+            depth_image = camframes.depth
+            color_image = camframes.color
             canvas.ims[0].set_data(
                 depth_image / self.caminfo.z_range[1])
-            canvas.ims[1].set_data(bg_removed)
+            canvas.ims[1].set_data(color_image)
             cube = iso_cube(np.array([0, 0, 400]), 120)
             # cube=iso_cube(np.array([-200, 20, 400]), 120)
             self.show_results(canvas, cube)
@@ -314,38 +267,12 @@ class capture:
             fps=30, extra_args=['-vcodec', 'libx264'])
 
     def capture_loop(self):
-        # Create a pipeline
-        pipeline = pyrs.pipeline()
-
-        # Create a config and configure the stream
-        config = pyrs.config()
-        config.enable_stream(pyrs.stream.depth, 640, 480, pyrs.format.z16, 30)
-        config.enable_stream(pyrs.stream.color, 640, 480, pyrs.format.rgb8, 30)
-        # config.enable_stream(pyrs.stream.color, 640, 480, pyrs.format.bgr8, 30)
-
-        # Start streaming
-        profile = pipeline.start(config)
-
-        # Getting the depth sensor's depth scale
-        depth_sensor = profile.get_device().first_depth_sensor()
-        # depth_sensor.set_option(pyrs.option.depth_units, 0.001); # RuntimeError: This option is read-only! - Not supported for SR300.
-        depth_scale = depth_sensor.get_depth_scale()
-        print("Depth Scale is: ", depth_scale)
-
-        # clip the background
-        # clipping_distance_in_meters = 1 #1 meter
-        # clipping_distance = clipping_distance_in_meters / depth_scale
-        # z_range = self.caminfo.z_range  # in metric system
-
-        # Create an align object
-        align_to = pyrs.stream.color
-        align = pyrs.align(align_to)
-
-        try:
-            # self.capture_test(pipeline, align, depth_scale)
-            self.capture_detect(pipeline, align, depth_scale)
-        finally:
-            pipeline.stop()
+        # from camera.realsense_cam import FetchHands17
+        # with FetchHands17(self.caminfo, self.args) as cam:
+        from camera.realsense_cam import realsence_cam
+        with realsence_cam(self.caminfo) as cam:
+            # self.capture_test(cam)
+            self.capture_detect(cam)
 
 
 def test_camera(cap):
@@ -367,7 +294,6 @@ if __name__ == '__main__':
         ARGS.mode = 'detect'
         ARGS.model_name = 'super_edt2m'
         argsholder.create_instance()
-        # ARGS.model_inst.check_dir(ARGS.data_inst, ARGS)  # TESTDATA!!
         cap = capture(ARGS)
         test_camera(cap)
         cap.capture_loop()

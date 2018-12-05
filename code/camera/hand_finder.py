@@ -75,6 +75,17 @@ class MomentTrack:
         self.clear()
 
 
+class HandCenter:
+    def __init__(self):
+        pass
+
+    def simple_mean(self, points):
+        return np.mean(points, axis=0)
+
+    def mean_shift(self, points):
+        return
+
+
 class hand_finder:
     def __init__(self, args, caminfo_ir):
         self.args = args
@@ -82,7 +93,8 @@ class hand_finder:
         self.estr = ""
         maxm = caminfo_ir.region_size / 1  # maximum move is 12mm
         self.tracker = MomentTrack(maxm)
-        self.tracker.test()
+        # self.tracker.test()
+        self.cen_ext = HandCenter()
 
     def simp_crop(self, dimg):
         caminfo = self.caminfo_ir
@@ -106,11 +118,10 @@ class hand_finder:
         p2z = np.vstack((xin, yin, dlist[in_id])).T
         p3d = self.args.data_ops.d2z_to_raw(
             p2z, self.caminfo_ir)
-        pmax = np.max(p3d, axis=0)
-        pmin = np.min(p3d, axis=0)
-        cen = (pmax + pmin) / 2
-        cen_m = self.tracker.update(cen)
-        print(cen, cen_m)
+        cen = self.cen_ext.simple_mean(p3d)
+        # cen_m = self.tracker.update(cen)
+        # print(cen, cen_m)
+        cen_m = cen
         if cen_m is False:
             # self.tracker.clear()
             return False
