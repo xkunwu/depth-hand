@@ -4,6 +4,8 @@ from collections import deque
 from copy import deepcopy
 import matplotlib.pyplot as mpplot
 from matplotlib.animation import FuncAnimation
+from skimage import io as skimio
+import warnings
 import tensorflow as tf
 # from tensorflow.contrib import slim
 from colour import Color
@@ -21,7 +23,21 @@ class DetCanvas:
         self.ims = ims
         self.axes = axes
 
-    def save(self, filename, axi=0):
+    def save_raw(self, filename, axi=0):
+        if 0 > axi:
+            raise ValueError('can only save subplot')
+            return
+        if len(self.axes) <= axi:
+            raise ValueError('there are only {} subplots'.format(len(self.axes)))
+            return
+        img = self.ims[axi].get_array()  # float64
+        img = img.astype(np.uint16)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            skimio.imsave(filename, img)
+        return img
+
+    def save_det(self, filename, axi=0):
         if 0 > axi:
             self.fig.savefig(filename)
             return
@@ -37,16 +53,20 @@ class DetCanvas:
         # Create the figure canvas
         fig, _ = mpplot.subplots(nrows=1, ncols=2, figsize=(2 * 6, 1 * 6))
         ax1 = mpplot.subplot(1, 2, 1)
-        # ax1.set_axis_off()
+        ax1.set_axis_off()
         ax1.set_xlim(0, 640)
         ax1.set_ylim(480, 0)
         ax2 = mpplot.subplot(1, 2, 2)
+        ax2.set_axis_off()
         # ax3 = mpplot.subplot(1, 3, 3)
-        # ax2.set_axis_off()
+        # ax3.set_axis_off()
         # mpplot.subplots_adjust(left=0, right=1, top=1, bottom=0)
         im1 = ax1.imshow(
-            np.zeros(caminfo.image_size, dtype=np.float),
-            vmin=0., vmax=1., cmap=mpplot.cm.bone_r)
+            np.zeros(caminfo.image_size, dtype=np.uint16),
+            vmin=0, vmax=2000, cmap=mpplot.cm.bone_r)
+        # im1 = ax1.imshow(
+        #     np.zeros(caminfo.image_size, dtype=np.float),
+        #     vmin=0., vmax=1., cmap=mpplot.cm.bone_r)
         im2 = ax2.imshow(np.zeros([480, 640, 3], dtype=np.uint8))
         # im3 = ax3.imshow(
         #     np.zeros((128, 128), dtype=np.float),
@@ -148,12 +168,21 @@ class capture:
         self.args = args
         self.caminfo = self.caminfo_ir
         # self.caminfo = args.data_inst  # TEST!!
-        # self.debug_fig = False
-        self.debug_fig = True
-        # self.save_fig = False
-        self.save_fig = os.path.join(self.args.out_dir, 'capture')
-        if not os.path.exists(self.save_fig):
-            os.makedirs(self.save_fig)
+        self.debug_fig = False
+        # self.debug_fig = True
+        self.save_dir = os.path.join(self.args.out_dir, 'capture')
+        if not os.path.exists(self.save_dir):
+            os.makedirs(self.save_dir)
+        # self.save_det = False
+        self.save_det = os.path.join(self.args.out_dir, 'capture')  # DO NOT copy/clone strings!
+        if self.save_det:
+            self.save_det = os.path.join(
+                self.save_det,
+                "detection_{}".format(time.time()))
+            if not os.path.exists(self.save_det):
+                os.makedirs(self.save_det)
+        self.save_raw = False
+        # self.save_raw = os.path.join(self.args.out_dir, 'capture')r
 
         # create the rendering canvas
         def close(event):
@@ -215,10 +244,13 @@ class capture:
             for artist in ax.lines + ax.collections:
                 artist.remove()  # remove all lines
             camframes = cam.provide()
+            if camframes is None:
+                return
             depth_image = camframes.depth
             color_image = camframes.color
-            canvas.ims[0].set_data(
-                depth_image / self.caminfo.z_range[1])
+            # canvas.ims[0].set_data(
+            #     depth_image / self.caminfo.z_range[1])
+            canvas.ims[0].set_data(depth_image)
             canvas.ims[1].set_data(color_image)
             cube = hfinder.simp_crop(depth_image)
             if cube is False:
@@ -226,13 +258,21 @@ class capture:
             # cube = camframes.extra  # FetchHands17
             pose_det = self.detect_region(
                 depth_image, cube, sess, ops)
-            if self.save_fig is not False:
-                filename = os.path.join(
-                    self.save_fig,
-                    "frame_{}.png".format(i))
-                self.canvas.save(filename)
             self.show_results(canvas, cube, pose_det)
-            self.show_debug_fig(depth_image, cube)
+            if self.debug_fig:
+                self.show_debug_fig(depth_image, cube)
+            if self.save_det is not False:
+                filename = os.path.join(
+                    self.save_det,
+                    self.args.data_io.index2imagename(i))
+                self.canvas.save_det(filename)
+            if self.save_raw is not False:
+                filename = os.path.join(
+                    self.save_raw,
+                    self.args.data_io.index2imagename(i))
+                self.canvas.save_raw(filename)
+                # img = self.canvas.save_raw(filename)
+                # print(np.max(abs(img - depth_image)), np.max(img), np.max(depth_image))
 
         # assign return value is necessary! Otherwise no updates.
         anim = FuncAnimation(
@@ -276,6 +316,8 @@ class capture:
         def update(i):
             canvas = self.canvas
             camframes = cam.provide()
+            if camframes is None:
+                return
             depth_image = camframes.depth
             color_image = camframes.color
             canvas.ims[0].set_data(
@@ -288,10 +330,10 @@ class capture:
         # assign return value is necessary! Otherwise no updates.
         anim = FuncAnimation(
             self.canvas.fig, update, blit=False, interval=1)
-        if self.save_fig is not False:
+        if self.save_raw is not False:
             filename = os.path.join(
-                self.save_fig,
-                "capture_{}.mp4".format(time.time()))
+                self.save_raw,
+                "animcap_{}.mp4".format(time.time()))
             anim.save(
                 filename, fps=30,
                 extra_args=['-vcodec', 'libx264'])
@@ -299,8 +341,10 @@ class capture:
     def capture_loop(self):
         # from camera.realsense_cam import FetchHands17
         # with FetchHands17(self.caminfo, self.args) as cam:
-        from camera.realsense_cam import realsence_cam
-        with realsence_cam(self.caminfo) as cam:
+        # from camera.realsense_cam import RealsenceCam
+        # with RealsenceCam(self.caminfo) as cam:
+        from camera.realsense_cam import FileStreamer
+        with FileStreamer(self.caminfo, self.args, self.save_dir) as cam:
             # self.capture_test(cam)
             self.capture_detect(cam)
 

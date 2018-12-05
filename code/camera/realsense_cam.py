@@ -1,5 +1,7 @@
+import os
 import sys
 import numpy as np
+import re
 from collections import namedtuple
 import pyrealsense2 as pyrs
 
@@ -52,7 +54,49 @@ class FetchHands17:
         return CamFrames(self.depth_image, self.depth_image, self.cube)
 
 
-class realsence_cam:
+class FileStreamer:
+    def __init__(self, caminfo, args=None, outdir=None):
+        if (args is None) or (outdir is None):
+            raise ValueError('need to provide valid output path')
+            return 0
+        self.args = args
+        filelist = [f for f in os.listdir(outdir) if re.match(r'image_D(\d+)\.png', f)]
+        # filelist = os.listdir(outdir)
+        # print(outdir)
+        # print(filelist)
+        # retem = re.compile(r'image_D(\d+)\.png')
+        # # filelist = filter(
+        # #     retem.match,
+        # #     filelist)
+        # filelist = [f for f in filelist if re.match(r'image_D(\d+)\.png', f)]
+        print(filelist)
+        filelist.sort(key=lambda f: int(args.data_io.imagename2index(f)))
+        self.filelist = [
+            os.path.join(outdir, f) for f in filelist]
+        self.clid = 0
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        if exc_type is not None:
+            import traceback
+            traceback.print_exception(exc_type, exc_value, exc_traceback)
+            sys.exit()
+        return self
+
+    def provide(self):
+        if self.clid >= len(self.filelist):
+            return None
+        # print('reading: {}'.format(self.filelist[self.clid]))
+        depth_image = self.args.data_io.read_image(
+            self.filelist[self.clid]
+        )
+        self.clid += 1
+        return CamFrames(depth_image, depth_image, None)
+
+
+class RealsenceCam:
     def __init__(self, caminfo):
         # Create a pipeline
         pipeline = pyrs.pipeline()
