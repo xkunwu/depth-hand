@@ -1,5 +1,4 @@
 import os
-from collections import namedtuple
 import numpy as np
 from collections import deque
 from copy import deepcopy
@@ -13,6 +12,70 @@ import time
 from args_holder import args_holder
 from utils.iso_boxes import iso_cube
 from camera.hand_finder import hand_finder
+
+
+# helper to define the rendering canvas
+class DetCanvas:
+    def __init__(self, fig, ims, axes):
+        self.fig = fig
+        self.ims = ims
+        self.axes = axes
+
+    def save(self, filename, axi=0):
+        if 0 > axi:
+            self.fig.savefig(filename)
+            return
+        if len(self.axes) <= axi:
+            raise ValueError('there are only {} subplots'.format(len(self.axes)))
+            return
+        extent = self.axes[axi].get_window_extent().transformed(
+            self.fig.dpi_scale_trans.inverted())
+        self.fig.savefig(filename, bbox_inches=extent)
+
+    @staticmethod
+    def create_canvas(caminfo):
+        # Create the figure canvas
+        fig, _ = mpplot.subplots(nrows=1, ncols=2, figsize=(2 * 6, 1 * 6))
+        ax1 = mpplot.subplot(1, 2, 1)
+        # ax1.set_axis_off()
+        ax1.set_xlim(0, 640)
+        ax1.set_ylim(480, 0)
+        ax2 = mpplot.subplot(1, 2, 2)
+        # ax3 = mpplot.subplot(1, 3, 3)
+        # ax2.set_axis_off()
+        # mpplot.subplots_adjust(left=0, right=1, top=1, bottom=0)
+        im1 = ax1.imshow(
+            np.zeros(caminfo.image_size, dtype=np.float),
+            vmin=0., vmax=1., cmap=mpplot.cm.bone_r)
+        im2 = ax2.imshow(np.zeros([480, 640, 3], dtype=np.uint8))
+        # im3 = ax3.imshow(
+        #     np.zeros((128, 128), dtype=np.float),
+        #     vmin=0., vmax=1., cmap=mpplot.cm.bone_r)
+        mpplot.tight_layout()
+        canvas = DetCanvas(
+            fig=fig, ims=(im1, im2), axes=(ax1, ax2))
+        return canvas
+
+    @staticmethod
+    def create_debug_canvas(caminfo):
+        # Create the figure canvas
+        fig, _ = mpplot.subplots(nrows=1, ncols=3, figsize=(3 * 4, 1 * 4))
+        ax1 = mpplot.subplot(1, 3, 1)
+        ax2 = mpplot.subplot(1, 3, 2)
+        ax3 = mpplot.subplot(1, 3, 3)
+        im1 = ax1.imshow(
+            np.zeros((128, 128), dtype=np.float),
+            vmin=0., vmax=1., cmap=mpplot.cm.bone_r)
+        im2 = ax2.imshow(
+            np.zeros((128, 128), dtype=np.float),
+            vmin=0., vmax=1., cmap=mpplot.cm.bone_r)
+        im3 = ax3.imshow(
+            np.zeros((128, 128), dtype=np.float),
+            vmin=0., vmax=1., cmap=mpplot.cm.bone_r)
+        mpplot.tight_layout()
+        canvas = DetCanvas(
+            fig=fig, ims=(im1, im2, im3), axes=(ax1, ax2, ax3))
+        return canvas
 
 
 class capture:
@@ -66,52 +129,6 @@ class capture:
         def __init__():
             pass
 
-    # helper to define the rendering canvas
-    Canvas = namedtuple("Canvas", "fig ims axes")
-
-    def create_canvas(self):
-        # Create the figure canvas
-        fig, _ = mpplot.subplots(nrows=1, ncols=2, figsize=(2 * 6, 1 * 6))
-        ax1 = mpplot.subplot(1, 2, 1)
-        # ax1.set_axis_off()
-        ax1.set_xlim(0, 640)
-        ax1.set_ylim(480, 0)
-        ax2 = mpplot.subplot(1, 2, 2)
-        # ax3 = mpplot.subplot(1, 3, 3)
-        # ax2.set_axis_off()
-        # mpplot.subplots_adjust(left=0, right=1, top=1, bottom=0)
-        im1 = ax1.imshow(
-            np.zeros(self.caminfo.image_size, dtype=np.float),
-            vmin=0., vmax=1., cmap=mpplot.cm.bone_r)
-        im2 = ax2.imshow(np.zeros([480, 640, 3], dtype=np.uint8))
-        # im3 = ax3.imshow(
-        #     np.zeros((128, 128), dtype=np.float),
-        #     vmin=0., vmax=1., cmap=mpplot.cm.bone_r)
-        mpplot.tight_layout()
-        canvas = self.Canvas(
-            fig=fig, ims=(im1, im2), axes=(ax1, ax2))
-        return canvas
-
-    def create_debug_canvas(self):
-        # Create the figure canvas
-        fig, _ = mpplot.subplots(nrows=1, ncols=3, figsize=(3 * 4, 1 * 4))
-        ax1 = mpplot.subplot(1, 3, 1)
-        ax2 = mpplot.subplot(1, 3, 2)
-        ax3 = mpplot.subplot(1, 3, 3)
-        im1 = ax1.imshow(
-            np.zeros((128, 128), dtype=np.float),
-            vmin=0., vmax=1., cmap=mpplot.cm.bone_r)
-        im2 = ax2.imshow(
-            np.zeros((128, 128), dtype=np.float),
-            vmin=0., vmax=1., cmap=mpplot.cm.bone_r)
-        im3 = ax3.imshow(
-            np.zeros((128, 128), dtype=np.float),
-            vmin=0., vmax=1., cmap=mpplot.cm.bone_r)
-        mpplot.tight_layout()
-        canvas = self.Canvas(
-            fig=fig, ims=(im1, im2, im3), axes=(ax1, ax2, ax3))
-        return canvas
-
     def show_debug_fig(self, img, cube):
         points3_pick = cube.pick(
             self.args.data_ops.img_to_raw(img, self.caminfo))
@@ -133,6 +150,10 @@ class capture:
         # self.caminfo = args.data_inst  # TEST!!
         # self.debug_fig = False
         self.debug_fig = True
+        # self.save_fig = False
+        self.save_fig = os.path.join(self.args.out_dir, 'capture')
+        if not os.path.exists(self.save_fig):
+            os.makedirs(self.save_fig)
 
         # create the rendering canvas
         def close(event):
@@ -143,11 +164,11 @@ class capture:
                     self.args.out_dir,
                     'capture_{}.png'.format(time.time())))
 
-        self.canvas = self.create_canvas()
+        self.canvas = DetCanvas.create_canvas(self.caminfo)
         self.canvas.fig.canvas.mpl_connect(
             "key_press_event", close)
         if self.debug_fig:
-            self.debug_fig = self.create_debug_canvas()
+            self.debug_fig = DetCanvas.create_debug_canvas(self.caminfo)
 
     def show_results(
         self, canvas,
@@ -205,6 +226,11 @@ class capture:
             # cube = camframes.extra  # FetchHands17
             pose_det = self.detect_region(
                 depth_image, cube, sess, ops)
+            if self.save_fig is not False:
+                filename = os.path.join(
+                    self.save_fig,
+                    "frame_{}.png".format(i))
+                self.canvas.save(filename)
             self.show_results(canvas, cube, pose_det)
             self.show_debug_fig(depth_image, cube)
 
@@ -262,9 +288,13 @@ class capture:
         # assign return value is necessary! Otherwise no updates.
         anim = FuncAnimation(
             self.canvas.fig, update, blit=False, interval=1)
-        anim.save(
-            os.path.join(self.args.out_dir, "capture_{}.mp4".format(time.time())),
-            fps=30, extra_args=['-vcodec', 'libx264'])
+        if self.save_fig is not False:
+            filename = os.path.join(
+                self.save_fig,
+                "capture_{}.mp4".format(time.time()))
+            anim.save(
+                filename, fps=30,
+                extra_args=['-vcodec', 'libx264'])
 
     def capture_loop(self):
         # from camera.realsense_cam import FetchHands17
