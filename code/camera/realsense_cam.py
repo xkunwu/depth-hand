@@ -91,6 +91,12 @@ class FetchHands17:
         self.depth_image, self.cube = \
             args.model_inst.fetch_random(args)
 
+    def smooth_data(self, scale=5):
+        import cv2
+        return cv2.bilateralFilter(
+            self.depth_image.astype(np.float32),
+            5, 30, 30)
+
     def __enter__(self):
         return self
 

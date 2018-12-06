@@ -12,6 +12,7 @@ scipy
 scikit-fmm
 scikit-learn
 scikit-image
+sklearn
 imageio
 
 Cython

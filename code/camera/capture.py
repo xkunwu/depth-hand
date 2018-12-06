@@ -261,6 +261,7 @@ class capture:
 
     def capture_test(self):
         def update(i):
+            print("==== Frame: ", i, "====")
             canvas = self.canvas
             camframes = self.cam.provide()
             if camframes is None:
@@ -302,6 +303,48 @@ def test_camera(cap):
         rect.show_dims()
 
 
+def test_smooth(args):
+    from mpl_toolkits.mplot3d import Axes3D
+    from camera.realsense_cam import FetchHands17
+    with FetchHands17(args) as cam:
+        depthimg = cam.depth_image
+        smoothed = cam.smooth_data()
+        cube = cam.cube
+        caminfo = cam.caminfo
+        mpplot.subplots(nrows=1, ncols=2, figsize=(2 * 5, 2 * 5))
+        ax = mpplot.subplot(1, 2, 1, projection='3d')
+        points3 = args.data_ops.img_to_raw(depthimg, caminfo)
+        points3_trans = points3
+        # points3_trans = cube.pick(points3)
+        # points3_trans = cube.transform_to_center(points3_trans)
+        numpts = points3_trans.shape[0]
+        if 10000 < numpts:
+            points3_trans = points3_trans[
+                np.random.choice(numpts, 1000, replace=False), :]
+        ax.scatter(
+            points3_trans[:, 0], points3_trans[:, 1], points3_trans[:, 2],
+            color=Color('lightsteelblue').rgb)
+        corners = cube.transform_to_center(cube.get_corners())
+        cube.draw_cube_wire(ax, corners)
+        ax.view_init(azim=-120, elev=-150)
+        ax = mpplot.subplot(1, 2, 2, projection='3d')
+        points3 = args.data_ops.img_to_raw(smoothed, caminfo)
+        points3_trans = points3
+        # points3_trans = cube.pick(points3)
+        # points3_trans = cube.transform_to_center(points3_trans)
+        numpts = points3_trans.shape[0]
+        if 10000 < numpts:
+            points3_trans = points3_trans[
+                np.random.choice(numpts, 1000, replace=False), :]
+        ax.scatter(
+            points3_trans[:, 0], points3_trans[:, 1], points3_trans[:, 2],
+            color=Color('lightsteelblue').rgb)
+        corners = cube.transform_to_center(cube.get_corners())
+        cube.draw_cube_wire(ax, corners)
+        ax.view_init(azim=-120, elev=-150)
+        mpplot.show()
+
+
 if __name__ == '__main__':
     with args_holder() as argsholder:
         argsholder.parse_args()
@@ -309,6 +352,7 @@ if __name__ == '__main__':
         ARGS.mode = 'detect'
         ARGS.model_name = 'super_edt2m'
         argsholder.create_instance()
+        # test_smooth(ARGS)
         if ARGS.read_stream:
             from camera.realsense_cam import FileStreamer
             with FileStreamer(ARGS) as cam:

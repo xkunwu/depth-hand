@@ -1,6 +1,7 @@
 import numpy as np
 from collections import deque
-from matplotlib.mlab import PCA
+import cv2
+from sklearn.decomposition import PCA
 from utils.iso_boxes import iso_cube
 
 
@@ -82,8 +83,32 @@ class HandCenter:
     def simple_mean(self, points):
         return np.mean(points, axis=0)
 
-    def mean_shift(self, points):
-        return
+    def shape_prior(self, points):
+        z = points[:, 2]
+        zmax = np.max(z)
+        zmin = np.min(z)
+        num_bin = 12
+        bins = np.linspace(zmax, zmin, num_bin + 1)  # 12 bins, decreasing
+        pca = PCA(n_components=1, svd_solver='arpack')
+        digi = np.digitize(z, bins, right=False)
+        evs = np.zeros(num_bin)
+        wpos = 0
+        for bi in range(0, num_bin):
+            psec = points[digi == (bi + 1)]
+            if 10 > psec.size:
+                continue
+            pca.fit(psec)
+            evs[bi] = pca.singular_values_[0]
+            if 0 == bi:
+                continue
+            if (evs[bi] > evs[bi - 1] * 1.1):
+                wpos = bi - 1  # include previous section
+                break
+        # print(bins)
+        # print(evs)
+        # print(wpos, bins[wpos])
+        points_wrist = points[z < bins[wpos]]
+        return np.mean(points_wrist, axis=0)
 
 
 class hand_finder:
@@ -98,7 +123,10 @@ class hand_finder:
 
     def simp_crop(self, dimg):
         caminfo = self.caminfo
-        dlist = dimg.ravel()
+        dimg_f = cv2.bilateralFilter(
+            dimg.astype(np.float32),
+            5, 30, 30)
+        dlist = dimg_f.ravel()
         dpart10 = np.partition(
             dlist[caminfo.z_range[0] + 0.01 < dlist],
             10)
@@ -111,9 +139,13 @@ class hand_finder:
             self.tracker.clear()
             return False
         zrs = z0 + caminfo.region_size
-        # zrs = z0 + caminfo.region_size * 2
         in_id = np.where(np.logical_and(z0 - 0.01 < dlist, dlist < zrs))
-        xin, yin = np.unravel_index(in_id, dimg.shape)
+        if 10 > len(in_id[0]):
+            self.estr = "not enough points in range"
+            print(self.estr)
+            self.tracker.clear()
+            return False
+        xin, yin = np.unravel_index(in_id, dimg_f.shape)
         ## FetchHands17!! {
         # p2z = np.vstack((yin, xin, dlist[in_id])).T
         ## }
@@ -128,7 +160,8 @@ class hand_finder:
         # cube.sidelen = self.caminfo.region_size
         ## }
         ## find center {
-        cen = self.cen_ext.simple_mean(p3d)
+        # cen = self.cen_ext.simple_mean(p3d)
+        cen = self.cen_ext.shape_prior(p3d)
         cen_m = self.tracker.update(cen)
         # cen_m = cen
         print(cen, cen_m)
