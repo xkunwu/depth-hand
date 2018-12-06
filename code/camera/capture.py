@@ -116,21 +116,20 @@ class capture:
         self.args = args
         self.cam = camera
         self.caminfo = camera.caminfo
-        # self.debug_fig = False
-        self.debug_fig = True
+        self.debug_fig = args.show_debug
         self.save_dir = os.path.join(self.args.out_dir, 'capture')
-        if not os.path.exists(self.save_dir):
-            os.makedirs(self.save_dir)
-        self.save_det = False
-        # self.save_det = os.path.join(self.args.out_dir, 'capture')  # DO NOT copy/clone strings!
+        self.save_det = args.save_det
         if self.save_det:
             self.save_det = os.path.join(
-                self.save_det,
+                self.save_dir,
                 "detection_{}".format(time.time()))
             if not os.path.exists(self.save_det):
                 os.makedirs(self.save_det)
-        self.save_raw = False
-        # self.save_raw = os.path.join(self.args.out_dir, 'capture')r
+            print('save detection at: ', self.save_det)
+        self.save_raw = args.save_stream
+        if self.save_raw:
+            self.save_raw = args.stream_dir
+            print('save detection at: ', self.save_raw)
 
         # create the rendering canvas
         def close(event):
@@ -310,12 +309,22 @@ if __name__ == '__main__':
         ARGS.mode = 'detect'
         ARGS.model_name = 'super_edt2m'
         argsholder.create_instance()
-        # from camera.realsense_cam import FetchHands17
-        # with FetchHands17(ARGS) as cam:
-        # from camera.realsense_cam import FileStreamer
-        # with FileStreamer(ARGS, self.save_dir) as cam:
-        from camera.realsense_cam import RealsenceCam
-        with RealsenceCam() as cam:
-            cap = capture(ARGS, cam)
-            test_camera(cap)
-            cap.capture_loop()
+        if ARGS.read_stream:
+            from camera.realsense_cam import FileStreamer
+            with FileStreamer(ARGS) as cam:
+                ## FetchHands17!! {
+                # cam.caminfo = ARGS.data_inst
+                ## }
+                cap = capture(ARGS, cam)
+                test_camera(cap)
+                cap.capture_loop()
+        else:
+            ## FetchHands17!! {
+            # from camera.realsense_cam import FetchHands17
+            # with FetchHands17(ARGS) as cam:
+            ## }
+            from camera.realsense_cam import RealsenceCam
+            with RealsenceCam(ARGS) as cam:
+                cap = capture(ARGS, cam)
+                test_camera(cap)
+                cap.capture_loop()

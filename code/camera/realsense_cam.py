@@ -83,10 +83,9 @@ class DummyCamFrame:
 
 
 class FetchHands17:
-    def __init__(self, args=None):
+    def __init__(self, args):
         if args is None:
             raise ValueError('need to provide valid args')
-            return 0
         self.caminfo = args.data_inst
         args.model_inst.check_dir(args.data_inst, args)
         self.depth_image, self.cube = \
@@ -107,13 +106,16 @@ class FetchHands17:
 
 
 class FileStreamer:
-    def __init__(self, args=None, outdir=None):
-        if (args is None) or (outdir is None):
-            raise ValueError('need to provide valid output path')
-            return 0
+    def __init__(self, args):
+        if args is None:
+            raise ValueError('need to provide valid args')
         self.caminfo = caminfo_ir
         self.args = args
+        outdir = args.stream_dir
+        print('reading path: ', outdir)
         filelist = [f for f in os.listdir(outdir) if re.match(r'image_D(\d+)\.png', f)]
+        if 0 == len(filelist):
+            raise ValueError('no stream data found!')
         filelist.sort(key=lambda f: int(args.data_io.imagename2index(f)))
         self.filelist = [
             os.path.join(outdir, f) for f in filelist]
@@ -141,7 +143,7 @@ class FileStreamer:
 
 
 class RealsenceCam:
-    def __init__(self):
+    def __init__(self, args):
         self.caminfo = caminfo_ir
 
         # Create a pipeline

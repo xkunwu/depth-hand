@@ -134,6 +134,20 @@ class args_holder:
             # fast decay, as using adaptive optimizer
             help='Decay rate for lr decay [default: 0.94]')
 
+        # detection & tracking
+        self.parser.add_argument(
+            '--show_debug', default=False,
+            help='show debug figures and additional info')
+        self.parser.add_argument(
+            '--read_stream', default=False,
+            help='read raw stream')
+        self.parser.add_argument(
+            '--save_stream', default=False,
+            help='save raw stream')
+        self.parser.add_argument(
+            '--save_det', default=False,
+            help='save detection results')
+
     def make_new_log(self):
         self.args.log_dir = os.path.join(self.args.out_dir, 'log')
         blinks = os.path.join(self.args.log_dir, 'blinks')
@@ -231,6 +245,12 @@ class args_holder:
             self.args.out_root,
             self.args.data_name
         )
+        self.args.stream_dir = os.path.join(
+            self.args.out_dir,
+            'capture', 'stream'
+        )
+        if not os.path.exists(self.args.stream_dir):
+            os.makedirs(self.args.stream_dir)
 
     def __enter__(self):
         return self
