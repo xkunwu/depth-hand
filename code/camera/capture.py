@@ -1,13 +1,11 @@
 import os
 import numpy as np
-from collections import deque
-from copy import deepcopy
+# from copy import deepcopy
 import matplotlib.pyplot as mpplot
 from matplotlib.animation import FuncAnimation
 from skimage import io as skimio
 import warnings
 import tensorflow as tf
-# from tensorflow.contrib import slim
 from colour import Color
 import time
 # from multiprocessing import Queue, Pool
@@ -99,56 +97,6 @@ class DetCanvas:
 
 
 class capture:
-    class caminfo_ir:
-        image_size = (480, 640)
-        region_size = 120
-        crop_size = 128  # input image size to models (may changed)
-        crop_range = 480  # only operate within this range
-        z_range = (100., 1060.)
-        anchor_num = 8
-        # intrinsic paramters of Intel Realsense SR300
-        focal = (463.889, 463.889)
-        centre = (320, 240)
-        # joints description
-        join_name = [
-            'Wrist',
-            'TMCP', 'IMCP', 'MMCP', 'RMCP', 'PMCP',
-            'TPIP', 'TDIP', 'TTIP',
-            'IPIP', 'IDIP', 'ITIP',
-            'MPIP', 'MDIP', 'MTIP',
-            'RPIP', 'RDIP', 'RTIP',
-            'PPIP', 'PDIP', 'PTIP'
-        ]
-        join_num = 21
-        join_type = ('W', 'T', 'I', 'M', 'R', 'P')
-        join_color = (
-            # Color('cyan'),
-            Color('black'),
-            Color('magenta'),
-            Color('blue'),
-            Color('lime'),
-            Color('yellow'),
-            Color('red')
-        )
-        join_id = (
-            (1, 6, 7, 8),
-            (2, 9, 10, 11),
-            (3, 12, 13, 14),
-            (4, 15, 16, 17),
-            (5, 18, 19, 20)
-        )
-        bone_id = (
-            ((0, 1), (1, 6), (6, 11), (11, 16)),
-            ((0, 2), (2, 7), (7, 12), (12, 17)),
-            ((0, 3), (3, 8), (8, 13), (13, 18)),
-            ((0, 4), (4, 9), (9, 14), (14, 19)),
-            ((0, 5), (5, 10), (10, 15), (15, 20))
-        )
-        bbox_color = Color('orange')
-
-        def __init__():
-            pass
-
     def show_debug_fig(self, img, cube):
         points3_pick = cube.pick(
             self.args.data_ops.img_to_raw(img, self.caminfo))
@@ -164,17 +112,17 @@ class capture:
         img_crop = cube.print_image(coord, depth, self.caminfo.crop_size)
         self.debug_fig.ims[2].set_data(img_crop)
 
-    def __init__(self, args):
+    def __init__(self, args, camera):
         self.args = args
-        self.caminfo = self.caminfo_ir
-        # self.caminfo = args.data_inst  # TEST!!
-        self.debug_fig = False
-        # self.debug_fig = True
+        self.cam = camera
+        self.caminfo = camera.caminfo
+        # self.debug_fig = False
+        self.debug_fig = True
         self.save_dir = os.path.join(self.args.out_dir, 'capture')
         if not os.path.exists(self.save_dir):
             os.makedirs(self.save_dir)
-        # self.save_det = False
-        self.save_det = os.path.join(self.args.out_dir, 'capture')  # DO NOT copy/clone strings!
+        self.save_det = False
+        # self.save_det = os.path.join(self.args.out_dir, 'capture')  # DO NOT copy/clone strings!
         if self.save_det:
             self.save_det = os.path.join(
                 self.save_det,
@@ -234,7 +182,7 @@ class capture:
             pred_val, cube, self.caminfo)
         return pose_det
 
-    def show_detection(self, cam, sess, ops):
+    def show_detection(self, sess, ops):
         hfinder = hand_finder(self.args, self.caminfo)
 
         def update(i):
@@ -243,7 +191,7 @@ class capture:
             [p.remove() for p in reversed(ax.patches)]  # remove previews Rectangle drawings
             for artist in ax.lines + ax.collections:
                 artist.remove()  # remove all lines
-            camframes = cam.provide()
+            camframes = self.cam.provide()
             if camframes is None:
                 return
             depth_image = camframes.depth
@@ -282,7 +230,7 @@ class capture:
                 self.debug_fig.fig, update, blit=False, interval=1)
         mpplot.show()
 
-    def capture_detect(self, cam):
+    def capture_detect(self):
         tf.reset_default_graph()
         with tf.Graph().as_default(), \
                 tf.device('/gpu:' + str(self.args.gpu_id)):
@@ -310,12 +258,12 @@ class capture:
                     'is_training': is_training_tf,
                     'pred': pred_op
                 }
-                self.show_detection(cam, sess, ops)
+                self.show_detection(sess, ops)
 
-    def capture_test(self, cam):
+    def capture_test(self):
         def update(i):
             canvas = self.canvas
-            camframes = cam.provide()
+            camframes = self.cam.provide()
             if camframes is None:
                 return
             depth_image = camframes.depth
@@ -339,14 +287,8 @@ class capture:
                 extra_args=['-vcodec', 'libx264'])
 
     def capture_loop(self):
-        # from camera.realsense_cam import FetchHands17
-        # with FetchHands17(self.caminfo, self.args) as cam:
-        # from camera.realsense_cam import RealsenceCam
-        # with RealsenceCam(self.caminfo) as cam:
-        from camera.realsense_cam import FileStreamer
-        with FileStreamer(self.caminfo, self.args, self.save_dir) as cam:
-            # self.capture_test(cam)
-            self.capture_detect(cam)
+            # self.capture_test()
+            self.capture_detect()
 
 
 def test_camera(cap):
@@ -368,6 +310,12 @@ if __name__ == '__main__':
         ARGS.mode = 'detect'
         ARGS.model_name = 'super_edt2m'
         argsholder.create_instance()
-        cap = capture(ARGS)
-        test_camera(cap)
-        cap.capture_loop()
+        # from camera.realsense_cam import FetchHands17
+        # with FetchHands17(ARGS) as cam:
+        # from camera.realsense_cam import FileStreamer
+        # with FileStreamer(ARGS, self.save_dir) as cam:
+        from camera.realsense_cam import RealsenceCam
+        with RealsenceCam() as cam:
+            cap = capture(ARGS, cam)
+            test_camera(cap)
+            cap.capture_loop()

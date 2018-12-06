@@ -3,17 +3,69 @@ import sys
 import numpy as np
 import re
 from collections import namedtuple
+from colour import Color
 import pyrealsense2 as pyrs
+
+
+class caminfo_ir:
+    image_size = (480, 640)
+    region_size = 120
+    crop_size = 128  # input image size to models (may changed)
+    crop_range = 480  # only operate within this range
+    z_range = (100., 1060.)
+    anchor_num = 8
+    # intrinsic paramters of Intel Realsense SR300
+    focal = (475.857, 475.856)
+    centre = (310.982, 246.123)
+    # joints description
+    join_name = [
+        'Wrist',
+        'TMCP', 'IMCP', 'MMCP', 'RMCP', 'PMCP',
+        'TPIP', 'TDIP', 'TTIP',
+        'IPIP', 'IDIP', 'ITIP',
+        'MPIP', 'MDIP', 'MTIP',
+        'RPIP', 'RDIP', 'RTIP',
+        'PPIP', 'PDIP', 'PTIP'
+    ]
+    join_num = 21
+    join_type = ('W', 'T', 'I', 'M', 'R', 'P')
+    join_color = (
+        # Color('cyan'),
+        Color('black'),
+        Color('magenta'),
+        Color('blue'),
+        Color('lime'),
+        Color('yellow'),
+        Color('red')
+    )
+    join_id = (
+        (1, 6, 7, 8),
+        (2, 9, 10, 11),
+        (3, 12, 13, 14),
+        (4, 15, 16, 17),
+        (5, 18, 19, 20)
+    )
+    bone_id = (
+        ((0, 1), (1, 6), (6, 11), (11, 16)),
+        ((0, 2), (2, 7), (7, 12), (12, 17)),
+        ((0, 3), (3, 8), (8, 13), (13, 18)),
+        ((0, 4), (4, 9), (9, 14), (14, 19)),
+        ((0, 5), (5, 10), (10, 15), (15, 20))
+    )
+    bbox_color = Color('orange')
+
+    def __init__():
+        pass
 
 
 CamFrames = namedtuple("CamFrames", "depth, color, extra")
 
 
 class DummyCamFrame:
-    def __init__(self, caminfo):
-        self.caminfo = caminfo
+    def __init__(self):
+        self.caminfo = caminfo_ir
         # for test purpose
-        self.test_depth = np.zeros(caminfo.image_size, dtype=np.uint16)
+        self.test_depth = np.zeros(self.caminfo.image_size, dtype=np.uint16)
         self.test_depth[10:20, 10:20] = 240
 
     def __enter__(self):
@@ -31,12 +83,12 @@ class DummyCamFrame:
 
 
 class FetchHands17:
-    def __init__(self, caminfo, args=None):
+    def __init__(self, args=None):
         if args is None:
             raise ValueError('need to provide valid args')
             return 0
+        self.caminfo = args.data_inst
         args.model_inst.check_dir(args.data_inst, args)
-        self.caminfo = caminfo
         self.depth_image, self.cube = \
             args.model_inst.fetch_random(args)
 
@@ -55,21 +107,13 @@ class FetchHands17:
 
 
 class FileStreamer:
-    def __init__(self, caminfo, args=None, outdir=None):
+    def __init__(self, args=None, outdir=None):
         if (args is None) or (outdir is None):
             raise ValueError('need to provide valid output path')
             return 0
+        self.caminfo = caminfo_ir
         self.args = args
         filelist = [f for f in os.listdir(outdir) if re.match(r'image_D(\d+)\.png', f)]
-        # filelist = os.listdir(outdir)
-        # print(outdir)
-        # print(filelist)
-        # retem = re.compile(r'image_D(\d+)\.png')
-        # # filelist = filter(
-        # #     retem.match,
-        # #     filelist)
-        # filelist = [f for f in filelist if re.match(r'image_D(\d+)\.png', f)]
-        print(filelist)
         filelist.sort(key=lambda f: int(args.data_io.imagename2index(f)))
         self.filelist = [
             os.path.join(outdir, f) for f in filelist]
@@ -97,18 +141,36 @@ class FileStreamer:
 
 
 class RealsenceCam:
-    def __init__(self, caminfo):
+    def __init__(self):
+        self.caminfo = caminfo_ir
+
         # Create a pipeline
         pipeline = pyrs.pipeline()
 
         # Create a config and configure the stream
         config = pyrs.config()
-        config.enable_stream(pyrs.stream.depth, 640, 480, pyrs.format.z16, 30)
-        config.enable_stream(pyrs.stream.color, 640, 480, pyrs.format.rgb8, 30)
-        # config.enable_stream(pyrs.stream.color, 640, 480, pyrs.format.bgr8, 30)
+        image_size = caminfo_ir.image_size
+        config.enable_stream(
+            pyrs.stream.depth,
+            image_size[1], image_size[0],
+            pyrs.format.z16, 30)
+        config.enable_stream(
+            pyrs.stream.color,
+            image_size[1], image_size[0],
+            pyrs.format.rgb8, 30)
 
         # Start streaming
         profile = pipeline.start(config)
+        depth_stream = profile.get_stream(pyrs.stream.depth)
+
+        # Read intrinsics
+        depth_intrinsics = depth_stream.as_video_stream_profile().get_intrinsics()
+        self.caminfo.focal = (
+            depth_intrinsics.fx, depth_intrinsics.fy)
+        self.caminfo.centre = (
+            depth_intrinsics.ppx, depth_intrinsics.ppy)
+        print("Depth intrinsics: ", depth_intrinsics)
+        print("Intrinsics copied: ", self.caminfo.focal, self.caminfo.centre)
 
         # Getting the depth sensor's depth scale
         depth_sensor = profile.get_device().first_depth_sensor()
@@ -128,7 +190,6 @@ class RealsenceCam:
         self.pipeline = pipeline
         self.align = align
         self.depth_scale = depth_scale
-        self.caminfo = caminfo
 
     def __enter__(self):
         return self

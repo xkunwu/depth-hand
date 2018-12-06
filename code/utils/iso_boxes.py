@@ -135,11 +135,18 @@ class iso_cube:
         )
         return points3[conds, :]
 
-    def build(self, points3, m=0.):
+    def extent_center(self, points3):
         pmax = np.max(points3, axis=0)
         pmin = np.min(points3, axis=0)
         self.cen = (pmax + pmin) / 2
-        self.sidelen = np.max(pmax - pmin) / 2
+        return np.max(pmax - pmin) / 2
+
+    def build(self, points3, m=0.):
+        # pmax = np.max(points3, axis=0)
+        # pmin = np.min(points3, axis=0)
+        # self.cen = (pmax + pmin) / 2
+        # self.sidelen = np.max(pmax - pmin) / 2
+        self.sidelen = self.extent_center(points3)
         # self.evecs = np.eye(3)
         self.add_margan(m)
         return self.transform_to_center(points3)

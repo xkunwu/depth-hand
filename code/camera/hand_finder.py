@@ -37,7 +37,7 @@ class MomentTrack:
             mm = self.get_momentum(delta)
             prob = self.get_prob(mm)
             cen_m = (1 - prob) * self.isocen[-1] + prob * cen
-            print(delta, mm, prob)
+            # print(delta, mm, prob)
             return cen_m
 
     def update(self, cen):
@@ -87,17 +87,17 @@ class HandCenter:
 
 
 class hand_finder:
-    def __init__(self, args, caminfo_ir):
+    def __init__(self, args, caminfo):
         self.args = args
-        self.caminfo_ir = caminfo_ir
+        self.caminfo = caminfo
         self.estr = ""
-        maxm = caminfo_ir.region_size / 1  # maximum move is 12mm
+        maxm = caminfo.region_size / 1  # maximum move is 12mm
         self.tracker = MomentTrack(maxm)
         # self.tracker.test()
         self.cen_ext = HandCenter()
 
     def simp_crop(self, dimg):
-        caminfo = self.caminfo_ir
+        caminfo = self.caminfo
         dlist = dimg.ravel()
         dpart10 = np.partition(
             dlist[caminfo.z_range[0] + 0.01 < dlist],
@@ -114,26 +114,37 @@ class hand_finder:
         # zrs = z0 + caminfo.region_size * 2
         in_id = np.where(np.logical_and(z0 - 0.01 < dlist, dlist < zrs))
         xin, yin = np.unravel_index(in_id, dimg.shape)
-        # p2z = np.vstack((yin, xin, dlist[in_id])).T  # TESTDATA!!
+        ## FetchHands17!! {
+        # p2z = np.vstack((yin, xin, dlist[in_id])).T
+        ## }
+        ## live stream {
         p2z = np.vstack((xin, yin, dlist[in_id])).T
+        ## }
         p3d = self.args.data_ops.d2z_to_raw(
-            p2z, self.caminfo_ir)
+            p2z, self.caminfo)
+        ## FetchHands17!! {
+        # cube = iso_cube()
+        # cube.extent_center(p3d)  # FetchHands17!!
+        # cube.sidelen = self.caminfo.region_size
+        ## }
+        ## find center {
         cen = self.cen_ext.simple_mean(p3d)
-        # cen_m = self.tracker.update(cen)
-        # print(cen, cen_m)
-        cen_m = cen
+        cen_m = self.tracker.update(cen)
+        # cen_m = cen
+        print(cen, cen_m)
         if cen_m is False:
             # self.tracker.clear()
             return False
         cube = iso_cube(
             cen_m,
-            self.caminfo_ir.region_size)
-        # print(cube.dump())  # [120.0000 -158.0551 -116.6658 240.0000]
+            self.caminfo.region_size)
+        ## }
+        # # print(cube.dump())  # [120.0000 -158.0551 -116.6658 240.0000]
         return cube
 
     def region_grow(self, dimg):
         dimg[::4, ::4]
-        caminfo = self.caminfo_ir
+        caminfo = self.caminfo
         dlist = dimg.ravel()
         dpart10 = np.partition(
             dlist[caminfo.z_range[0] + 0.01 < dlist],
