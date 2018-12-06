@@ -102,21 +102,25 @@ class HandCenter:
             if 0 == bi:
                 continue
             if (evs[bi] > evs[bi - 1] * 1.1):
-                wpos = bi - 1  # include previous section
+                wpos = bi  # include previous section
+                # wpos = bi - 1  # include previous section
                 break
         # print(bins)
         # print(evs)
         # print(wpos, bins[wpos])
         points_wrist = points[z < bins[wpos]]
-        return np.mean(points_wrist, axis=0)
+        mean_upper = np.mean(points_wrist, axis=0)
+        mean_wrist = np.mean(points[digi == (wpos + 1)], axis=0)
+        mean_tweak = (mean_upper - mean_wrist) * 0.2
+        return mean_upper + mean_tweak
 
 
-class hand_finder:
+class hand_locator:
     def __init__(self, args, caminfo):
         self.args = args
         self.caminfo = caminfo
         self.estr = ""
-        maxm = caminfo.region_size / 1  # maximum move is 12mm
+        maxm = caminfo.region_size / 1  # maximum move is 120mm
         self.tracker = MomentTrack(maxm)
         # self.tracker.test()
         self.cen_ext = HandCenter()

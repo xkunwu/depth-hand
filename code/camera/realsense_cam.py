@@ -184,7 +184,7 @@ class RealsenceCam:
         depth_sensor = profile.get_device().first_depth_sensor()
         # depth_sensor.set_option(pyrs.option.depth_units, 0.001); # RuntimeError: This option is read-only! - Not supported for SR300.
         depth_scale = depth_sensor.get_depth_scale()
-        print("Depth Scale is: ", depth_scale)
+        print("Depth Scale is: ", depth_scale)  # 0.00012498664727900177
 
         # clip the background
         # clipping_distance_in_meters = 1 #1 meter
@@ -197,7 +197,8 @@ class RealsenceCam:
 
         self.pipeline = pipeline
         self.align = align
-        self.depth_scale = depth_scale
+        self.depth_scale = depth_scale * 1000  # scale to metric
+        self.depth_scale *= 0.8  # scale tweak
 
     def __enter__(self):
         return self
@@ -231,7 +232,7 @@ class RealsenceCam:
         if not aligned_depth_frame or not color_frame:
             return
         depth_image = np.asanyarray(aligned_depth_frame.get_data())
-        depth_image = depth_image * depth_scale / 0.001  # scale to metric
+        depth_image = depth_image * depth_scale
         color_image = np.asanyarray(color_frame.get_data())
         # color_image = np.asanyarray(color_frame.get_data())[..., ::-1]
         # mirror the horizontal direction

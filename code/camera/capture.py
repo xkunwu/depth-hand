@@ -11,7 +11,7 @@ import time
 # from multiprocessing import Queue, Pool
 from args_holder import args_holder
 from utils.iso_boxes import iso_cube
-from camera.hand_finder import hand_finder
+from camera.hand_locator import hand_locator
 
 
 # helper to define the rendering canvas
@@ -182,7 +182,7 @@ class capture:
         return pose_det
 
     def show_detection(self, sess, ops):
-        hfinder = hand_finder(self.args, self.caminfo)
+        hfinder = hand_locator(self.args, self.caminfo)
 
         def update(i):
             canvas = self.canvas
