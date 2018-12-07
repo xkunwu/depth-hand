@@ -19,6 +19,5 @@ python -m train.evaluate \
 ```
 
 ## Tracking
-If you happen to have a Intel® RealSense™ depth camera.
-The code is tested using SR300 and D450.
-Note: the code was updated to use [Intel® RealSense™ SDK 2.0](https://github.com/IntelRealSense/librealsense), so the minimum supported camera model is SR300.
+If you happen to have a Intel® RealSense™ depth camera, you can also take a look and test the [tracking part](code/camera/) of this project.
+Code for real-time capture, detection, tracking is provided there, which can be use for pose estimation.

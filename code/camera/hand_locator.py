@@ -81,9 +81,14 @@ class HandCenter:
         pass
 
     def simple_mean(self, points):
-        return np.mean(points, axis=0)
+        if 10 > points.size:
+            return False
+        else:
+            return np.mean(points, axis=0)
 
     def shape_prior(self, points):
+        if 10 > points.size:
+            return False
         z = points[:, 2]
         zmax = np.max(z)
         zmin = np.min(z)
@@ -108,9 +113,14 @@ class HandCenter:
         # print(bins)
         # print(evs)
         # print(wpos, bins[wpos])
-        points_wrist = points[z < bins[wpos]]
-        mean_upper = np.mean(points_wrist, axis=0)
-        mean_wrist = np.mean(points[digi == (wpos + 1)], axis=0)
+        points_wrist = points[digi == (wpos + 1)]
+        if 10 > points_wrist.size:
+            return False
+        points_upper = points[z < bins[wpos]]
+        if 10 > points_upper.size:
+            return False
+        mean_upper = np.mean(points_upper, axis=0)
+        mean_wrist = np.mean(points_wrist, axis=0)
         mean_tweak = (mean_upper - mean_wrist) * 0.2
         return mean_upper + mean_tweak
 
@@ -166,11 +176,18 @@ class hand_locator:
         ## find center {
         # cen = self.cen_ext.simple_mean(p3d)
         cen = self.cen_ext.shape_prior(p3d)
+        if cen is False:
+            self.estr = "center not found"
+            print(self.estr)
+            self.tracker.clear()
+            return False
         cen_m = self.tracker.update(cen)
         # cen_m = cen
         print(cen, cen_m)
         if cen_m is False:
-            # self.tracker.clear()
+            self.estr = "lost track"
+            print(self.estr)
+            self.tracker.clear()
             return False
         cube = iso_cube(
             cen_m,
