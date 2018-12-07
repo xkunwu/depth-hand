@@ -98,8 +98,9 @@ class args_holder:
             '--out_root', default=os.path.join(home_dir, 'data', 'univue', 'output'),
             help='Output dir [default: output]')
         self.parser.add_argument(
-            '--retrain', default=False,
-            help='retrain the model [default: False]')
+            '--retrain', dest='retrain', action='store_true',
+            help='retrain the model')
+        self.parser.set_defaults(retrain=False)
         self.parser.add_argument(
             '--mode', default='train',
             help='programm mode [default: train], from \
@@ -191,7 +192,7 @@ class args_holder:
             os.makedirs(blinks)
         log_dir_ln = os.path.join(
             blinks, self.args.model_name + self.args.model_desc)
-        if (not os.path.exists(log_dir_ln)):
+        if (not os.path.exists(log_dir_ln)) or self.args.retrain:
             from datetime import datetime
             log_time = datetime.now().strftime('%y%m%d-%H%M%S')
             # git_hash = subprocess.check_output(
