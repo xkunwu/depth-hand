@@ -15,6 +15,8 @@ from utils.iso_boxes import iso_cube
 
 
 class draw(object):
+    """ visualization
+    """
     @classmethod
     def draw_pose2d(
         cls, ax, thedata, pose2d,

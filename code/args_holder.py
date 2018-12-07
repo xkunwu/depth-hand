@@ -5,6 +5,38 @@ import argparse
 import logging
 from utils.coder import file_pack
 
+model_ref = {
+    'super_edt3': 'EDT3',
+    'super_ov3edt2m': 'MV-CR w/ surface distance (weighted)',
+    'super_ov3dist2': 'MV-CR w/ Euclidean distance',
+    'super_ov3edt2': 'MV-CR w/ surface distance',
+    'super_edt2m': '2D CR w/ surface distance (weighted)',
+    'super_edt2': '2D CR w/ surface distance',
+    'super_dist3': '3D CR w/ Euclidean distance',
+    'voxel_regre': '3D CR w/ offset',
+    'voxel_offset': '3D offset regression',
+    'super_vxhit': '3D CR w/ detection',
+    'voxel_detect': 'Moon et al. (CVPR\'18)',
+    'super_dist2': '2D CR w/ Euclidean distance',
+    'super_udir2': '2D CR w/ offset',
+    'super_hmap2': '2D CR w/ heatmap',
+    # 'dense_regre': 'Wan et al. (CVPR\'18)',
+    'dense_regre': '2D offset regression',
+    'direc_tsdf': 'Ge et al. (CVPR\'17)',
+    'trunc_dist': '3D truncated Euclidean distance',
+    'base_conv3': '3D CR',
+    'base_conv3_inres': '3D CR w/ inception-resnet',
+    'ortho3view': 'Ge et al. (CVPR\'16)',
+    'base_clean': '2D CR',
+    'base_regre': '2D CR-background',
+    'base_clean_inres': '2D CR w/ inception-resnet',
+    'base_regre_inres': '2D CR-background w/ inception-resnet',
+    'base_clean_hg': '2D CR w/ hourglass',
+    'base_regre_hg': '2D CR-background w/ hourglass',
+    'localizer3': '3D localizer',
+    'localizer2': '2D localizer',
+}
+
 model_map = {
     'super_edt3': 'model.super_edt3',
     'super_ov3edt2m': 'model.super_ov3edt2m',
@@ -75,6 +107,10 @@ class args_holder:
         self.parser.add_argument(
             '--show_draw', default=False,
             help='allow popping out drawing window')
+        self.parser.add_argument(
+            '--print_models', dest='print_models', action='store_true',
+            help='print the model maps and exit')
+        self.parser.set_defaults(print_models=False)
 
         # system parameters
         self.parser.add_argument(
@@ -236,7 +272,17 @@ class args_holder:
 
     # parse arguments, and only perform very basic managements
     def parse_args(self):
-        self.args = self.parser.parse_args()
+        try:
+            self.args = self.parser.parse_args()
+        except:
+            self.args = None
+            self.parser.print_help()
+            return False
+        if self.args.print_models:
+            print('Currently implemented model list:')
+            for k, v in model_map.items():
+                print(k, " --> ", v, ": ", model_ref[k])
+            return False
         self.args.filepack = file_pack()  # central file pack
         self.args.data_dir = os.path.join(
             self.args.data_root,
@@ -251,12 +297,14 @@ class args_holder:
         )
         if not os.path.exists(self.args.stream_dir):
             os.makedirs(self.args.stream_dir)
+        return True
 
     def __enter__(self):
         return self
 
     def __exit__(self, exc_type, exc_value, exc_traceback):
-        self.args.filepack = None
+        if self.args:
+            self.args.filepack = None
         logger = logging.getLogger('univue')
         for handler in logger.handlers[:]:
             handler.close()
@@ -362,6 +410,7 @@ class args_holder:
 if __name__ == "__main__":
     # python args_holder.py --batch_size=16
     with args_holder() as argsholder:
-        argsholder.parse_args()
+        if not argsholder.parse_args():
+            sys.exit(0)
         ARGS = argsholder.args
         argsholder.create_instance()

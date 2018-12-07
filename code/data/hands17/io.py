@@ -4,6 +4,8 @@ from data.io_abc import io_abc
 
 
 class io(io_abc):
+    """ IO related
+    """
     @classmethod
     def imagename2index(cls, image_name):
         return int(re.match(r'^image_D(\d+)\.png', image_name).group(1))

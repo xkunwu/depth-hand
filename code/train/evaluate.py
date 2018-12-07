@@ -5,39 +5,7 @@ from importlib import import_module
 from shutil import copyfile
 import numpy as np
 import re
-
-
-model_ref = {
-    'super_edt3': 'EDT3',
-    'super_ov3edt2m': 'MV-CR w/ surface distance (weighted)',
-    'super_ov3dist2': 'MV-CR w/ Euclidean distance',
-    'super_ov3edt2': 'MV-CR w/ surface distance',
-    'super_edt2m': '2D CR w/ surface distance (weighted)',
-    'super_edt2': '2D CR w/ surface distance',
-    'super_dist3': '3D CR w/ Euclidean distance',
-    'voxel_regre': '3D CR w/ offset',
-    'voxel_offset': '3D offset regression',
-    'super_vxhit': '3D CR w/ detection',
-    'voxel_detect': 'Moon et al. (CVPR\'18)',
-    'super_dist2': '2D CR w/ Euclidean distance',
-    'super_udir2': '2D CR w/ offset',
-    'super_hmap2': '2D CR w/ heatmap',
-    # 'dense_regre': 'Wan et al. (CVPR\'18)',
-    'dense_regre': '2D offset regression',
-    'direc_tsdf': 'Ge et al. (CVPR\'17)',
-    'trunc_dist': '3D truncated Euclidean distance',
-    'base_conv3': '3D CR',
-    'base_conv3_inres': '3D CR w/ inception-resnet',
-    'ortho3view': 'Ge et al. (CVPR\'16)',
-    'base_clean': '2D CR',
-    'base_regre': '2D CR-background',
-    'base_clean_inres': '2D CR w/ inception-resnet',
-    'base_regre_inres': '2D CR-background w/ inception-resnet',
-    'base_clean_hg': '2D CR w/ hourglass',
-    'base_regre_hg': '2D CR-background w/ hourglass',
-    'localizer3': '3D localizer',
-    'localizer2': '2D localizer',
-}
+from args_holder import model_ref
 
 
 def run_one(args, with_train=False, with_eval=False):
@@ -174,7 +142,8 @@ if __name__ == "__main__":
     # mpl = import_module('matplotlib')
     # mpl.use('Agg')
     with args_holder() as argsholder:
-        argsholder.parse_args()
+        if not argsholder.parse_args():
+            sys.exit()
         args = argsholder.args
         argsholder.create_instance()
         # import shutil
@@ -220,7 +189,8 @@ if __name__ == "__main__":
     ]
     for meth in methlist:
         with args_holder() as argsholder:
-            argsholder.parse_args()
+            if not argsholder.parse_args():
+                sys.exit(0)
             args = argsholder.args
             args.model_name = meth
             argsholder.create_instance()
@@ -231,7 +201,8 @@ if __name__ == "__main__":
             args.model_inst.detect_write_images()
             argsholder.append_log()
     with args_holder() as argsholder:
-        argsholder.parse_args()
+        if not argsholder.parse_args():
+            sys.exit(0)
         argsholder.create_instance()
         args = argsholder.args
         draw_compare(args)

@@ -4,6 +4,8 @@ from .ops import ops as dataops
 
 
 class eval(eval_abc):
+    """ collect evaluation statistics
+    """
     # @classmethod
     # def compare_error(thedata, fname_echt, fname_pred):
     #     """ NOTE: the number of predictions might be smaller

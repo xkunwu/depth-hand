@@ -1,4 +1,5 @@
 import os
+import sys
 import numpy as np
 # from copy import deepcopy
 import matplotlib.pyplot as mpplot
@@ -347,7 +348,8 @@ def test_smooth(args):
 
 if __name__ == '__main__':
     with args_holder() as argsholder:
-        argsholder.parse_args()
+        if not argsholder.parse_args():
+            sys.exit(0)
         ARGS = argsholder.args
         ARGS.mode = 'detect'
         ARGS.model_name = 'super_edt2m'

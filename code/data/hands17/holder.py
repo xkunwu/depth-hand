@@ -13,12 +13,17 @@ from utils.iso_boxes import iso_cube
 
 class hands17holder:
     """ Pose class for Hands17 dataset
-        wired coordinate system:
+        Defines:
+           info about the data, preprocessing framework, storage dependencies, preprocessing function entry points 
+
+        This dataset has a weird coordinate system:
             ---> x
             |
             |y
         which is the same as image space.
         BUT np use row-major, so remember exchange (x, y) for each mapping
+        Many data.ops functions are affected
+        DO NOT try to change anything (believe me, it's a pain)
     """
 
     # # dataset info

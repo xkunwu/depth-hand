@@ -400,7 +400,8 @@ class train_abc():
 if __name__ == "__main__":
     # python train_abc.py --max_epoch=1 --batch_size=16 --model_name=base_regre
     with args_holder() as argsholder:
-        argsholder.parse_args()
+        if not argsholder.parse_args():
+            sys.exit(0)
         argsholder.create_instance()
         trainer = train_abc(argsholder.args)
         trainer.train()

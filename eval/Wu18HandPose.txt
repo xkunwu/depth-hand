@@ -1,0 +1,7 @@
+@InProceedings{Wu18HandPose,
+    author = {Wu, Xiaokun and Finnegan, Daniel and O'Neill, Eamonn and Yang, Yong-Liang},
+    title = {HandMap: Robust Hand Pose Estimation via Intermediate Dense Guidance Map Supervision},
+    booktitle = {The European Conference on Computer Vision (ECCV)},
+    month = {September},
+    year = {2018}
+} 
