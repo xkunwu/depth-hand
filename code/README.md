@@ -12,62 +12,17 @@ Tested on Ubuntu (18.04/16.04), Python (3.6/2.7), NVIDIA GPU (9.0/8.0) or CPU.
     ```
 -   [Tensorflow](https://www.tensorflow.org/install/): follow official instructions.
 
-    Note: make sure the python version is correct
-
-## Resources
-<a name="resources"></a>
-Resources can be downloaded from [here](https://pan.baidu.com/s/1XErtAR6WhMQ8p5Q1v9htFA).
--   [Hands17 dataset](http://icvl.ee.ic.ac.uk/hands17/):
-    I am not authorized to redistribute. Please contact the organizers for downloading the data.
--   Pretrained model:
--   Data preprocessing output: if you do not have the raw data, using preprocessed data is just fine. This one-time preprocessing step is performed so that no additional data operations are necessary in the training stage, which help with reducing training time.
-
-    Especially:
-    ```
-    %out_root%/output/hands17/prepared/: prepared data root
-        - annotation: annotation - training and validation split
-        - annotation_test: annotation - test split
-        - clean_128: cropped frames for the hand region
-        - anything else: preprocessed data tailored to each model
-    ```
--   Results used to plot figures in the ECCV2018 paper:
-### File structure
-Please make sure to the downloaded files are organized in the following structure, otherwise the code will automatically redo data preprocessing and training (taking quite a while).
-```
-%out_root%/hands17: if you have Hands17 dataset, put it here
-%out_root%/output/hands17/
-    - log/: log, pretrained models
-        - univue.log: main log
-        - log-%model_name%-%timestamp%/: training output (include pretrained model)
-            - args.txt: arguments for this run
-            - univue.log: main log for this run
-            - train.log: training/validation/evaluation log
-            - model.ckpt*: pretrained model
-        - blinks/: soft links for each model, so referring to different timestamp is possible
-    - predict/: predictions (used in paper), plots for sanity check and statistics
-        - predict_%model_name%: predictions for test split
-        - draw_%model_name%_%frame_id%.png: sanity check
-        - detection_%model_name%_%frame_id%.png: detection example visualization
-        - %model_name%_error_rate.png: error rate (see paper)
-        - %model_name%_error_bar.png: error bar (see paper)
-        - error_rate.png, error_bar.png: final summary for chosen models
-    - prepared/: preprocessing output
-    - capture/: output for real-time tracking
-        - stream/: raw stream
-        - detection_%timestamp%/: detection with timestamp
-```
-
-#### Prepared data dependency structure
-This is the key to understand the data preprocessing work flow.
+    Note: make sure python version is correct, also install correct version of NVIDIA CUDA/CUDNN if using GPU.
 
 ## Usage
-### Installation
+#### Installation
 -   Clone this repo:
     ```
     git clone https://github.com/xkunwu/depth-hand.git
     cd depth-hand/code
     pip install -r requirements.txt
     ```
+#### Basic usage
 -   Test using pre-trained model:
     ```
     python -m train.evaluate \
@@ -84,6 +39,7 @@ This is the key to understand the data preprocessing work flow.
         --max_epoch=1 \
         --model_name=base_clean
     ```
+#### Print useful information
 -   Print prepared data dependency structure:
     ```
     python -m train.evaluate --print_prepared_dependency
@@ -94,12 +50,13 @@ This is the key to understand the data preprocessing work flow.
     ```
     But it requires huge storage: 'udir2_32' is 66G! - An example of time-storage trade-off.
 -   Print currently implemented model list:
+    <a name="print-model-list"></a>
     ```
     python -m train.evaluate --print_models
     ```
     Format: (model name) --> (file path): (annotation)
 
-    Current output:
+    Current output should like this:
     ```
     Currently implemented model list:
     super_edt3  -->  model.super_edt3 :  EDT3
@@ -132,7 +89,7 @@ This is the key to understand the data preprocessing work flow.
     localizer2  -->  model.localizer2 :  2D localizer
     ```
 
-### File structure
+#### Code structure
 ```
 %proj_root%/code/
     - args_holder.py: arguments parser (check all the default values here)
@@ -146,8 +103,8 @@ This is the key to understand the data preprocessing work flow.
         - provider.py: multiprocessing storage provider, save preprocessed data to save training time
     - model/: all models
         - base_regre.py: base class, many template implementation
+        - base_clean.py: default setting, baseline evaluation, base class for every other models except 'base_regre', good starting point for extensions
         - base_conv3.py: base class for 3D convolution
-        - base_clean.py: baseline evaluation
         - incept_resnet.py: [Inception-ResNet](https://arxiv.org/abs/1602.07261) module (STAR while I started this project)
         - super_edt2m.py: best standalone model, used in the tracker part
         - super_ov3edt2m.py: best overall, as reported in the paper
@@ -155,15 +112,75 @@ This is the key to understand the data preprocessing work flow.
     - utils/: utility code
 ```
 
+## Resources
+Resources can be downloaded from [here](https://pan.baidu.com/s/1XErtAR6WhMQ8p5Q1v9htFA).
+-   [Hands17 dataset](http://icvl.ee.ic.ac.uk/hands17/):
+    I am not authorized to redistribute. Please contact the organizers for downloading the data.
+-   Pretrained models:
+    <a name="pretrained-models"></a>
+    ```
+    %out_root%/output/hands17/log/
+    ```
+-   Data preprocessing output: if you do not have the raw data, using preprocessed data is just fine. This one-time preprocessing step is performed so that no additional data operations are necessary in the training stage, which help with reducing training time.
+
+    Especially:
+    ```
+    %out_root%/output/hands17/prepared/: prepared data root
+        - annotation: annotation - training and validation split
+        - annotation_test: annotation - test split
+        - clean_128: cropped frames for the hand region
+        - anything else: preprocessed data tailored to each model
+    ```
+-   Results used to plot figures in the ECCV2018 paper:
+    ```
+    %out_root%/output/hands17/predict/
+    ```
+
+#### File structure
+Please make sure to the downloaded files are organized in the following structure, otherwise the code will automatically redo data preprocessing and training (will take quite a while).
+```
+%out_root%/hands17: if you have Hands17 dataset, put it here
+%out_root%/output/hands17/
+    - log/: log, pretrained models
+        - univue.log: main log
+        - log-%model_name%-%timestamp%/: training output (include pretrained model)
+            - args.txt: arguments for this run
+            - univue.log: main log for this run
+            - train.log: training/validation/evaluation log
+            - model.ckpt*: pretrained model
+        - blinks/: soft links for each model, so referring to different timestamp is possible
+    - predict/: predictions (used in paper), plots for sanity check and statistics
+        - predict_%model_name%: predictions for test split
+        - draw_%model_name%_%frame_id%.png: sanity check
+        - detection_%model_name%_%frame_id%.png: detection example visualization
+        - %model_name%_error_rate.png: error rate (see paper)
+        - %model_name%_error_bar.png: error bar (see paper)
+        - error_rate.png, error_bar.png: final summary for chosen models
+    - prepared/: preprocessing output
+    - capture/: output for real-time tracking
+        - stream/: raw stream
+        - detection_%timestamp%/: detection with timestamp
+```
+
+#### Prepared data dependency structure
+This is the key to understand the data preprocessing work flow.
+
+## FAQ
+##### Q: There are only a few prepared data shared online?
+A: The prepared data is huge, but my internet bandwidth is limited. I would suggest you just run the data preprocessing locally - it's multi-threaded, so actually quite fast if you have a good CPU with many cores.
+
+##### Q: The prepared data is too HUGE!
+A: Agreed. But HDF5 format is already doing good job on compression. Given that the storage is much cheaper than our precious time waiting for training, I would bear with it right now.
+
 ## Misc topics
-### Remote management
+#### Remote management
 ```
 tensorboard --logdir log
 jupyter-notebook --no-browser --port=8888
 ssh ${1:-sipadan} -L localhost:${2:-1}6006:localhost:6006 -L localhost:${2:-1}8888:localhost:8888
 ```
 
-### Get hardware info
+#### Get hardware info
 ```
 cat /proc/meminfo
 hwinfo --short
