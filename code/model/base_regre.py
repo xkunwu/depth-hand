@@ -390,8 +390,6 @@ class base_regre(object):
         time_e = str(timedelta(seconds=timer() - time_s))
         self.logger.info('data prepared [{}], time: {}'.format(
             self.__class__.__name__, time_e))
-        self.logger.info('the following stored data are required: {}'.format(
-            list(self.store_name.values())))
 
         self.store_handle = {
             'train': {},

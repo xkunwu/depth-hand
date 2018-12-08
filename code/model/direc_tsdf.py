@@ -77,7 +77,7 @@ class direc_tsdf(base_conv3):
         #     print(volume3[0, 0, 3], type(volume3[0, 0, 3]))
         #     mlab.outline()
         # mlab.show()
-        # sys.exit()
+        # os._exit(0)
 
         # mode = 'train'
         mode = 'test'

@@ -2,7 +2,7 @@
 
 > Experimental hand detection and tracking from single depth camera.
 
-<span style="display:block;text-align:center">![Test sequence.](eval/test_seq.gif)</span>
+<span style="display:block;text-align:center">![Test sequence.](../../eval/test_seq.gif)</span>
 
 Note: this is a two-week quick patch following the [hand pose estimation project](https://github.com/xkunwu/depth-hand) located in the main repo.
 The purpose is to make live capture and hand tracking possible, but currently no plan to make the code waterproof (might be a future research project).
@@ -16,26 +16,28 @@ Note: the code was updated to use [Intel® RealSense™ SDK 2.0](https://github.
 ## Usage
 Default is using the 'super_edt2m' model.
 Please check the main repo for finding the full list of models.
+
+Note: tracking code does not require the prepared data, only need to download your favorite pretrained model. See [README.md in the pose estimation part](../../README.md#resources).
 ```
 cd code
-python -m camera.capture
+python -m camera.capture --model_name=super_edt2m
 ```
 -   If you want to see more debug information:
     ```
-    python -m camera.capture --show_debug=True
+    python -m camera.capture --model_name=super_edt2m --show_debug=True
     ```
 -   Save detection results:
     ```
-    python -m camera.capture --save_det=True
+    python -m camera.capture --model_name=super_edt2m --save_det=True
     ```
 -   Save raw stream data (for replay and test):
     ```
-    python -m camera.capture --save_stream=True --save_det=True
+    python -m camera.capture --model_name=super_edt2m --save_stream=True --save_det=True
     ```
     NOTE: previous data will be overwritten!
 -   Read saved raw stream data (instead of live capture):
     ```
-    python -m camera.capture --read_stream=True --save_det=True
+    python -m camera.capture --model_name=super_edt2m --read_stream=True --save_det=True
     ```
 
 ## Assumptions

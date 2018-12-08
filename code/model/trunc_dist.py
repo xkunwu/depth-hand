@@ -91,7 +91,7 @@ class trunc_dist(base_conv3):
         # print(frame[0, 0, 3], type(frame[0, 0, 3]))
         # mlab.outline()
         # mlab.show()
-        # sys.exit()
+        # os._exit(0)
 
         index_h5 = self.store_handle['index']
         store_size = index_h5.shape[0]

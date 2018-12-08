@@ -290,8 +290,8 @@ class capture:
                 extra_args=['-vcodec', 'libx264'])
 
     def capture_loop(self):
-        self.capture_test()
-        # self.capture_detect()
+        # self.capture_test()
+        self.capture_detect()
 
 
 def test_camera(cap):
@@ -352,11 +352,12 @@ if __name__ == '__main__':
     # import pdb; pdb.set_trace()
     with args_holder() as argsholder:
         if not argsholder.parse_args():
-            sys.exit(0)
+            os._exit(0)
         ARGS = argsholder.args
         ARGS.mode = 'detect'
-        ARGS.model_name = 'super_edt2m'
-        argsholder.create_instance()
+        # ARGS.model_name = 'super_edt2m'
+        if not argsholder.create_instance():
+            os._exit(0)
         # test_smooth(ARGS)
         if ARGS.read_stream:
             from camera.realsense_cam import FileStreamer

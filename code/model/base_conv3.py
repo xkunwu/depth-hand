@@ -85,7 +85,7 @@ class base_conv3(base_clean):
         # print(frame[0, 0, 3], type(frame[0, 0, 3]))
         # mlab.outline()
         # mlab.show()
-        # sys.exit()
+        # os._exit(0)
 
         # mode = 'train'
         mode = 'test'

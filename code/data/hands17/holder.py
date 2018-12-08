@@ -14,7 +14,7 @@ from utils.iso_boxes import iso_cube
 class hands17holder:
     """ Pose class for Hands17 dataset
         Defines:
-           info about the data, preprocessing framework, storage dependencies, preprocessing function entry points 
+           info about the data, preprocessing framework, storage dependencies, preprocessing function entry points
 
         This dataset has a weird coordinate system:
             ---> x
@@ -171,6 +171,14 @@ class hands17holder:
                 self.prepared_join,
                 filepack, batchallot
             )
+
+    def print_precon_recur(self, target, precon_names):
+        precon_list = self.store_precon[target]
+        precon_names.extend(precon_list)
+        if not precon_list:
+            return
+        for precon in precon_list:
+            self.print_precon_recur(precon, precon_names)
 
     def remove_out_frame_annot_mt(self):
         from itertools import islice

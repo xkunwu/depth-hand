@@ -1,5 +1,9 @@
+# Hand pose estimation
+
+> Single view depth image based pose estimation, given cropped out hand region.
+
 ## Prerequisites
-Tested on Ubuntu (18.04/16.04), Python (2/3), CPU or NVIDIA GPU.
+Tested on Ubuntu (18.04/16.04), Python (3.6/2.7), NVIDIA GPU (9.0/8.0) or CPU.
 -   Install requirements (presuming [Miniconda](https://conda.io/miniconda.html)):
     ```
     export PYTHON_VERSION=3.6
@@ -11,12 +15,26 @@ Tested on Ubuntu (18.04/16.04), Python (2/3), CPU or NVIDIA GPU.
     Note: make sure the python version is correct
 
 ## Resources
+<a name="resources"></a>
+Resources can be downloaded from [here](https://pan.baidu.com/s/1XErtAR6WhMQ8p5Q1v9htFA).
+-   [Hands17 dataset](http://icvl.ee.ic.ac.uk/hands17/):
+    I am not authorized to redistribute. Please contact the organizers for downloading the data.
 -   Pretrained model:
--   Data preprocessing output:
+-   Data preprocessing output: if you do not have the raw data, using preprocessed data is just fine. This one-time preprocessing step is performed so that no additional data operations are necessary in the training stage, which help with reducing training time.
+
+    Especially:
+    ```
+    %out_root%/output/hands17/prepared/: prepared data root
+        - annotation: annotation - training and validation split
+        - annotation_test: annotation - test split
+        - clean_128: cropped frames for the hand region
+        - anything else: preprocessed data tailored to each model
+    ```
 -   Results used to plot figures in the ECCV2018 paper:
 ### File structure
 Please make sure to the downloaded files are organized in the following structure, otherwise the code will automatically redo data preprocessing and training (taking quite a while).
 ```
+%out_root%/hands17: if you have Hands17 dataset, put it here
 %out_root%/output/hands17/
     - log/: log, pretrained models
         - univue.log: main log
@@ -38,6 +56,9 @@ Please make sure to the downloaded files are organized in the following structur
         - stream/: raw stream
         - detection_%timestamp%/: detection with timestamp
 ```
+
+#### Prepared data dependency structure
+This is the key to understand the data preprocessing work flow.
 
 ## Usage
 ### Installation
@@ -63,6 +84,15 @@ Please make sure to the downloaded files are organized in the following structur
         --max_epoch=1 \
         --model_name=base_clean
     ```
+-   Print prepared data dependency structure:
+    ```
+    python -m train.evaluate --print_prepared_dependency
+    ```
+    For example, the output for the best performing standalone model 'super_edt2m' looks like this:
+    ```
+    Prepared dependency for super_edt2m: {'annotation', 'edt2m_32', 'pose_c', 'clean_128', 'udir2_32', 'edt2_32'}
+    ```
+    But it requires huge storage: 'udir2_32' is 66G! - An example of time-storage trade-off.
 -   Print currently implemented model list:
     ```
     python -m train.evaluate --print_models
@@ -107,7 +137,7 @@ Please make sure to the downloaded files are organized in the following structur
 %proj_root%/code/
     - args_holder.py: arguments parser (check all the default values here)
     - camera/: the tracking code
-    - data/hands17/: data operations (only 'hands17' working)
+    - data/hands17/: data operations (mainly tested on 'hands17' dataset)
         - holder.py: info about the data, preprocessing framework, storage dependencies, preprocessing function entry points
         - draw.py: visualization
         - eval.py: collect evaluation statistics

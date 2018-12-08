@@ -142,9 +142,10 @@ if __name__ == "__main__":
     # mpl.use('Agg')
     with args_holder() as argsholder:
         if not argsholder.parse_args():
-            sys.exit()
+            os._exit(0)
         args = argsholder.args
-        argsholder.create_instance()
+        if not argsholder.create_instance():
+            os._exit(0)
         # import shutil
         # shutil.rmtree(args.out_dir)
         # os.makedirs(args.out_dir)
@@ -153,7 +154,7 @@ if __name__ == "__main__":
         argsholder.append_log()
 
         # draw_compare(args)
-    sys.exit()
+    os._exit(0)
 
     mpl = import_module('matplotlib')
     mpl.use('Agg')
@@ -189,20 +190,22 @@ if __name__ == "__main__":
     for meth in methlist:
         with args_holder() as argsholder:
             if not argsholder.parse_args():
-                sys.exit(0)
+                os._exit(0)
             args = argsholder.args
             args.model_name = meth
-            argsholder.create_instance()
+            if not argsholder.create_instance():
+                os._exit(0)
             run_one(args, with_train, with_eval)
-            # sys.exit()
+            # os._exit(0)
             # run_one(args, True, True)
             # run_one(args, False, False)
             args.model_inst.detect_write_images()
             argsholder.append_log()
     with args_holder() as argsholder:
         if not argsholder.parse_args():
-            sys.exit(0)
-        argsholder.create_instance()
+            os._exit(0)
+        if not argsholder.create_instance():
+            os._exit(0)
         args = argsholder.args
         draw_compare(args)
         # argsholder.append_log()

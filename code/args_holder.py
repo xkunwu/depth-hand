@@ -112,6 +112,10 @@ class args_holder:
             '--print_models', dest='print_models', action='store_true',
             help='print the model maps and exit')
         self.parser.set_defaults(print_models=False)
+        self.parser.add_argument(
+            '--print_prepared_dependency', dest='print_prepared_dependency', action='store_true',
+            help='print the prepared data dependency structure and exit')
+        self.parser.set_defaults(print_prepared_dependency=False)
 
         # system parameters
         self.parser.add_argument(
@@ -318,7 +322,7 @@ class args_holder:
         if exc_type is not None:
             import traceback
             traceback.print_exception(exc_type, exc_value, exc_traceback)
-            sys.exit()
+            os._exit(0)
         return self
 
     # this is called after hard coded parameter tweakings
@@ -404,14 +408,21 @@ class args_holder:
 
         # bind data instance to model instance
         self.args.model_inst.receive_data(self.args.data_inst, self.args)
+        if self.args.print_prepared_dependency:
+            print('Prepared dependency for {}: {}'.format(
+                self.args.model_name,
+                set(self.args.model_inst.store_name.values())))
+            return False
 
         self.write_args(self.args)
+        return True
 
 
 if __name__ == "__main__":
     # python args_holder.py --batch_size=16
     with args_holder() as argsholder:
         if not argsholder.parse_args():
-            sys.exit(0)
+            os._exit(0)
         ARGS = argsholder.args
-        argsholder.create_instance()
+        if not argsholder.create_instance():
+            os._exit(0)

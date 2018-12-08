@@ -75,7 +75,7 @@ class base_clean(base_regre):
         #     pose_trans[:, 0], pose_trans[:, 1], pose_trans[:, 2],
         #     color=Color('lightsteelblue').rgb)
         # mpplot.show()
-        # sys.exit()
+        # os._exit(0)
 
         # mode = 'train'
         mode = 'test'

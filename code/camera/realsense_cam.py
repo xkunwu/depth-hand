@@ -75,7 +75,7 @@ class DummyCamFrame:
         if exc_type is not None:
             import traceback
             traceback.print_exception(exc_type, exc_value, exc_traceback)
-            sys.exit()
+            os._exit(0)
         return self
 
     def provide(self):
@@ -104,7 +104,7 @@ class FetchHands17:
         if exc_type is not None:
             import traceback
             traceback.print_exception(exc_type, exc_value, exc_traceback)
-            sys.exit()
+            os._exit(0)
         return self
 
     def provide(self):
@@ -134,7 +134,7 @@ class FileStreamer:
         if exc_type is not None:
             import traceback
             traceback.print_exception(exc_type, exc_value, exc_traceback)
-            sys.exit()
+            os._exit(0)
         return self
 
     def provide(self):
@@ -208,7 +208,7 @@ class RealsenceCam:
         if exc_type is not None:
             import traceback
             traceback.print_exception(exc_type, exc_value, exc_traceback)
-            sys.exit()
+            os._exit(0)
         return self
 
     def provide(self):
