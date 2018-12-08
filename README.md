@@ -7,7 +7,7 @@
 ## Introduction
 This repo includes the code for:
 
-> HandMap: Robust hand pose estimation via intermediate dense guidance map supervision, in ECCV2018. \[[BibTex](/eval/Wu18HandPose.txt)\]
+> HandMap: Robust hand pose estimation via intermediate dense guidance map supervision, in ECCV2018. \[[Webpage](https://xkunwu.github.io/research/18HandPose/18HandPose)\] \[[BibTex](/eval/Wu18HandPose.txt)\]
 
 This repo also includes following up work for real-time [tracking](#tracking).
 
