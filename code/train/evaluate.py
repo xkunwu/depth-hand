@@ -133,7 +133,6 @@ def draw_compare(args, predict_dir=None):
 
 if __name__ == "__main__":
     from args_holder import args_holder
-    # import tfplot
     # with_train = True
     with_train = False
     # with_eval = True

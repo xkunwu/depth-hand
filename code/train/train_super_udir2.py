@@ -4,7 +4,7 @@ import tensorflow as tf
 import progressbar
 from functools import reduce
 from train.train_abc import train_abc
-from utils.image_ops import tfplot_olmap, tfplot_uomap
+# from utils.image_ops import tfplot_olmap, tfplot_uomap
 
 
 class train_super_udir2(train_abc):
@@ -51,45 +51,45 @@ class train_super_udir2(train_abc):
             learning_rate = self.get_learning_rate(global_step)
             tf.summary.scalar('learning_rate', learning_rate)
 
-            num_j = self.args.model_inst.join_num
-            joint_id = num_j - 1
-            frame = frames_op[0, ..., 0]
-            dist2_echt = udir2_op[0, ..., joint_id]
-            dist2_echt_op = tf.expand_dims(tfplot_olmap(
-                frame, dist2_echt), axis=0)
-            tf.summary.image('dist2_echt/', dist2_echt_op, max_outputs=1)
-            netid = 0
-            for ends in self.args.model_inst.end_point_list:
-                if not ends.startswith('hourglass_'):
-                    continue
-                net = end_points[ends]
-                dist2_pred = net[0, ..., joint_id]
-                dist2_pred_op = tf.expand_dims(tfplot_olmap(
-                    frame, dist2_pred), axis=0)
-                tf.summary.image(
-                    'dist2_pred_{:d}/'.format(netid),
-                    dist2_pred_op, max_outputs=1)
-                netid += 1
-            unit2_echt = udir2_op[
-                0, ...,
-                num_j + 3 * joint_id:num_j + 3 * (joint_id + 1)]
-            unit2_echt_op = tf.expand_dims(tfplot_uomap(
-                frame, unit2_echt), axis=0)
-            tf.summary.image('unit2_echt/', unit2_echt_op, max_outputs=1)
-            netid = 0
-            for ends in self.args.model_inst.end_point_list:
-                if not ends.startswith('hourglass_'):
-                    continue
-                net = end_points[ends]
-                unit2_pred = net[
-                    0, ...,
-                    num_j + 3 * joint_id:num_j + 3 * (joint_id + 1)]
-                unit2_pred_op = tf.expand_dims(tfplot_uomap(
-                    frame, unit2_pred), axis=0)
-                tf.summary.image(
-                    'unit2_pred_{:d}/'.format(netid),
-                    unit2_pred_op, max_outputs=1)
-                netid += 1
+            # num_j = self.args.model_inst.join_num
+            # joint_id = num_j - 1
+            # frame = frames_op[0, ..., 0]
+            # dist2_echt = udir2_op[0, ..., joint_id]
+            # dist2_echt_op = tf.expand_dims(tfplot_olmap(
+            #     frame, dist2_echt), axis=0)
+            # tf.summary.image('dist2_echt/', dist2_echt_op, max_outputs=1)
+            # netid = 0
+            # for ends in self.args.model_inst.end_point_list:
+            #     if not ends.startswith('hourglass_'):
+            #         continue
+            #     net = end_points[ends]
+            #     dist2_pred = net[0, ..., joint_id]
+            #     dist2_pred_op = tf.expand_dims(tfplot_olmap(
+            #         frame, dist2_pred), axis=0)
+            #     tf.summary.image(
+            #         'dist2_pred_{:d}/'.format(netid),
+            #         dist2_pred_op, max_outputs=1)
+            #     netid += 1
+            # unit2_echt = udir2_op[
+            #     0, ...,
+            #     num_j + 3 * joint_id:num_j + 3 * (joint_id + 1)]
+            # unit2_echt_op = tf.expand_dims(tfplot_uomap(
+            #     frame, unit2_echt), axis=0)
+            # tf.summary.image('unit2_echt/', unit2_echt_op, max_outputs=1)
+            # netid = 0
+            # for ends in self.args.model_inst.end_point_list:
+            #     if not ends.startswith('hourglass_'):
+            #         continue
+            #     net = end_points[ends]
+            #     unit2_pred = net[
+            #         0, ...,
+            #         num_j + 3 * joint_id:num_j + 3 * (joint_id + 1)]
+            #     unit2_pred_op = tf.expand_dims(tfplot_uomap(
+            #         frame, unit2_pred), axis=0)
+            #     tf.summary.image(
+            #         'unit2_pred_{:d}/'.format(netid),
+            #         unit2_pred_op, max_outputs=1)
+            #     netid += 1
 
             optimizer = tf.train.AdamOptimizer(learning_rate)
             # train_op = optimizer.minimize(

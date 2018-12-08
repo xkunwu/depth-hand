@@ -4,7 +4,7 @@ import tensorflow as tf
 import progressbar
 from functools import reduce
 from train.train_abc import train_abc
-from utils.image_ops import tfplot_vxmap, tfplot_uomap3d
+# from utils.image_ops import tfplot_vxmap, tfplot_uomap3d
 
 
 class train_voxel_offset(train_abc):
@@ -49,30 +49,30 @@ class train_voxel_offset(train_abc):
             learning_rate = self.get_learning_rate(global_step)
             tf.summary.scalar('learning_rate', learning_rate)
 
-            hmap_size = self.args.model_inst.hmap_size
-            num_j = self.args.model_inst.join_num
-            joint_id = num_j - 1
-            frame = frames_op[0, ..., 0]
-            vxdist_echt = poses_op[0, ..., joint_id]
-            vxdist_pred = pred_op[0, ..., joint_id]
-            uomap_echt = poses_op[
-                0, hmap_size / 2, ...,
-                num_j + 3 * joint_id:num_j + 3 * (joint_id + 1)]
-            uomap_pred = pred_op[
-                0, hmap_size / 2, ...,
-                num_j + 3 * joint_id:num_j + 3 * (joint_id + 1)]
-            vxdist_echt_op = tf.expand_dims(tfplot_vxmap(
-                frame, vxdist_echt, hmap_size, reduce_fn=np.max), axis=0)
-            tf.summary.image('vxdist_echt/', vxdist_echt_op, max_outputs=1)
-            vxdist_pred_op = tf.expand_dims(tfplot_vxmap(
-                frame, vxdist_pred, hmap_size, reduce_fn=np.max), axis=0)
-            tf.summary.image('vxdist_pred/', vxdist_pred_op, max_outputs=1)
-            vxunit_echt_op = tf.expand_dims(tfplot_uomap3d(
-                frame, uomap_echt), axis=0)
-            tf.summary.image('vxunit_echt/', vxunit_echt_op, max_outputs=1)
-            vxunit_pred_op = tf.expand_dims(tfplot_uomap3d(
-                frame, uomap_pred), axis=0)
-            tf.summary.image('vxunit_pred/', vxunit_pred_op, max_outputs=1)
+            # hmap_size = self.args.model_inst.hmap_size
+            # num_j = self.args.model_inst.join_num
+            # joint_id = num_j - 1
+            # frame = frames_op[0, ..., 0]
+            # vxdist_echt = poses_op[0, ..., joint_id]
+            # vxdist_pred = pred_op[0, ..., joint_id]
+            # uomap_echt = poses_op[
+            #     0, hmap_size / 2, ...,
+            #     num_j + 3 * joint_id:num_j + 3 * (joint_id + 1)]
+            # uomap_pred = pred_op[
+            #     0, hmap_size / 2, ...,
+            #     num_j + 3 * joint_id:num_j + 3 * (joint_id + 1)]
+            # vxdist_echt_op = tf.expand_dims(tfplot_vxmap(
+            #     frame, vxdist_echt, hmap_size, reduce_fn=np.max), axis=0)
+            # tf.summary.image('vxdist_echt/', vxdist_echt_op, max_outputs=1)
+            # vxdist_pred_op = tf.expand_dims(tfplot_vxmap(
+            #     frame, vxdist_pred, hmap_size, reduce_fn=np.max), axis=0)
+            # tf.summary.image('vxdist_pred/', vxdist_pred_op, max_outputs=1)
+            # vxunit_echt_op = tf.expand_dims(tfplot_uomap3d(
+            #     frame, uomap_echt), axis=0)
+            # tf.summary.image('vxunit_echt/', vxunit_echt_op, max_outputs=1)
+            # vxunit_pred_op = tf.expand_dims(tfplot_uomap3d(
+            #     frame, uomap_pred), axis=0)
+            # tf.summary.image('vxunit_pred/', vxunit_pred_op, max_outputs=1)
 
             optimizer = tf.train.AdamOptimizer(learning_rate)
             # train_op = optimizer.minimize(

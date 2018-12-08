@@ -3,7 +3,6 @@ import tensorflow as tf
 from functools import reduce
 import progressbar
 from train.train_abc import train_abc
-from utils.image_ops import tfplot_vxlab, tfplot_vxflt
 from utils.tf_utils import unravel_index
 
 

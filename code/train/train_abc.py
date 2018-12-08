@@ -145,17 +145,6 @@ class train_abc():
             tf.summary.histogram('out_value_echt', poses_op)
             tf.summary.histogram('out_value_pred', pred_op)
 
-            # from model.base_clean import tfplot_pose_pred
-            # frame = frames_op[0, ...]
-            # pose_pred = pred_op[0, ...]
-            # resce_op = tf.placeholder(tf.float32, shape=(None, 4,))
-            # resce = resce_op[0, ...]
-            # pose_pred_op = tf.expand_dims(tfplot_pose_pred(
-            #     frame, pose_pred, resce,
-            #     self.args.data_draw.draw_pose2d,
-            #     self.args.data_inst), axis=0)
-            # tf.summary.image('pose_pred/', pose_pred_op, max_outputs=1)
-
             optimizer = tf.train.AdamOptimizer(learning_rate)
             # train_op = optimizer.minimize(
             #     loss_op, global_step=global_step)

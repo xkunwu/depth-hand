@@ -13,6 +13,7 @@ import time
 from args_holder import args_holder
 from utils.iso_boxes import iso_cube
 from camera.hand_locator import hand_locator
+mpplot.switch_backend("TkAgg")
 
 
 # helper to define the rendering canvas
@@ -186,6 +187,7 @@ class capture:
         hfinder = hand_locator(self.args, self.caminfo)
 
         def update(i):
+            print("==== Frame: ", i, "====")
             canvas = self.canvas
             ax = canvas.axes[0]
             [p.remove() for p in reversed(ax.patches)]  # remove previews Rectangle drawings
@@ -269,8 +271,7 @@ class capture:
                 return
             depth_image = camframes.depth
             color_image = camframes.color
-            canvas.ims[0].set_data(
-                depth_image / self.caminfo.z_range[1])
+            canvas.ims[0].set_data(depth_image)
             canvas.ims[1].set_data(color_image)
             cube = iso_cube(np.array([0, 0, 400]), 120)
             # cube=iso_cube(np.array([-200, 20, 400]), 120)
@@ -279,6 +280,7 @@ class capture:
         # assign return value is necessary! Otherwise no updates.
         anim = FuncAnimation(
             self.canvas.fig, update, blit=False, interval=1)
+        mpplot.show()
         if self.save_raw is not False:
             filename = os.path.join(
                 self.save_raw,
@@ -288,8 +290,8 @@ class capture:
                 extra_args=['-vcodec', 'libx264'])
 
     def capture_loop(self):
-            # self.capture_test()
-            self.capture_detect()
+        self.capture_test()
+        # self.capture_detect()
 
 
 def test_camera(cap):
@@ -347,6 +349,7 @@ def test_smooth(args):
 
 
 if __name__ == '__main__':
+    # import pdb; pdb.set_trace()
     with args_holder() as argsholder:
         if not argsholder.parse_args():
             sys.exit(0)

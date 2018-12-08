@@ -125,37 +125,6 @@ Please make sure to the downloaded files are organized in the following structur
     - utils/: utility code
 ```
 
-## install requirements
-```
-conda install --file requirements.txt
-pip install pyquaternion
-pip install colour
-pip install pycparser
-pip install cython
-pip install pyrealsense
-conda install --channel menpo opencv
-conda install --channel menpo mayavi
-conda install pyside
-pip install mayavi
-
-Cython
-pandas
-prettytable
-pillow
-seaborn
-imageio
-traits
-configobj
-envisage
-h5py
-#vispy
-#vtk
-#mayavi
-#PyQt5
-```
-
-## Code structure
-
 ## Misc topics
 ### Remote management
 ```

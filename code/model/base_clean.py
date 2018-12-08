@@ -5,30 +5,6 @@ from .base_regre import base_regre
 from utils.iso_boxes import iso_cube
 
 
-# def draw_pose_pred(
-#     fig, ax, img_crop, pose_pred, resce,
-#         draw_fn, caminfo):
-#     cube = iso_cube()
-#     cube.load(resce)
-#     ax.imshow(img_crop, cmap='bone_r')
-#     pose3d = cube.trans_scale_to(pose_pred)
-#     pose2d, _ = cube.project_ortho(pose3d, roll=0, sort=False)
-#     pose2d *= caminfo.crop_size
-#     draw_fn(
-#         ax, caminfo,
-#         pose2d,
-#     )
-#
-#
-# def figure_pose_pred(img_crop, pose_pred, resce, draw_fn, caminfo):
-#     fig, ax = tfplot.subplots(figsize=(4, 4))
-#     draw_pose_pred(fig, ax, img_crop, pose_pred, resce, draw_fn, caminfo)
-#     ax.axis('off')
-#     return fig
-#
-# tfplot_pose_pred = tfplot.wrap(figure_pose_pred, batch=False)
-
-
 class base_clean(base_regre):
     """ This class use cleaned data from 3D PCA bounding cube.
     """

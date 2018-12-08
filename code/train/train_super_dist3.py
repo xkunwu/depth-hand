@@ -4,7 +4,7 @@ import tensorflow as tf
 import progressbar
 from functools import reduce
 from train.train_abc import train_abc
-from utils.image_ops import tfplot_vxmap
+# from utils.image_ops import tfplot_vxmap
 
 
 class train_super_dist3(train_abc):
@@ -50,26 +50,26 @@ class train_super_dist3(train_abc):
             learning_rate = self.get_learning_rate(global_step)
             tf.summary.scalar('learning_rate', learning_rate)
 
-            hmap_size = self.args.model_inst.hmap_size
-            num_j = self.args.model_inst.join_num
-            joint_id = num_j - 1
-            frame = frames_op[0, ..., 0]
-            vxdist_echt = vxudir_op[0, ..., joint_id]
-            vxdist_echt_op = tf.expand_dims(tfplot_vxmap(
-                frame, vxdist_echt, hmap_size, reduce_fn=np.max), axis=0)
-            tf.summary.image('vxdist_echt/', vxdist_echt_op, max_outputs=1)
-            netid = 0
-            for ends in self.args.model_inst.end_point_list:
-                if not ends.startswith('hourglass_'):
-                    continue
-                net = end_points[ends]
-                vxdist_pred = net[0, ..., joint_id]
-                vxdist_pred_op = tf.expand_dims(tfplot_vxmap(
-                    frame, vxdist_pred, hmap_size, reduce_fn=np.max), axis=0)
-                tf.summary.image(
-                    'vxdist_pred_{:d}/'.format(netid),
-                    vxdist_pred_op, max_outputs=1)
-                netid += 1
+            # hmap_size = self.args.model_inst.hmap_size
+            # num_j = self.args.model_inst.join_num
+            # joint_id = num_j - 1
+            # frame = frames_op[0, ..., 0]
+            # vxdist_echt = vxudir_op[0, ..., joint_id]
+            # vxdist_echt_op = tf.expand_dims(tfplot_vxmap(
+            #     frame, vxdist_echt, hmap_size, reduce_fn=np.max), axis=0)
+            # tf.summary.image('vxdist_echt/', vxdist_echt_op, max_outputs=1)
+            # netid = 0
+            # for ends in self.args.model_inst.end_point_list:
+            #     if not ends.startswith('hourglass_'):
+            #         continue
+            #     net = end_points[ends]
+            #     vxdist_pred = net[0, ..., joint_id]
+            #     vxdist_pred_op = tf.expand_dims(tfplot_vxmap(
+            #         frame, vxdist_pred, hmap_size, reduce_fn=np.max), axis=0)
+            #     tf.summary.image(
+            #         'vxdist_pred_{:d}/'.format(netid),
+            #         vxdist_pred_op, max_outputs=1)
+            #     netid += 1
 
             optimizer = tf.train.AdamOptimizer(learning_rate)
             # train_op = optimizer.minimize(

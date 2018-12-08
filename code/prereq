@@ -1,0 +1,11 @@
+#!/bin/bash
+
+export PYTHON_VERSION=3.6
+conda create -n hand python=$PYTHON_VERSION numpy pip
+pip install -r requirements.txt
+pip install tensorflow-gpu
+# conda install notebook jupyterlab
+# pip install cite2c
+# pip install ipympl
+# pip install git+https://github.com/wookayin/tensorflow-plot.git@master
+# conda install -c pyviz holoviews bokeh

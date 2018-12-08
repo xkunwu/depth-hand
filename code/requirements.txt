@@ -1,9 +1,5 @@
 matplotlib
-cite2c
-ipympl
 pyrealsense2
-tensorflow-gpu
-git+https://github.com/wookayin/tensorflow-plot.git@master
 colour
 opencv-python
 progressbar2
@@ -12,5 +8,5 @@ scipy
 scikit-fmm
 scikit-learn
 scikit-image
-sklearn
 imageio
+h5py

@@ -3,7 +3,7 @@ import matplotlib.pyplot as mpplot
 import matplotlib.image as mpimg
 import matplotlib.collections as mcoll
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-import tfplot
+# import tfplot
 from utils.coder import file_pack
 from utils.regu_grid import regu_grid
 
@@ -30,13 +30,13 @@ def draw_edt2(fig, ax, edt2):
     fig.colorbar(img_edt2, cax=cax)
 
 
-def figure_edt2(edt2):
-    fig, ax = tfplot.subplots(figsize=(4, 4))
-    draw_edt2(fig, ax, edt2)
-    ax.axis('off')
-    return fig
-
-tfplot_edt2 = tfplot.wrap(figure_edt2, batch=False)
+# def figure_edt2(edt2):
+#     fig, ax = tfplot.subplots(figsize=(4, 4))
+#     draw_edt2(fig, ax, edt2)
+#     ax.axis('off')
+#     return fig
+#
+# tfplot_edt2 = tfplot.wrap(figure_edt2, batch=False)
 
 
 def draw_dist3(vxdist, voxize_crop, scale):
@@ -139,13 +139,13 @@ def draw_uomap3d(fig, ax, vxcnt_crop, uomap):
     ax.invert_yaxis()
 
 
-def figure_uomap3d(vxcnt_crop, uomap):
-    fig, ax = tfplot.subplots(figsize=(4, 4))
-    draw_uomap3d(fig, ax, vxcnt_crop, uomap)
-    ax.axis('off')
-    return fig
-
-tfplot_uomap3d = tfplot.wrap(figure_uomap3d, batch=False)
+# def figure_uomap3d(vxcnt_crop, uomap):
+#     fig, ax = tfplot.subplots(figsize=(4, 4))
+#     draw_uomap3d(fig, ax, vxcnt_crop, uomap)
+#     ax.axis('off')
+#     return fig
+#
+# tfplot_uomap3d = tfplot.wrap(figure_uomap3d, batch=False)
 
 
 def draw_vxmap(
@@ -172,13 +172,13 @@ def draw_vxmap(
     ax.invert_yaxis()
 
 
-def figure_vxmap(vxcnt_crop, vxmap, voxize_hmap, reduce_fn=np.sum, roll=0):
-    fig, ax = tfplot.subplots(figsize=(4, 4))
-    draw_vxmap(fig, ax, vxcnt_crop, vxmap, voxize_hmap, reduce_fn, roll)
-    ax.axis('off')
-    return fig
-
-tfplot_vxmap = tfplot.wrap(figure_vxmap, batch=False)
+# def figure_vxmap(vxcnt_crop, vxmap, voxize_hmap, reduce_fn=np.sum, roll=0):
+#     fig, ax = tfplot.subplots(figsize=(4, 4))
+#     draw_vxmap(fig, ax, vxcnt_crop, vxmap, voxize_hmap, reduce_fn, roll)
+#     ax.axis('off')
+#     return fig
+#
+# tfplot_vxmap = tfplot.wrap(figure_vxmap, batch=False)
 
 
 def draw_vxlab(
@@ -206,13 +206,13 @@ def draw_vxlab(
     # ax.invert_yaxis()
 
 
-def figure_vxlab(vxcnt_crop, vxlab, voxize_hmap):
-    fig, ax = tfplot.subplots(figsize=(4, 4))
-    draw_vxlab(fig, ax, vxcnt_crop, vxlab, voxize_hmap)
-    ax.axis('off')
-    return fig
-
-tfplot_vxlab = tfplot.wrap(figure_vxlab, batch=False)
+# def figure_vxlab(vxcnt_crop, vxlab, voxize_hmap):
+#     fig, ax = tfplot.subplots(figsize=(4, 4))
+#     draw_vxlab(fig, ax, vxcnt_crop, vxlab, voxize_hmap)
+#     ax.axis('off')
+#     return fig
+#
+# tfplot_vxlab = tfplot.wrap(figure_vxlab, batch=False)
 
 
 def draw_vxflt(
@@ -238,13 +238,13 @@ def draw_vxflt(
     # ax.invert_yaxis()
 
 
-def figure_vxflt(vxcnt_crop, vxmap_flat, voxize_hmap):
-    fig, ax = tfplot.subplots(figsize=(4, 4))
-    draw_vxflt(fig, ax, vxcnt_crop, vxmap_flat, voxize_hmap)
-    ax.axis('off')
-    return fig
-
-tfplot_vxflt = tfplot.wrap(figure_vxflt, batch=False)
+# def figure_vxflt(vxcnt_crop, vxmap_flat, voxize_hmap):
+#     fig, ax = tfplot.subplots(figsize=(4, 4))
+#     draw_vxflt(fig, ax, vxcnt_crop, vxmap_flat, voxize_hmap)
+#     ax.axis('off')
+#     return fig
+#
+# tfplot_vxflt = tfplot.wrap(figure_vxflt, batch=False)
 
 
 def draw_hmap2(fig, ax, image_crop, hmap2):
@@ -320,29 +320,29 @@ def draw_uomap(fig, ax, image_crop, uomap):
     #     color='r', width=0.004, scale=20)
 
 
-def figure_hmap2(depth_hmap, hmap2):
-    fig, ax = tfplot.subplots(figsize=(4, 4))
-    draw_hmap2(fig, ax, depth_hmap, hmap2)
-    # ax.axis('off')
-    return fig
-
-
-def figure_olmap(depth_hmap, olmap):
-    fig, ax = tfplot.subplots(figsize=(4, 4))
-    draw_olmap(fig, ax, depth_hmap, olmap)
-    # ax.axis('off')
-    return fig
-
-
-def figure_uomap(depth_crop, uomap):
-    fig, ax = tfplot.subplots(figsize=(4, 4))
-    draw_uomap(fig, ax, depth_crop, uomap)
-    # ax.axis('off')
-    return fig
-
-tfplot_hmap2 = tfplot.wrap(figure_hmap2, batch=False)
-tfplot_olmap = tfplot.wrap(figure_olmap, batch=False)
-tfplot_uomap = tfplot.wrap(figure_uomap, batch=False)
+# def figure_hmap2(depth_hmap, hmap2):
+#     fig, ax = tfplot.subplots(figsize=(4, 4))
+#     draw_hmap2(fig, ax, depth_hmap, hmap2)
+#     # ax.axis('off')
+#     return fig
+#
+#
+# def figure_olmap(depth_hmap, olmap):
+#     fig, ax = tfplot.subplots(figsize=(4, 4))
+#     draw_olmap(fig, ax, depth_hmap, olmap)
+#     # ax.axis('off')
+#     return fig
+#
+#
+# def figure_uomap(depth_crop, uomap):
+#     fig, ax = tfplot.subplots(figsize=(4, 4))
+#     draw_uomap(fig, ax, depth_crop, uomap)
+#     # ax.axis('off')
+#     return fig
+#
+# tfplot_hmap2 = tfplot.wrap(figure_hmap2, batch=False)
+# tfplot_olmap = tfplot.wrap(figure_olmap, batch=False)
+# tfplot_uomap = tfplot.wrap(figure_uomap, batch=False)
 
 
 class cam_info:

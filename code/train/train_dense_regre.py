@@ -4,7 +4,7 @@ import tensorflow as tf
 import progressbar
 from functools import reduce
 from train.train_abc import train_abc
-from utils.image_ops import tfplot_hmap2, tfplot_olmap, tfplot_uomap
+# from utils.image_ops import tfplot_hmap2, tfplot_olmap, tfplot_uomap
 
 
 class train_dense_regre(train_abc):
@@ -49,51 +49,51 @@ class train_dense_regre(train_abc):
             learning_rate = self.get_learning_rate(global_step)
             tf.summary.scalar('learning_rate', learning_rate)
 
-            num_j = self.args.model_inst.join_num
-            joint_id = num_j - 1
-            frame = frames_op[0, ..., 0]
-            hmap2_echt = poses_op[0, ..., joint_id]
-            hmap2_pred = pred_op[0, ..., joint_id]
-            olmap_echt = poses_op[0, ..., num_j + joint_id]
-            olmap_pred = pred_op[0, ..., num_j + joint_id]
-            uomap_echt = poses_op[
-                0, ...,
-                2 * num_j + 3 * joint_id:2 * num_j + 3 * (joint_id + 1)]
-            uomap_pred = pred_op[
-                0, ...,
-                2 * num_j + 3 * joint_id:2 * num_j + 3 * (joint_id + 1)]
-            hmap2_echt_op = tf.expand_dims(tfplot_hmap2(
-                frame, hmap2_echt), axis=0)
-            tf.summary.image('hmap2_echt/', hmap2_echt_op, max_outputs=1)
-            hmap2_pred_op = tf.expand_dims(tfplot_hmap2(
-                frame, hmap2_pred), axis=0)
-            tf.summary.image('hmap2_pred/', hmap2_pred_op, max_outputs=1)
-            olmap_echt_op = tf.expand_dims(tfplot_olmap(
-                frame, olmap_echt), axis=0)
-            tf.summary.image('olmap_echt/', olmap_echt_op, max_outputs=1)
-            olmap_pred_op = tf.expand_dims(tfplot_olmap(
-                frame, olmap_pred), axis=0)
-            tf.summary.image('olmap_pred/', olmap_pred_op, max_outputs=1)
-            uomap_echt_op = tf.expand_dims(tfplot_uomap(
-                frame, uomap_echt), axis=0)
-            tf.summary.image('uomap_echt/', uomap_echt_op, max_outputs=1)
-            uomap_pred_op = tf.expand_dims(tfplot_uomap(
-                frame, uomap_pred), axis=0)
-            tf.summary.image('uomap_pred/', uomap_pred_op, max_outputs=1)
+            # num_j = self.args.model_inst.join_num
+            # joint_id = num_j - 1
+            # frame = frames_op[0, ..., 0]
+            # hmap2_echt = poses_op[0, ..., joint_id]
+            # hmap2_pred = pred_op[0, ..., joint_id]
+            # olmap_echt = poses_op[0, ..., num_j + joint_id]
+            # olmap_pred = pred_op[0, ..., num_j + joint_id]
+            # uomap_echt = poses_op[
+            #     0, ...,
+            #     2 * num_j + 3 * joint_id:2 * num_j + 3 * (joint_id + 1)]
+            # uomap_pred = pred_op[
+            #     0, ...,
+            #     2 * num_j + 3 * joint_id:2 * num_j + 3 * (joint_id + 1)]
+            # hmap2_echt_op = tf.expand_dims(tfplot_hmap2(
+            #     frame, hmap2_echt), axis=0)
+            # tf.summary.image('hmap2_echt/', hmap2_echt_op, max_outputs=1)
+            # hmap2_pred_op = tf.expand_dims(tfplot_hmap2(
+            #     frame, hmap2_pred), axis=0)
+            # tf.summary.image('hmap2_pred/', hmap2_pred_op, max_outputs=1)
+            # olmap_echt_op = tf.expand_dims(tfplot_olmap(
+            #     frame, olmap_echt), axis=0)
+            # tf.summary.image('olmap_echt/', olmap_echt_op, max_outputs=1)
+            # olmap_pred_op = tf.expand_dims(tfplot_olmap(
+            #     frame, olmap_pred), axis=0)
+            # tf.summary.image('olmap_pred/', olmap_pred_op, max_outputs=1)
+            # uomap_echt_op = tf.expand_dims(tfplot_uomap(
+            #     frame, uomap_echt), axis=0)
+            # tf.summary.image('uomap_echt/', uomap_echt_op, max_outputs=1)
+            # uomap_pred_op = tf.expand_dims(tfplot_uomap(
+            #     frame, uomap_pred), axis=0)
+            # tf.summary.image('uomap_pred/', uomap_pred_op, max_outputs=1)
 
-            num_j = self.args.model_inst.join_num
-            tf.summary.histogram(
-                'hmap2_value_echt', poses_op[..., :num_j])
-            tf.summary.histogram(
-                'hmap2_value_pred', pred_op[..., :num_j])
-            tf.summary.histogram(
-                'olmap_value_echt', poses_op[..., num_j:num_j * 2])
-            tf.summary.histogram(
-                'olmap_value_pred', pred_op[..., num_j:num_j * 2])
-            tf.summary.histogram(
-                'uomap_value_echt', poses_op[..., - num_j * 3:])
-            tf.summary.histogram(
-                'uomap_value_pred', pred_op[..., - num_j * 3:])
+            # num_j = self.args.model_inst.join_num
+            # tf.summary.histogram(
+            #     'hmap2_value_echt', poses_op[..., :num_j])
+            # tf.summary.histogram(
+            #     'hmap2_value_pred', pred_op[..., :num_j])
+            # tf.summary.histogram(
+            #     'olmap_value_echt', poses_op[..., num_j:num_j * 2])
+            # tf.summary.histogram(
+            #     'olmap_value_pred', pred_op[..., num_j:num_j * 2])
+            # tf.summary.histogram(
+            #     'uomap_value_echt', poses_op[..., - num_j * 3:])
+            # tf.summary.histogram(
+            #     'uomap_value_pred', pred_op[..., - num_j * 3:])
 
             optimizer = tf.train.AdamOptimizer(learning_rate)
             # train_op = optimizer.minimize(
