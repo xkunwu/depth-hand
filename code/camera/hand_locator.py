@@ -1,3 +1,6 @@
+""" Hand in Depth
+    https://github.com/xkunwu/depth-hand
+"""
 import numpy as np
 from collections import deque
 import cv2

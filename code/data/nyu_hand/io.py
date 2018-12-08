@@ -1,3 +1,6 @@
+""" Hand in Depth
+    https://github.com/xkunwu/depth-hand
+"""
 import re
 from skimage import io as skimio
 from data.io_abc import io_abc

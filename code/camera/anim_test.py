@@ -1,3 +1,6 @@
+""" Hand in Depth
+    https://github.com/xkunwu/depth-hand
+"""
 import numpy as np
 import matplotlib.pyplot as mpplot
 from matplotlib.animation import FuncAnimation

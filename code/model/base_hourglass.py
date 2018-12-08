@@ -1,3 +1,6 @@
+""" Hand in Depth
+    https://github.com/xkunwu/depth-hand
+"""
 import os
 from .hourglass import hourglass
 from .base_clean import base_clean

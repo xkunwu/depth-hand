@@ -1,3 +1,6 @@
+""" Hand in Depth
+    https://github.com/xkunwu/depth-hand
+"""
 import os
 import numpy as np
 from .ops import ops as dataops

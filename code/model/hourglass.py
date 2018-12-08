@@ -1,3 +1,6 @@
+""" Hand in Depth
+    https://github.com/xkunwu/depth-hand
+"""
 import tensorflow as tf
 from tensorflow.contrib import slim
 from model.incept_resnet import incept_resnet

@@ -1,3 +1,6 @@
+""" Hand in Depth
+    https://github.com/xkunwu/depth-hand
+"""
 import os
 from .incept_resnet import incept_resnet
 from .inresnet3d import inresnet3d

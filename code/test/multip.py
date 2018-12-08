@@ -1,3 +1,6 @@
+""" Hand in Depth
+    https://github.com/xkunwu/depth-hand
+"""
 #from multiprocessing import Pool as ThreadPool
 from multiprocessing import Pool as ThreadPool
 from functools import partial

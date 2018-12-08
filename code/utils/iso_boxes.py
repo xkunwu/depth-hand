@@ -1,3 +1,6 @@
+""" Hand in Depth
+    https://github.com/xkunwu/depth-hand
+"""
 import numpy as np
 # from pyquaternion import Quaternion
 from colour import Color

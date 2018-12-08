@@ -1,3 +1,6 @@
+""" Hand in Depth
+    https://github.com/xkunwu/depth-hand
+"""
 import numpy as np
 from data.eval_abc import eval_abc
 from .ops import ops as dataops

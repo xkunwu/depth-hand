@@ -2,7 +2,7 @@
 
 > Experimental hand detection and tracking from single depth camera.
 
-<span style="display:block;text-align:center">![Test sequence.](../../eval/test_seq.gif)</span>
+<span style="display:block;text-align:center">![Test sequence.](/eval/test_seq.gif)</span>
 
 Note: this is a two-week quick patch following the [hand pose estimation project](https://github.com/xkunwu/depth-hand) located in the main repo.
 The purpose is to make live capture and hand tracking possible, but currently no plan to make the code waterproof (might be a future research project).
@@ -17,9 +17,9 @@ Also note: SR300 should work nicely after installing the drivers (hit 'realsense
 
 ## Usage
 Default is using the 'super_edt2m' model.
-Please check the main repo for [finding the full list of models](../README.md#print-model-list).
+Please check the main repo for [finding the full list of models](/README.md#print-model-list).
 
-Note: tracking code does not require the prepared data, only need to download your favorite pretrained model. See [README.md in the pose estimation part](../README.md#pretrained-models) for more details.
+Note: tracking code does not require the prepared data, only need to download your favorite pretrained model. See [README.md in the pose estimation part](/README.md#pretrained-models) for more details.
 ```
 cd depth-hand/code
 python -m camera.capture --model_name=super_edt2m
