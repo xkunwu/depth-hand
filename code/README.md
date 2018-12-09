@@ -113,7 +113,7 @@ Tested on Ubuntu (18.04/16.04), Python (3.6/2.7), NVIDIA GPU (9.0/8.0) or CPU.
 ```
 
 ## Resources
-Resources can be downloaded from [here](https://pan.baidu.com/s/1XErtAR6WhMQ8p5Q1v9htFA).
+Resources can be downloaded from: \[[Baidu Cloud Storage](https://pan.baidu.com/s/1XErtAR6WhMQ8p5Q1v9htFA)\].
 -   [Hands17 dataset](http://icvl.ee.ic.ac.uk/hands17/):
     I am not authorized to redistribute. Please contact the organizers for downloading the data.
 -   Pretrained models:
@@ -166,8 +166,8 @@ Please make sure to the downloaded files are organized in the following structur
 This is the key to understand the data preprocessing work flow.
 
 ## FAQ
-##### Q: There are only a few prepared data shared online?
-A: The prepared data is huge, but my internet bandwidth is limited. I would suggest you just run the data preprocessing locally - it's multi-threaded, so actually quite fast if you have a good CPU with many cores.
+##### Q: Only a few prepared data shared online?
+A: The prepared data is huge, but my internet bandwidth is limited, my online storage limit is low. I would suggest you just run the data preprocessing locally - it's multi-threaded, so actually quite fast if you have a good CPU with many cores.
 
 ##### Q: The prepared data is too HUGE!
 A: Agreed. But HDF5 format is already doing good job on compression. Given that the storage is much cheaper than our precious time waiting for training, I would bear with it right now.

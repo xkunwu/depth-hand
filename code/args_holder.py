@@ -23,7 +23,6 @@ model_ref = {
     'super_dist2': '2D CR w/ Euclidean distance',
     'super_udir2': '2D CR w/ offset',
     'super_hmap2': '2D CR w/ heatmap',
-    # 'dense_regre': 'Wan et al. (CVPR\'18)',
     'dense_regre': '2D offset regression',
     'direc_tsdf': 'Ge et al. (CVPR\'17)',
     'trunc_dist': '3D truncated Euclidean distance',
@@ -350,26 +349,12 @@ class args_holder:
             self.args.model_inst = self.args.model_class(self.args)
         else:
             raise ValueError('mode (%s) not recognized', self.args.mode)
-        if 'detect' == self.args.mode:
-            self.args.localizer_class = getattr(
-                import_module(model_map[self.args.localizer_name]),
-                self.args.localizer_name
-            )
-            self.args.localizer_inst = self.args.localizer_class(self.args)
-        # if 'train' == self.args.mode:
-        #     self.args.model_class = getattr(
-        #         import_module(model_map[self.args.model_name]),
-        #         self.args.model_name
-        #     )
-        #     self.args.model_inst = self.args.model_class(self.args)
-        # elif 'detect' == self.args.mode:
-        #     self.args.model_class = getattr(
+        # if 'detect' == self.args.mode:
+        #     self.args.localizer_class = getattr(
         #         import_module(model_map[self.args.localizer_name]),
         #         self.args.localizer_name
         #     )
-        #     self.args.model_inst = self.args.model_class(self.args)
-        # else:
-        #     raise ValueError('mode (%s) not recognized', self.args.mode)
+        #     self.args.localizer_inst = self.args.localizer_class(self.args)
         # model instance has a chance to tweak parameters if necessary
         self.args.model_inst.tweak_arguments(self.args)
         self.args.decay_step //= self.args.batch_size
