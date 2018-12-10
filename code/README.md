@@ -40,15 +40,6 @@ Tested on Ubuntu (18.04/16.04), Python (3.6/2.7), NVIDIA GPU (9.0/8.0) or CPU.
         --model_name=base_clean
     ```
 #### Print useful information
--   Print prepared data dependency structure:
-    ```
-    python -m train.evaluate --print_prepared_dependency
-    ```
-    For example, the output for the best performing standalone model 'super_edt2m' looks like this:
-    ```
-    Prepared dependency for super_edt2m: {'annotation', 'edt2m_32', 'pose_c', 'clean_128', 'udir2_32', 'edt2_32'}
-    ```
-    But it requires huge storage: 'udir2_32' is 66G! - An example of time-storage trade-off.
 -   Print currently implemented model list:
     <a name="print-model-list"></a>
     ```
@@ -137,7 +128,7 @@ Resources can be downloaded from: \[[Baidu Cloud Storage](https://pan.baidu.com/
     ```
 
 #### File structure
-Please make sure to the downloaded files are organized in the following structure, otherwise the code will automatically redo data preprocessing and training (will take quite a while).
+Please make sure that the downloaded files are organized in the following structure, otherwise the code will automatically redo data preprocessing and training (will take quite a while).
 ```
 %out_root%/hands17: if you have Hands17 dataset, put it here
 %out_root%/output/hands17/
@@ -164,6 +155,49 @@ Please make sure to the downloaded files are organized in the following structur
 
 #### Prepared data dependency structure
 This is the key to understand the data preprocessing work flow.
+In a nutshell, each model/algorithm requires different types preprocessed data, and sometimes one type may depends on several other types as input.
+So the data types are modularized and abstracted into a hierarchical structure - in correspondence to the inheritance structure of model classes.
+-   Print data dependency for a specific model class:
+    ```
+    python -m train.evaluate --print_model_prereq
+    ```
+    For example, the output for the best performing standalone model 'super_edt2m' looks like this:
+    ```
+    Prepared dependency for super_edt2m: {'annotation', 'edt2m_32', 'pose_c', 'clean_128', 'udir2_32', 'edt2_32'}
+    ```
+    But it requires huge storage: 'udir2_32' is 66G! - An example of time-storage trade-off.
+-   Print data dependency hierarchy for a data set:
+    ```
+    python -m train.evaluate --print_data_deps
+    ```
+    Format: (data type) --> (dependencies)
+
+    Currently, the output for the Hands17 dataset should look like this:
+    ```
+    Data dependency hierarchy for hands17:
+    index  -->  []
+    poses  -->  []
+    resce  -->  []
+    pose_c  -->  ['poses', 'resce']
+    pose_hit  -->  ['poses', 'resce']
+    pose_lab  -->  ['poses', 'resce']
+    crop2  -->  ['index', 'resce']
+    clean  -->  ['index', 'resce']
+    ortho3  -->  ['index', 'resce']
+    pcnt3  -->  ['index', 'resce']
+    tsdf3  -->  ['pcnt3']
+    vxhit  -->  ['index', 'resce']
+    vxudir  -->  ['pcnt3', 'poses', 'resce']
+    edt2  -->  ['clean', 'poses', 'resce']
+    hmap2  -->  ['poses', 'resce']
+    udir2  -->  ['clean', 'poses', 'resce']
+    edt2m  -->  ['edt2', 'udir2']
+    ov3dist2  -->  ['vxudir']
+    ov3edt2  -->  ['ortho3', 'poses', 'resce']
+    ov3edt2m  -->  ['ov3edt2', 'ov3dist2']
+    ```
+    Note: the output in the 'prepared' fold also have a number appended to these base names, which means the resolution of the data type (configurable for each model class).
+    For example, 'clean_128' means the image should be 128x128 in dimensions.
 
 ## FAQ
 ##### Q: Only a few prepared data shared online?

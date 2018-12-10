@@ -41,6 +41,8 @@ python -m camera.capture --model_name=super_edt2m
     ```
     python -m camera.capture --model_name=super_edt2m --read_stream=True --save_det=True
     ```
+    This is very useful for debug: after making changes to the code, replay the same sequence and see if your idea works better.
+    For example, you can play with the [test capture sequence](https://pan.baidu.com/s/1dm8gTcEOO0GjW6U9SEH1gw) used for generating the teaser figure on the top.
 
 ## Documents
 Please check the [project webpage](https://xkunwu.github.io/projects/depth-hand/depth-hand) to see how it works or why not working as promised.

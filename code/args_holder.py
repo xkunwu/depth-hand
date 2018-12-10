@@ -115,9 +115,13 @@ class args_holder:
             help='print the model maps and exit')
         self.parser.set_defaults(print_models=False)
         self.parser.add_argument(
-            '--print_prepared_dependency', dest='print_prepared_dependency', action='store_true',
+            '--print_model_prereq', dest='print_model_prereq', action='store_true',
+            help='print the prepared data dependency for the current model class and exit')
+        self.parser.set_defaults(print_model_prereq=False)
+        self.parser.add_argument(
+            '--print_data_deps', dest='print_data_deps', action='store_true',
             help='print the prepared data dependency structure and exit')
-        self.parser.set_defaults(print_prepared_dependency=False)
+        self.parser.set_defaults(print_data_deps=False)
 
         # system parameters
         self.parser.add_argument(
@@ -396,10 +400,17 @@ class args_holder:
 
         # bind data instance to model instance
         self.args.model_inst.receive_data(self.args.data_inst, self.args)
-        if self.args.print_prepared_dependency:
+
+        # asked for information?
+        if self.args.print_model_prereq:
             print('Prepared dependency for {}: {}'.format(
                 self.args.model_name,
                 set(self.args.model_inst.store_name.values())))
+            return False
+        if self.args.print_data_deps:
+            print('Data dependency hierarchy for {}:'.format(self.args.data_name))
+            for k, v in self.args.data_inst.store_precon.items():
+                print(k, " --> ", v)
             return False
 
         self.write_args(self.args)

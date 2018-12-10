@@ -4,6 +4,8 @@ set -e
 
 cd /tmp/$1/
 
+find -type d -name "__pycache__" -exec rm -rf {} \;
+
 rm -rf data/
 rm -rf docker/
 rm -rf scripts/
@@ -29,7 +31,7 @@ rm -f code/model/base_inres.py
 rm -f code/model/base_conv3_inres.py
 rm -f code/model/localizer*
 
-find . -regextype posix-extended -regex ".*\.py($|\..*)" -type f -exec sed -i '3i\    Cleaned and handover to Camera@UoB, 21 December 2018' {} \;
+find . -regextype posix-extended -regex ".*\.py($|\..*)" -type f -exec sed -i '3i\    Cleaned and hand-over to Camera@UoB, 21 December 2018' {} \;
 
 sed -i '/^The code in this repo.*/s//The code in this repo was written by Xiaokun when he was a postdoc at the CAMERA group of Uni Bath./' README.md
 
