@@ -2,6 +2,8 @@
 
 > Single view depth image based pose estimation, given cropped out hand region.
 
+Please check the [paper webpage](https://xkunwu.github.io/research/18HandPose/18HandPose/) for more details about the pipeline and algorithms.
+
 ## Prerequisites
 Tested on Ubuntu (18.04/16.04), Python (3.6/2.7), NVIDIA GPU (9.0/8.0) or CPU.
 -   Install requirements (presuming [Miniconda](https://conda.io/miniconda.html)):
@@ -23,14 +25,14 @@ Tested on Ubuntu (18.04/16.04), Python (3.6/2.7), NVIDIA GPU (9.0/8.0) or CPU.
     pip install -r requirements.txt
     ```
 #### Basic usage
--   Test using pre-trained model:
+-   Test using pretrained model (this prepare required data automatically):
     ```
     python -m train.evaluate \
         --data_root=$HOME/data \
         --out_root=$HOME/data/univue/output \
         --model_name=base_clean
     ```
--   Retrain the model:
+-   Retrain the model (this happen automatically when pretrained model does not present):
     ```
     python -m train.evaluate \
         --data_root=$HOME/data \
@@ -201,10 +203,16 @@ So the data types are modularized and abstracted into a hierarchical structure -
 
 ## FAQ
 ##### Q: Only a few prepared data shared online?
-A: The prepared data is huge, but my internet bandwidth is limited, my online storage limit is low. I would suggest you just run the data preprocessing locally - it's multi-threaded, so actually quite fast if you have a good CPU with many cores.
+A: The prepared data is huge, but my internet bandwidth is limited, my online storage limit is low.
+I would suggest you just run the data preprocessing locally - it's multi-threaded, so actually quite fast if you have a good CPU with many cores.
 
 ##### Q: The prepared data is too HUGE!
-A: Agreed. But HDF5 format is already doing good job on compression. Given that the storage is much cheaper than our precious time waiting for training, I would bear with it right now.
+A: Agreed. But HDF5 format is already doing good job on compression.
+Given that the storage is much cheaper than our precious time waiting for training, I would bear with it right now.
+
+##### Q: The code is almost 20k lines, where should I start to read?
+A: (_Sigh_) Take your time - it took me nearly half a year to write.
+If you are in a hurry, delete everything except those (abstract) base classes and utils - including data preprocessing work flow - then you will feel much relieved to see the essence.
 
 ## Misc topics
 #### Remote management
