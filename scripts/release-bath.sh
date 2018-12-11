@@ -8,7 +8,6 @@ rm -rf data/
 rm -rf docker/
 rm -rf scripts/
 rm -rf eval/figures/
-rm -rf eval/line-count.txt
 rm -f .gitignore
 rm -f HEADER
 rm -f code/playground.ipynb

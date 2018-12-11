@@ -16,7 +16,8 @@ import time
 from args_holder import args_holder
 from utils.iso_boxes import iso_cube
 from camera.hand_locator import hand_locator
-mpplot.switch_backend("TkAgg")
+mpplot.switch_backend("TkAgg")  # sometimes does not work
+# mpplot.switch_backend("Qt5Agg")  # VERY, VERY slow
 
 
 # helper to define the rendering canvas

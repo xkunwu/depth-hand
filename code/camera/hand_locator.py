@@ -144,6 +144,11 @@ class hand_locator:
             dimg.astype(np.float32),
             5, 30, 30)
         dlist = dimg_f.ravel()
+        if 10 > len(dlist):
+            self.estr = "hand out of detection range"
+            print(self.estr)
+            self.tracker.clear()
+            return False
         dpart10 = np.partition(
             dlist[caminfo.z_range[0] + 0.01 < dlist],
             10)

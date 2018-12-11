@@ -216,7 +216,7 @@ Given that the storage is much cheaper than our precious time waiting for traini
 A: Thanks for your interest.
 Take your time and read the text above first.
 If you are in a hurry, delete everything except those (abstract) base classes and utils - including data preprocessing work flow - then you will feel much relieved to see the essence.
-Or take a look at 'scripts/release-bath.sh' to see how to clean the code.
+Or take a look at '[scripts/release-bath.sh](/scripts/release-bath.sh)' to see how to clean the code.
 
 ## Misc topics
 #### Remote management

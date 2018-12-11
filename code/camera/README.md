@@ -20,29 +20,63 @@ Default is using the 'super_edt2m' model.
 Please check the main repo for [finding the full list of models](/README.md#print-model-list).
 
 Note: tracking code does not require the prepared data, only need to download your favorite pretrained model. See [README.md in the pose estimation part](/README.md#pretrained-models) for more details.
+
+### Basic usage
 ```
 cd depth-hand/code
-python -m camera.capture --model_name=super_edt2m
+python -m camera.capture \
+    --data_root=$HOME/data \
+    --out_root=$HOME/data/univue/output \
+    --model_name=super_edt2m
 ```
+Key responses:
+-   q: quit the current window.
+-   b: save a single frame.
+
+### Other options
 -   If you want to see more debug information:
     ```
-    python -m camera.capture --model_name=super_edt2m --show_debug=True
+    python -m camera.capture \
+        --data_root=$HOME/data \
+        --out_root=$HOME/data/univue/output \
+        --show_debug=True \
+        --model_name=super_edt2m
     ```
 -   Save detection results:
     ```
-    python -m camera.capture --model_name=super_edt2m --save_det=True
+    python -m camera.capture \
+        --data_root=$HOME/data \
+        --out_root=$HOME/data/univue/output \
+        --save_det=True \
+        --model_name=super_edt2m
     ```
 -   Save raw stream data (for replay and test):
     ```
-    python -m camera.capture --model_name=super_edt2m --save_stream=True --save_det=True
+    python -m camera.capture \
+        --data_root=$HOME/data \
+        --out_root=$HOME/data/univue/output \
+        --save_stream=True --save_det=True \
+        --model_name=super_edt2m
     ```
     NOTE: previous data will be overwritten!
 -   Read saved raw stream data (instead of live capture):
     ```
-    python -m camera.capture --model_name=super_edt2m --read_stream=True --save_det=True
+    python -m camera.capture \
+        --data_root=$HOME/data \
+        --out_root=$HOME/data/univue/output \
+        --read_stream=True --save_det=True \
+        --model_name=super_edt2m
     ```
     This is very useful for debug: after making changes to the code, replay the same sequence and see if your idea works better.
     For example, you can play with the [test capture sequence](https://pan.baidu.com/s/1dm8gTcEOO0GjW6U9SEH1gw) used for generating the teaser figure on the top.
 
 ## Documents
 Please check the [project webpage](https://xkunwu.github.io/projects/depth-hand/depth-hand) to see how it works or why not working as promised.
+
+## FAQ
+##### Q: When turned on 'show_debug', only two blank windows show up?
+A: That *sometimes* happens with the "TkAgg" [backend of matplotlib](https://matplotlib.org/faq/usage_faq.html#what-is-a-backend), which is unfortunately the default.
+> [Tkinter is Python's de-facto standard GUI (Graphical User Interface) package."](https://wiki.python.org/moin/TkInter)
+
+So make sure [Tcl/Tk](http://www.tcl.tk/) is installed correctly on your system.
+Or switching to another backend might help (See [code/camera/capture.py](/code/camera/capture.py) around the top), e.g. "Qt5Agg" backen is more stable (IMO), but *extremely* slow.
