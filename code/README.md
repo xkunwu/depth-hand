@@ -41,6 +41,8 @@ Tested on Ubuntu (18.04/16.04), Python (3.6/2.7), NVIDIA GPU (9.0/8.0) or CPU.
         --max_epoch=1 \
         --model_name=base_clean
     ```
+    Note: this implies that the soft link to pretrained model will be overwritten with your new training output.
+    Please see the [Pretrained models section](#pretrained-models) below for the details, if you want to link it back.
 #### Print useful information
 -   Print currently implemented model list:
     <a name="print-model-list"></a>
