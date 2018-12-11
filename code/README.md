@@ -210,9 +210,11 @@ I would suggest you just run the data preprocessing locally - it's multi-threade
 A: Agreed. But HDF5 format is already doing good job on compression.
 Given that the storage is much cheaper than our precious time waiting for training, I would bear with it right now.
 
-##### Q: The code is almost 20k lines, where should I start to read?
-A: (_Sigh_) Take your time - it took me nearly half a year to write.
+##### Q: Where should I start to read the code?
+A: Thanks for your interest.
+Take your time and read the text above first.
 If you are in a hurry, delete everything except those (abstract) base classes and utils - including data preprocessing work flow - then you will feel much relieved to see the essence.
+Or take a look at 'scripts/release-bath.sh' to see how to clean the code.
 
 ## Misc topics
 #### Remote management
