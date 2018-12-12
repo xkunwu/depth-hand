@@ -70,13 +70,23 @@ Key responses:
     This is very useful for debug: after making changes to the code, replay the same sequence and see if your idea works better.
     For example, you can play with the [test capture sequence](https://pan.baidu.com/s/1dm8gTcEOO0GjW6U9SEH1gw) used for generating the teaser figure on the top.
 
-## Documents
+## Algorithms
 Please check the [project webpage](https://xkunwu.github.io/projects/depth-hand/depth-hand) to see how it works or why not working as promised.
 
 ## FAQ
+##### Q: There is a long halt before the first detection show up?
+The Tensorflow pretrained model is loaded on the first frame when something interesting show up in the range.
+On my laptop it roughly takes 2 seconds.
+After that, the detection should be almost as fast as the capture rate of your depth camera.
+
 ##### Q: When turned on 'show_debug', only two blank windows show up?
 A: That *sometimes* happens with the "TkAgg" [backend of matplotlib](https://matplotlib.org/faq/usage_faq.html#what-is-a-backend), which is unfortunately the default.
 > [Tkinter is Python's de-facto standard GUI (Graphical User Interface) package."](https://wiki.python.org/moin/TkInter)
 
 So make sure [Tcl/Tk](http://www.tcl.tk/) is installed correctly on your system.
 Or switching to another backend might help (See [code/camera/capture.py](/code/camera/capture.py) around the top), e.g. "Qt5Agg" backen is more stable (IMO), but *extremely* slow.
+
+##### Q: Detection looks very unstable?
+A: Mostly due to noise of depth image, which may relates to (in addition to algorithm complexity): hardware sensibility, lighting condition, reflective objects within range (in one funny test case, our tester's metal watch makes detection very random :joy:), etc.
+
+##### Note: other FAQ related to the algorithm may be found at the [project webpage](https://xkunwu.github.io/projects/depth-hand/depth-hand).
