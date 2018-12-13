@@ -48,7 +48,7 @@ find -type d -name "__pycache__" -exec rm -rf {} +
 
 find . -regextype posix-extended -regex ".*\.py($|\..*)" -type f -exec sed -i "3i\    Cleaned and hand-over to Camera@UoB, `date`" {} \;
 
-sed -i "/^The code in this repo.*/s//This code was written by Xiaokun when he was a postdoc at the CAMERA group of Uni Bath. - `date`/" README.md
+sed -i "/^The code in this repo.*/s!!This code was written by [Kelvin](https://xkunwu.github.io) when he was a postdoc at the CAMERA group of Uni Bath.\nThe code was last cleaned on `date`!" README.md
 
 cd /tmp
 tar -czf $HOME/Downloads/$1.tgz $1/

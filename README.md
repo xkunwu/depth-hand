@@ -13,7 +13,7 @@ This repo also includes following up work for real-time [tracking](#tracking).
 
 If you use code in this repo for your research, please cite the above mentioned paper.
 
-The code in this repo is written and maintained by [Xiaokun Wu](https://xkunwu.github.io/).
+The code in this repo is written and maintained by [Xiaokun Wu](https://xkunwu.github.io).
 
 ## Pose estimation
 <a name="pose-estimation"></a>

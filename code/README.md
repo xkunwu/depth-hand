@@ -108,6 +108,7 @@ Tested on Ubuntu (18.04/16.04), Python (3.6/2.7), NVIDIA GPU (9.0/8.0) or CPU.
 ```
 
 ## Resources
+<a name="resources"></a>
 Resources can be downloaded from: \[[Baidu Cloud Storage](https://pan.baidu.com/s/1XErtAR6WhMQ8p5Q1v9htFA)\].
 -   [Hands17 dataset](http://icvl.ee.ic.ac.uk/hands17/):
     I am not authorized to redistribute. Please contact the organizers for downloading the data.
