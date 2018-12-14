@@ -46,9 +46,11 @@ rm -f code/model/super_dist2.py
 
 find -type d -name "__pycache__" -exec rm -rf {} +
 
-find . -regextype posix-extended -regex ".*\.py($|\..*)" -type f -exec sed -i "3i\    Cleaned and hand-over to Camera@UoB, `date`" {} \;
+find . -regextype posix-extended -regex ".*\.py($|\..*)" -type f -exec sed -i "3i\    Cleaned by Kelvin for CAMERA@UoB, `date`" {} \;
 
 sed -i "/^The code in this repo.*/s!!This code was written by [Kelvin](https://xkunwu.github.io) when he was a postdoc at the CAMERA group of Uni Bath.\nThe code was last cleaned on `date`!" README.md
+
+sed -i "/^Resources can be downloaded from.*/s!!Resources can be found in '~/data'. Note: '/eds' is the mount point of secondary storage.!" code/README.md
 
 cd /tmp
 tar -czf $HOME/Downloads/$1.tgz $1/
