@@ -4,14 +4,14 @@
 
 <span style="display:block;text-align:center">![Test sequence.](/eval/test_seq.gif)</span>
 
-Note: this is a two-week quick patch following the [hand pose estimation project](https://github.com/xkunwu/depth-hand) located in the main repo.
+**Note**: this is a two-week quick patch following the [hand pose estimation project](https://github.com/xkunwu/depth-hand) located in the main repo.
 The purpose is to make live capture and hand tracking possible, but currently no plan to make the code waterproof (might be a future research project).
 
 ## Hardware prerequisite
 The code was tested using SR300 and D400 series (D415/D435).
 Please follow the [official instructions](https://github.com/IntelRealSense/librealsense/blob/master/doc/distribution_linux.md) to install necessary drivers.
 
-Note: the code was updated to use [Intel® RealSense™ SDK 2.0](https://github.com/IntelRealSense/librealsense), so the minimum supported camera model is SR300.
+**Note**: the code was updated to use [Intel® RealSense™ SDK 2.0](https://github.com/IntelRealSense/librealsense), so the minimum supported camera model is SR300.
 
 Also note: SR300 should work nicely after installing the drivers (hit 'realsense_viewer' to test if anything went wrong). But for D400 series, additional firmware update is necessary: go to the [official site](https://downloadcenter.intel.com/download/28377/Latest-Firmware-for-Intel-RealSense-D400-Product-Family?v=t) and following instructions there ('realsense_viewer' will also find any firmware issues and show you the latest update link).
 
@@ -19,7 +19,7 @@ Also note: SR300 should work nicely after installing the drivers (hit 'realsense
 Default is using the 'super_edt2m' model.
 Please check the main repo for [finding the full list of models](/README.md#print-model-list).
 
-Note: tracking code does not require the prepared data, only need to download your favorite pretrained model. See [README.md in the pose estimation part](/README.md#pretrained-models) for more details.
+**Note**: tracking code does not require the prepared data, only need to download your favorite pretrained model. See [README.md in the pose estimation part](/README.md#pretrained-models) for more details.
 
 ### Basic usage
 ```
@@ -32,6 +32,7 @@ python -m camera.capture \
 Key responses:
 -   q: quit the current window.
 -   b: save a single frame.
+-   [Navigation Keyboard Shortcuts](https://matplotlib.org/users/navigation_toolbar.html#navigation-keyboard-shortcuts) of matplotlib.
 
 ### Other options
 -   If you want to see more debug information:

@@ -52,5 +52,7 @@ sed -i "/^The code in this repo.*/s!!This code was written by [Kelvin](https://x
 
 sed -i "/^Resources can be downloaded from.*/s!!Resources can be found in '~/data'. Note: '/eds' is the mount point of secondary storage.!" code/README.md
 
+# All permissions are revoked after removing the file LICENSE.
+
 cd /tmp
 tar -czf $HOME/Downloads/$1.tgz $1/

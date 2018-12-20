@@ -109,7 +109,7 @@ Tested on Ubuntu (18.04/16.04), Python (3.6/2.7), NVIDIA GPU (9.0/8.0) or CPU.
 
 ## Resources
 <a name="resources"></a>
-Resources can be downloaded from: \[[Baidu Cloud Storage](https://pan.baidu.com/s/1XErtAR6WhMQ8p5Q1v9htFA)\], \[[Google Drive](https://drive.google.com/open?id=16zZDVJKnQ8QYX94ecRoGl9LVHMPvF5zD)\].
+Resources can be downloaded from: \[[Baidu Cloud Storage](https://pan.baidu.com/s/1aPda9jG83d9nrAoPr-0MGw)\], \[[Google Drive](https://drive.google.com/open?id=16zZDVJKnQ8QYX94ecRoGl9LVHMPvF5zD)\].
 
 -   [Hands17 dataset](http://icvl.ee.ic.ac.uk/hands17/):
     I am not authorized to redistribute. Please contact the organizers for downloading the data.
@@ -133,7 +133,7 @@ Resources can be downloaded from: \[[Baidu Cloud Storage](https://pan.baidu.com/
     %out_root%/output/hands17/predict/
     ```
 
-**Note**: Only pretrained models (i.e. 'log') is shared in the 'Google Drive' link, due to my online storage limited. These pretrained models are the only prerequisite of [Hand tracking part](/code/camera/README.md), so you can still run the demo.
+**Note**: Only pretrained models (i.e. 'log') is shared in the 'Google Drive' link, due to my limited online storage. These pretrained models are the only prerequisite of [Hand tracking part](/code/camera/README.md), so you can still run the demo.
 
 #### File structure
 Please make sure that the downloaded files are organized in the following structure, otherwise the code will automatically redo data preprocessing and training (will take quite a while).
