@@ -207,6 +207,14 @@ So the data types are modularized and abstracted into a hierarchical structure -
     Note: the output in the 'prepared' fold also have a number appended to these base names, which means the resolution of the data type (configurable for each model class).
     For example, 'clean_128' means the image should be 128x128 in dimensions.
 
+#### Date structure
+Each data type is sequentially stored in compressed [HDF5 format](https://www.hdfgroup.org/solutions/hdf5/).
+E.g., pose are stored like [this](https://github.com/xkunwu/depth-hand/blob/656309b5d0cd907a4482f50880140c8a23dedacc/code/data/hands17/holder.py#L231).
+Note that the data processing part is multi-threaded, so there are a few seemingly convolved code.
+
+Image frames is preprocessed by each model class as required.
+E.g., the base model 'base_regre' just crop a sub-region, which looks like [this](https://github.com/xkunwu/depth-hand/blob/656309b5d0cd907a4482f50880140c8a23dedacc/code/model/base_regre.py#L366).
+
 ## FAQ
 ##### Q: Only a few prepared data shared online?
 A: The prepared data is huge, but my internet bandwidth is limited, my online storage limit is low.
