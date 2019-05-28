@@ -353,7 +353,7 @@ class hands17holder:
         # self.training_images = os.path.join(self.data_dir, 'training/images')
         # self.test_images = os.path.join(self.data_dir, 'training/images')
         self.training_annot_origin = os.path.join(
-            self.data_dir, 'training/Training_Annotation.txt')
+            self.data_dir, 'training', 'Training_Annotation.txt')
         # self.annotation_cleaned = os.path.join(
         #     self.out_dir, 'annotation')
         self.annotation = 'annotation'

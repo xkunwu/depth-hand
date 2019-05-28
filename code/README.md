@@ -5,7 +5,7 @@
 Please check the [paper webpage](https://xkunwu.github.io/research/18HandPose/18HandPose/) for more details about the pipeline and algorithms.
 
 ## Prerequisites
-Tested on Ubuntu (18.04/16.04), Python (3.6/2.7), NVIDIA GPU (9.0/8.0) or CPU.
+Tested on Ubuntu (18.04/16.04) or Windows 10, Python (3.6/2.7), NVIDIA GPU (9.0/8.0) or CPU.
 -   Install requirements (presuming [Miniconda](https://conda.io/miniconda.html)):
     ```
     export PYTHON_VERSION=3.6
@@ -243,3 +243,9 @@ ssh ${1:-sipadan} -L localhost:${2:-1}6006:localhost:6006 -L localhost:${2:-1}88
 cat /proc/meminfo
 hwinfo --short
 ```
+
+#### Windows
+    ```
+    python -m train.evaluate --data_root=C:\Users\xkunw\data --out_root=C:\Users\xkunw\data\univue\output --model_name=super_edt2m
+    python -m camera.capture --data_root=C:\Users\xkunw\data --out_root=C:\Users\xkunw\data\univue\output --model_name=super_edt2m
+    ```
