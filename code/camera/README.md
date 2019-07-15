@@ -17,9 +17,9 @@ Also note: SR300 should work nicely after installing the drivers (hit 'realsense
 
 ## Usage
 Default is using the 'super_edt2m' model.
-Please check the main repo for [finding the full list of models](/README.md#print-model-list).
+Please check the main repo for [finding the full list of models](/code/README.md#print-model-list).
 
-**Note**: tracking code does not require the prepared data, only need to download your favorite pretrained model. See [README.md in the pose estimation part](/README.md#pretrained-models) for more details.
+**Note**: tracking code does not require the prepared data, only need to download your favorite pretrained model. See [README.md in the pose estimation part](/code/README.md#pretrained-models) for more details.
 
 ### Basic usage
 ```

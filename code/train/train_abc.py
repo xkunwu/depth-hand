@@ -99,7 +99,7 @@ class train_abc():
 
     def _pre_train(self):
         self.args.model_inst.check_dir(self.args.data_inst, self.args)
-        self.args.model_inst.draw_random(self.args.data_inst, self.args)
+        # self.args.model_inst.draw_random(self.args.data_inst, self.args)
 
     def train(self):
         self.logger.info('######## Training ########')
